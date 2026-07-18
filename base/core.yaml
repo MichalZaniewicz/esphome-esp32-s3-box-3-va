@@ -1,0 +1,1209 @@
+###############################################################################
+# ESP32-S3-BOX-3 - Home Assistant voice assistant (core)
+#
+# Always-on core: ES8311 DAC + speaker, ES7210 dual-mic ADC, on-device wake word
+# (micro_wake_word), the full HA Assist pipeline, voice timers, and an LVGL UI on
+# the 320x240 panel driven by the GT911 capacitive touchscreen.
+#
+# WHY LVGL AND NOT THE UPSTREAM CASITA CONFIG
+# esphome/wake-word-voice-assistants paints the S3-Box-3 with `display:` +
+# `pages:` + full-screen PNGs, and never touches the touch panel. LVGL and
+# `display: pages:` are mutually exclusive, so this core replaces that layer
+# rather than extending it: same phases, same illustrations, but as LVGL pages
+# with a real touchscreen underneath to build on.
+#
+# WHY TTS IS NOT WIRED INTO voice_assistant
+# `voice_assistant:` deliberately has NO `media_player:`. With one set, ESPHome
+# itself streams and decodes the TTS URL on the device at TTS_END
+# (voice_assistant.cpp: `media_player_->make_call().set_media_url(url)`), on top
+# of whatever you do in `on_tts_end`. On long replies that local download+decode
+# is what rebooted the box while the external speaker happily played on. Without
+# it, HA still runs TTS and still delivers the URL to `on_tts_end` (the pipeline
+# flags do not depend on the media player), so routing is ours to decide - see
+# the `tts_output` select. Timer sounds and HA announcements keep working: they
+# go through the `speaker_media_player` component directly.
+#
+# Pinout and hardware notes: docs/HARDWARE.md.
+###############################################################################
+
+substitutions:
+  name: esp32-s3-box-3-va
+  friendly_name: "S3 Box 3 Voice"
+
+  # ---------------------------------------------------------------------------
+  # Voice assistant phases - drive which LVGL page is shown (see draw_display)
+  # ---------------------------------------------------------------------------
+  voice_assist_idle_phase_id: '1'            # ready, waiting for a wake word
+  voice_assist_listening_phase_id: '2'       # woken, recording the command
+  voice_assist_thinking_phase_id: '3'        # STT / LLM running
+  voice_assist_replying_phase_id: '4'        # TTS playing
+  voice_assist_not_ready_phase_id: '10'      # no HA connection
+  voice_assist_error_phase_id: '11'          # pipeline error
+  voice_assist_muted_phase_id: '12'          # microphone muted
+  voice_assist_timer_finished_phase_id: '20' # a timer is ringing
+
+  # ---------------------------------------------------------------------------
+  # Pins - ESP32-S3-BOX-3 (docs/HARDWARE.md). Do not change unless you are
+  # porting to another board. GPIO0/3/45/46 are strapping pins, hence the
+  # ignore_strapping_warning flags below.
+  # ---------------------------------------------------------------------------
+  i2c_sda: GPIO8            # shared: ES7210 + ES8311 + GT911
+  i2c_scl: GPIO18
+  lcd_clk: GPIO7
+  lcd_mosi: GPIO6
+  lcd_cs: GPIO5
+  lcd_dc: GPIO4
+  lcd_reset: GPIO48         # active low; also resets the GT911 (shared net)
+  lcd_backlight: GPIO47
+  touch_int: GPIO3
+  i2s_mclk: GPIO2
+  i2s_bclk: GPIO17
+  i2s_lrclk: GPIO45
+  i2s_dout: GPIO15          # ESP -> ES8311 (speaker out)
+  i2s_din: GPIO16           # ES7210 -> ESP (mic in)
+  amp_enable: GPIO46        # speaker power amplifier, active high
+  top_button: GPIO0         # the button on the top face
+
+  # ---------------------------------------------------------------------------
+  # Home Assistant / network
+  # ---------------------------------------------------------------------------
+  hidden_ssid: 'false'      # true = fast_connect, required for a hidden SSID
+
+  # Media player volume clamps for the onboard speaker.
+  volume_min: '0.5'
+  volume_max: '0.8'
+
+  # Clock timezone in POSIX form - the device has no IANA database. It is only a
+  # fallback: HA's time platform syncs the clock at runtime. Grab yours from
+  # https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+  posix_timezone: "UTC0"
+
+  # ---------------------------------------------------------------------------
+  # TTS routing (see the header). `tts_output_default` picks the boot default of
+  # the "TTS output" select; the user can change it live in HA.
+  #   "This device"     - the box speaks (upstream behaviour)
+  #   "External player" - only ${external_media_player_id} speaks
+  #   "Both"            - both, at the cost of the local decode
+  # ---------------------------------------------------------------------------
+  external_media_player_id: media_player.living_room
+  tts_output_default: "This device"
+
+  # ---------------------------------------------------------------------------
+  # Phase illustrations. 320x240 PNGs, fetched at compile time and baked into
+  # flash, so any URL or local path works. Override them in your thin config to
+  # reskin the assistant without touching this file.
+  # ---------------------------------------------------------------------------
+  loading_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
+  idle_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/idle_320_240.png
+  listening_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
+  thinking_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/thinking_320_240.png
+  replying_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/replying_320_240.png
+  error_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/error_320_240.png
+  timer_finished_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/timer_finished_320_240.png
+
+  # Page background behind each illustration (they have alpha).
+  idle_background_color: '000000'
+  listening_background_color: 'FFFFFF'
+  thinking_background_color: 'FFFFFF'
+  replying_background_color: 'FFFFFF'
+  loading_background_color: '000000'
+  error_background_color: '000000'
+
+  # ---------------------------------------------------------------------------
+  # Fonts. `font_glyphsets` covers a language family wholesale; `extra_glyphs`
+  # is for the handful of characters your language needs on top of it (Polish,
+  # Czech, ... ). Every character the assistant may print must be in one or the
+  # other, or it renders blank.
+  # ---------------------------------------------------------------------------
+  font_family: Figtree
+  font_glyphsets: "GF_Latin_Core"
+  extra_glyphs: "°²³ęóąśłżźćńĘĄÓŻĆŹŃŚŁ"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.4.0
+  name_add_mac_suffix: false
+  on_boot:
+    priority: 600
+    then:
+      - script.execute: draw_display
+      # If HA never shows up, stop pretending we are still booting.
+      - delay: 30s
+      - if:
+          condition:
+            lambda: return id(init_in_progress);
+          then:
+            - lambda: id(init_in_progress) = false;
+            - script.execute: draw_display
+
+esp32:
+  board: esp32s3box
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+
+# The mipi_spi S3BOX model hard-requires PSRAM, and LVGL's draw buffer lives
+# here too.
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+api:
+  on_client_connected:
+    - script.execute: draw_display
+  on_client_disconnected:
+    - script.execute: draw_display
+
+ota:
+  - platform: esphome
+    id: ota_esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: ${hidden_ssid}
+  ap:
+  on_connect:
+    - script.execute: draw_display
+  on_disconnect:
+    - script.execute: draw_display
+
+captive_portal:
+
+# HA owns the clock; the POSIX string is only the pre-sync fallback. Having a
+# real clock on the device is groundwork for anything time-based on the screen.
+time:
+  - platform: homeassistant
+    id: ha_time
+    timezone: ${posix_timezone}
+
+###############################################################################
+# DISPLAY + TOUCH
+#
+# The GT911 shares the I2C bus with the two audio codecs, and shares its reset
+# net with the LCD (GPIO48). esp-bsp drives no separate touch reset, so neither
+# do we: declaring GPIO48 on both components would have them pulse reset against
+# each other. Instead the touchscreen inits late (setup_priority) so the
+# display's own reset pulse has already brought the GT911 up.
+###############################################################################
+
+i2c:
+  - id: i2c_bus
+    scl: ${i2c_scl}
+    sda: ${i2c_sda}
+
+spi:
+  - id: spi_bus
+    clk_pin: ${lcd_clk}
+    mosi_pin: ${lcd_mosi}
+
+display:
+  - platform: mipi_spi
+    id: s3_box_lcd
+    model: S3BOX          # bakes in 320x240, mirror_x/y and BGR - do not re-add
+    data_rate: 40MHz
+    cs_pin: ${lcd_cs}
+    dc_pin: ${lcd_dc}
+    reset_pin:
+      number: ${lcd_reset}
+      inverted: true
+    invert_colors: false
+    # Both are mandatory under LVGL: LVGL owns the framebuffer and the redraws.
+    update_interval: never
+    auto_clear_enabled: false
+
+touchscreen:
+  - platform: gt911
+    id: box_touch
+    i2c_id: i2c_bus
+    setup_priority: -200
+    interrupt_pin:
+      number: ${touch_int}
+      ignore_strapping_warning: true
+
+output:
+  - platform: ledc
+    pin: ${lcd_backlight}
+    id: backlight_output
+
+light:
+  - platform: monochromatic
+    id: backlight
+    name: Screen
+    icon: "mdi:television"
+    entity_category: config
+    output: backlight_output
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 250ms
+
+###############################################################################
+# AUDIO
+#
+# One I2S bus, the ES7210 capturing at 16 kHz for the wake word and the ES8311
+# playing back at 48 kHz. Unlike boards that share clock pins between separate
+# ADC/DAC buses, the S3-Box-3 wires both codecs to a single bus, so this is the
+# plain stock layout with no master/slave trickery.
+###############################################################################
+
+audio_adc:
+  - platform: es7210
+    i2c_id: i2c_bus
+    id: es7210_adc
+    bits_per_sample: 16bit
+    sample_rate: 16000
+
+audio_dac:
+  - platform: es8311
+    i2c_id: i2c_bus
+    id: es8311_dac
+    bits_per_sample: 16bit
+    sample_rate: 48000
+
+i2s_audio:
+  - id: i2s_audio_bus
+    i2s_lrclk_pin:
+      number: ${i2s_lrclk}
+      ignore_strapping_warning: true
+    i2s_bclk_pin: ${i2s_bclk}
+    i2s_mclk_pin: ${i2s_mclk}
+
+microphone:
+  - platform: i2s_audio
+    id: box_mic
+    i2s_din_pin: ${i2s_din}
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    adc_type: external
+
+speaker:
+  - platform: i2s_audio
+    id: box_speaker
+    i2s_dout_pin: ${i2s_dout}
+    dac_type: external
+    audio_dac: es8311_dac
+    sample_rate: 48000
+    bits_per_sample: 16bit
+    channel: left          # the box has a single output channel
+    buffer_duration: 100ms
+
+media_player:
+  - platform: speaker
+    id: speaker_media_player
+    name: None
+    volume_min: ${volume_min}
+    volume_max: ${volume_max}
+    announcement_pipeline:
+      speaker: box_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+    files:
+      - id: timer_finished_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+    on_announcement:
+      # The mic cannot capture while the speaker holds the bus, so drop the wake
+      # word for the duration of any announcement.
+      - if:
+          condition:
+            - microphone.is_capturing:
+          then:
+            - script.execute: stop_wake_word
+            - if:
+                condition:
+                  - lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
+                then:
+                  - wait_until:
+                      - not:
+                          voice_assistant.is_running:
+      # No pipeline running means this is user- or HA-initiated playback, not a
+      # reply: show the muted (blank) page while it plays.
+      - if:
+          condition:
+            not:
+              voice_assistant.is_running:
+          then:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+            - script.execute: draw_display
+    on_idle:
+      - if:
+          condition:
+            not:
+              voice_assistant.is_running:
+          then:
+            - script.execute: start_wake_word
+            - script.execute: set_idle_or_mute_phase
+            - script.execute: draw_display
+
+###############################################################################
+# VOICE ASSISTANT
+###############################################################################
+
+micro_wake_word:
+  id: mww
+  vad:
+  models:
+    - model: alexa
+    - model: okay_nabu
+  on_wake_word_detected:
+    - voice_assistant.start:
+        wake_word: !lambda return wake_word;
+
+voice_assistant:
+  id: va
+  microphone: box_mic
+  micro_wake_word: mww
+  # No `media_player:` on purpose - see the header. TTS routing is handled in
+  # on_tts_end so a long reply never forces a local download+decode.
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  on_listening:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_listening_phase_id};
+    - text_sensor.template.publish:
+        id: text_request
+        state: "..."
+    - text_sensor.template.publish:
+        id: text_response
+        state: "..."
+    - script.execute: draw_display
+  on_stt_vad_end:
+    - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
+    - script.execute: draw_display
+  on_stt_end:
+    - text_sensor.template.publish:
+        id: text_request
+        state: !lambda return x;
+    - script.execute: draw_display
+  on_tts_start:
+    - text_sensor.template.publish:
+        id: text_response
+        state: !lambda return x;
+    - lambda: id(voice_assistant_phase) = ${voice_assist_replying_phase_id};
+    - script.execute: draw_display
+  # `x` is the TTS media URL. This trigger also fires for HA's "announce" API
+  # when no media player is attached, so announcements follow the same routing.
+  on_tts_end:
+    - if:
+        condition:
+          lambda: return id(tts_output).current_option() != "This device";
+        then:
+          - homeassistant.service:
+              service: media_player.play_media
+              data:
+                entity_id: ${external_media_player_id}
+                media_content_id: !lambda 'return x;'
+                media_content_type: music
+                announce: "true"
+    - if:
+        condition:
+          lambda: return id(tts_output).current_option() != "External player";
+        then:
+          - media_player.play_media:
+              id: speaker_media_player
+              media_url: !lambda 'return x;'
+              announcement: true
+  on_end:
+    # Give a local announcement a moment to start, then let it finish before
+    # taking the I2S bus back for the wake word.
+    - wait_until:
+        condition:
+          - media_player.is_announcing:
+        timeout: 0.5s
+    - wait_until:
+        - and:
+            - not:
+                media_player.is_announcing:
+            - not:
+                speaker.is_playing:
+    - if:
+        condition:
+          - lambda: return id(wake_word_engine_location).current_option() == "On device";
+        then:
+          - lambda: id(va).set_use_wake_word(false);
+          - micro_wake_word.start:
+    - script.execute: set_idle_or_mute_phase
+    - script.execute: draw_display
+    - text_sensor.template.publish:
+        id: text_request
+        state: ""
+    - text_sensor.template.publish:
+        id: text_response
+        state: ""
+  on_error:
+    - if:
+        condition:
+          lambda: return !id(init_in_progress);
+        then:
+          - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
+          - script.execute: draw_display
+          - delay: 1s
+          - script.execute: set_idle_or_mute_phase
+          - script.execute: draw_display
+  on_client_connected:
+    - lambda: id(init_in_progress) = false;
+    - script.execute: start_wake_word
+    - script.execute: set_idle_or_mute_phase
+    - script.execute: draw_display
+  on_client_disconnected:
+    - script.execute: stop_wake_word
+    - lambda: id(voice_assistant_phase) = ${voice_assist_not_ready_phase_id};
+    - script.execute: draw_display
+  on_timer_started:
+    - script.execute: draw_display
+  on_timer_cancelled:
+    - script.execute: draw_display
+  on_timer_updated:
+    - script.execute: draw_display
+  on_timer_tick:
+    - script.execute: draw_display
+  on_timer_finished:
+    - switch.turn_on: timer_ringing
+    - lambda: id(voice_assistant_phase) = ${voice_assist_timer_finished_phase_id};
+    - script.execute: draw_display
+
+###############################################################################
+# STATE
+###############################################################################
+
+globals:
+  - id: init_in_progress
+    type: bool
+    restore_value: false
+    initial_value: "true"
+  - id: voice_assistant_phase
+    type: int
+    restore_value: false
+    initial_value: ${voice_assist_not_ready_phase_id}
+  - id: first_timer
+    type: voice_assistant::Timer
+    restore_value: false
+  - id: has_timer
+    type: bool
+    restore_value: false
+  - id: has_active_timer
+    type: bool
+    restore_value: false
+  - id: timer_percent
+    type: int
+    restore_value: false
+    initial_value: "0"
+
+script:
+  # Single entry point for "put the right thing on screen". Every state change
+  # calls this rather than switching pages itself, so there is one place where
+  # the precedence (booting > no wifi > no HA > phase) is decided.
+  - id: draw_display
+    then:
+      - script.execute: refresh_timer_widgets
+      - script.execute: sync_text
+      - if:
+          condition:
+            lambda: return id(init_in_progress);
+          then:
+            - lvgl.page.show: page_boot
+          else:
+            - if:
+                condition:
+                  not:
+                    wifi.connected:
+                then:
+                  - lvgl.page.show: page_no_wifi
+                else:
+                  - if:
+                      condition:
+                        not:
+                          api.connected:
+                      then:
+                        - lvgl.page.show: page_no_ha
+                      else:
+                        - script.execute: show_phase_page
+
+  # Phase -> page. Flat ifs rather than a lambda `switch`, because page changes
+  # must go through the LVGL component's own action: it tracks which page is
+  # current, and lv_scr_load() behind its back desyncs that bookkeeping.
+  - id: show_phase_page
+    then:
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
+          then:
+            - lvgl.page.show: page_listening
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_thinking_phase_id};
+          then:
+            - lvgl.page.show: page_thinking
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_replying_phase_id};
+          then:
+            - lvgl.page.show: page_replying
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
+          then:
+            - lvgl.page.show: page_error
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id};
+          then:
+            - lvgl.page.show: page_muted
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_not_ready_phase_id};
+          then:
+            - lvgl.page.show: page_no_ha
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_timer_finished_phase_id};
+          then:
+            - lvgl.page.show: page_timer_finished
+      # Anything else (including the idle phase) lands on idle.
+      - if:
+          condition:
+            lambda: |-
+              const int p = id(voice_assistant_phase);
+              return p != ${voice_assist_listening_phase_id}
+                  && p != ${voice_assist_thinking_phase_id}
+                  && p != ${voice_assist_replying_phase_id}
+                  && p != ${voice_assist_error_phase_id}
+                  && p != ${voice_assist_muted_phase_id}
+                  && p != ${voice_assist_not_ready_phase_id}
+                  && p != ${voice_assist_timer_finished_phase_id};
+          then:
+            - lvgl.page.show: page_idle
+
+  # Push what was said / what was answered onto the labels. The text sensors are
+  # the source of truth; LVGL labels do not follow them on their own.
+  - id: sync_text
+    then:
+      - lvgl.label.update:
+          id: request_label
+          text: !lambda return id(text_request).state;
+      - lvgl.label.update:
+          id: request_label_reply
+          text: !lambda return id(text_request).state;
+      - lvgl.label.update:
+          id: response_label
+          text: !lambda return id(text_response).state;
+
+  # Walks the timer list once and caches what the UI needs: is there a timer at
+  # all, is one actually counting, which one finishes first, and how far along
+  # it is. `get_timers()` hands back a std::vector<Timer>.
+  - id: scan_timers
+    then:
+      - lambda: |-
+          const auto &timers = id(va).get_timers();
+          id(has_timer) = !timers.empty();
+          id(has_active_timer) = false;
+          id(timer_percent) = 0;
+          if (timers.empty()) {
+            return;
+          }
+          bool picked = false;
+          voice_assistant::Timer best{};
+          // Prefer the soonest running timer; fall back to the soonest paused one.
+          for (const auto &timer : timers) {
+            if (!timer.is_active) {
+              continue;
+            }
+            id(has_active_timer) = true;
+            if (!picked || timer.seconds_left < best.seconds_left) {
+              best = timer;
+              picked = true;
+            }
+          }
+          if (!picked) {
+            for (const auto &timer : timers) {
+              if (!picked || timer.seconds_left < best.seconds_left) {
+                best = timer;
+                picked = true;
+              }
+            }
+          }
+          id(first_timer) = best;
+          const uint32_t total = std::max(best.total_seconds, static_cast<uint32_t>(1));
+          id(timer_percent) = static_cast<int>(lroundf(100.0f * best.seconds_left / total));
+
+  # Paints the timer strip and countdown that live on LVGL's top layer, above
+  # whichever page is showing. Two bars rather than one recoloured bar: a running
+  # timer is green, a paused one blue, and swapping which is visible needs no
+  # style updates at runtime.
+  - id: refresh_timer_widgets
+    then:
+      - script.execute: scan_timers
+      - if:
+          condition:
+            lambda: return id(has_timer);
+          then:
+            - lvgl.label.update:
+                id: timer_label
+                text: !lambda |-
+                  const uint32_t left = id(first_timer).seconds_left;
+                  const uint32_t hours = left / 3600;
+                  const uint32_t minutes = (left % 3600) / 60;
+                  const uint32_t seconds = left % 60;
+                  char buf[16];
+                  if (hours > 0) {
+                    snprintf(buf, sizeof(buf), "%02u:%02u", hours, minutes);
+                  } else {
+                    snprintf(buf, sizeof(buf), "%02u:%02u", minutes, seconds);
+                  }
+                  return std::string(buf);
+            - lvgl.widget.show: timer_label
+            - if:
+                condition:
+                  lambda: return id(has_active_timer);
+                then:
+                  - lvgl.bar.update:
+                      id: timer_bar_active
+                      value: !lambda return id(timer_percent);
+                  - lvgl.widget.show: timer_bar_active
+                  - lvgl.widget.hide: timer_bar_paused
+                else:
+                  - lvgl.bar.update:
+                      id: timer_bar_paused
+                      value: !lambda return id(timer_percent);
+                  - lvgl.widget.show: timer_bar_paused
+                  - lvgl.widget.hide: timer_bar_active
+          else:
+            - lvgl.widget.hide: timer_label
+            - lvgl.widget.hide: timer_bar_active
+            - lvgl.widget.hide: timer_bar_paused
+
+  # Starts whichever wake word engine is selected. mWW runs on the device;
+  # "In Home Assistant" streams audio continuously instead.
+  - id: start_wake_word
+    then:
+      - if:
+          condition:
+            and:
+              - not:
+                  - voice_assistant.is_running:
+              - lambda: return id(wake_word_engine_location).current_option() == "On device";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - micro_wake_word.start:
+      - if:
+          condition:
+            and:
+              - not:
+                  - voice_assistant.is_running:
+              - lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(true);
+            - voice_assistant.start_continuous:
+
+  - id: stop_wake_word
+    then:
+      - if:
+          condition:
+            lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
+          then:
+            - lambda: id(va).set_use_wake_word(false);
+            - voice_assistant.stop:
+      - if:
+          condition:
+            lambda: return id(wake_word_engine_location).current_option() == "On device";
+          then:
+            - micro_wake_word.stop:
+
+  - id: set_idle_or_mute_phase
+    then:
+      - if:
+          condition:
+            switch.is_off: mute
+          then:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+          else:
+            - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+
+  # Tap-to-talk: same entry point as a wake word, minus the wake word. Ignored
+  # while muted or while a pipeline is already running.
+  - id: tap_to_talk
+    then:
+      - if:
+          condition:
+            and:
+              - api.connected:
+              - switch.is_off: mute
+              - not:
+                  voice_assistant.is_running:
+          then:
+            - script.execute: stop_wake_word
+            - delay: 100ms
+            - voice_assistant.start:
+
+###############################################################################
+# ENTITIES
+###############################################################################
+
+binary_sensor:
+  - platform: gpio
+    id: top_button_sensor
+    internal: true
+    pin:
+      number: ${top_button}
+      mode: INPUT_PULLUP
+      inverted: true
+      ignore_strapping_warning: true
+    on_multi_click:
+      # Short press: silence a ringing timer.
+      - timing:
+          - ON for at least 50ms
+          - OFF for at least 50ms
+        then:
+          - switch.turn_off: timer_ringing
+      # Held for 10 s: factory reset.
+      - timing:
+          - ON for at least 10s
+        then:
+          - button.press: factory_reset_btn
+
+  # The red circle silkscreened below the screen is not a GPIO - it is touch
+  # button 0 on the GT911.
+  - platform: gt911
+    id: home_button
+    internal: true
+    index: 0
+    on_press:
+      - switch.turn_off: timer_ringing
+      - script.execute: tap_to_talk
+
+button:
+  - platform: factory_reset
+    id: factory_reset_btn
+    internal: true
+
+switch:
+  - platform: gpio
+    id: speaker_enable
+    name: Speaker enable
+    pin:
+      number: ${amp_enable}
+      ignore_strapping_warning: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    disabled_by_default: true
+
+  - platform: template
+    id: mute
+    name: Mute
+    icon: "mdi:microphone-off"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: config
+    on_turn_on:
+      - microphone.mute:
+      - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+      - script.execute: draw_display
+    on_turn_off:
+      - microphone.unmute:
+      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+      - script.execute: draw_display
+
+  # Exposed (not `internal:`) so an HA automation can silence a timer that is
+  # ringing in an empty kitchen.
+  - platform: template
+    id: timer_ringing
+    name: Timer ringing
+    icon: "mdi:timer-alert"
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      # Repeat the alarm with a 1 s gap until something turns this off.
+      - lambda: |-
+          id(speaker_media_player)
+            ->make_call()
+            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
+            .set_announcement(true)
+            .perform();
+          id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 1000);
+      - media_player.speaker.play_on_device_media_file:
+          media_file: timer_finished_sound
+          announcement: true
+      - delay: 15min
+      - switch.turn_off: timer_ringing
+    on_turn_off:
+      - lambda: |-
+          id(speaker_media_player)
+            ->make_call()
+            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_OFF)
+            .set_announcement(true)
+            .perform();
+          id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 0);
+      - media_player.stop:
+          announcement: true
+      - script.execute: set_idle_or_mute_phase
+      - script.execute: draw_display
+
+select:
+  - platform: template
+    id: wake_word_engine_location
+    name: Wake word engine location
+    icon: "mdi:account-voice"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - In Home Assistant
+      - On device
+    initial_option: On device
+    on_value:
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            # Never switch engines mid-pipeline.
+            - wait_until:
+                lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id} || id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+            - if:
+                condition:
+                  lambda: return x == "In Home Assistant";
+                then:
+                  - micro_wake_word.stop:
+                  - delay: 500ms
+                  - if:
+                      condition:
+                        switch.is_off: mute
+                      then:
+                        - lambda: id(va).set_use_wake_word(true);
+                        - voice_assistant.start_continuous:
+            - if:
+                condition:
+                  lambda: return x == "On device";
+                then:
+                  - lambda: id(va).set_use_wake_word(false);
+                  - voice_assistant.stop:
+                  - delay: 500ms
+                  - if:
+                      condition:
+                        switch.is_off: mute
+                      then:
+                        - micro_wake_word.start:
+
+  # Where the assistant's replies come out. "External player" keeps the box from
+  # downloading and decoding the TTS at all, which is what long replies choke on.
+  - platform: template
+    id: tts_output
+    name: TTS output
+    icon: "mdi:speaker-message"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - This device
+      - External player
+      - Both
+    initial_option: ${tts_output_default}
+
+text_sensor:
+  - platform: template
+    id: text_request
+    internal: true
+  - platform: template
+    id: text_response
+    internal: true
+
+sensor:
+  - platform: wifi_signal
+    name: Wi-Fi signal
+    entity_category: diagnostic
+    update_interval: 60s
+    disabled_by_default: true
+
+###############################################################################
+# ASSETS
+###############################################################################
+
+image:
+  # RGB565 matches LVGL's 16-bit colour depth, so nothing is converted at draw
+  # time and each illustration costs ~150 KB of flash instead of ~230 KB.
+  - id: art_loading
+    file: ${loading_illustration_file}
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+  - id: art_idle
+    file: ${idle_illustration_file}
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+  - id: art_listening
+    file: ${listening_illustration_file}
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+  - id: art_thinking
+    file: ${thinking_illustration_file}
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+  - id: art_replying
+    file: ${replying_illustration_file}
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+  - id: art_error
+    file: ${error_illustration_file}
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+  - id: art_timer_finished
+    file: ${timer_finished_illustration_file}
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+  - id: art_no_wifi
+    file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-wifi.png
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+  - id: art_no_ha
+    file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-ha.png
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+
+font:
+  - id: font_body
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 400
+    size: 16
+    glyphsets:
+      - ${font_glyphsets}
+    extras:
+      - file:
+          type: gfonts
+          family: ${font_family}
+          weight: 400
+        glyphs: ${extra_glyphs}
+  - id: font_request
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 300
+      italic: true
+    size: 16
+    glyphsets:
+      - ${font_glyphsets}
+    extras:
+      - file:
+          type: gfonts
+          family: ${font_family}
+          weight: 300
+          italic: true
+        glyphs: ${extra_glyphs}
+  - id: font_timer
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 500
+    size: 26
+    glyphsets:
+      - ${font_glyphsets}
+
+###############################################################################
+# LVGL UI
+#
+# One page per assistant phase, mirroring the upstream look, plus a top layer
+# that carries the timer strip so it survives page changes. Every page is a
+# full-screen invisible button, so a tap anywhere is tap-to-talk - that is the
+# hook the touchscreen work builds on.
+###############################################################################
+
+lvgl:
+  id: lvgl_ui
+  displays:
+    - s3_box_lcd
+  touchscreens:
+    - touchscreen_id: box_touch
+      long_press_time: 400ms
+  buffer_size: 25%
+  default_font: font_body
+  bg_color: 0x000000
+
+  top_layer:
+    widgets:
+      - bar:
+          id: timer_bar_active
+          hidden: true
+          align: BOTTOM_MID
+          width: 320
+          height: 14
+          min_value: 0
+          max_value: 100
+          value: 0
+          bg_color: 0xFFFFFF
+          border_width: 0
+          pad_all: 1
+          indicator:
+            bg_color: 0x26ED3A
+      - bar:
+          id: timer_bar_paused
+          hidden: true
+          align: BOTTOM_MID
+          width: 320
+          height: 14
+          min_value: 0
+          max_value: 100
+          value: 0
+          bg_color: 0xFFFFFF
+          border_width: 0
+          pad_all: 1
+          indicator:
+            bg_color: 0x3B89E3
+      - label:
+          id: timer_label
+          hidden: true
+          align: TOP_RIGHT
+          x: -8
+          y: 8
+          text: "00:00"
+          text_font: font_timer
+          text_color: 0x000000
+          bg_color: 0xFFFFFF
+          bg_opa: COVER
+          radius: 6
+          pad_all: 6
+
+  pages:
+    - id: page_boot
+      bg_color: 0x${loading_background_color}
+      widgets:
+        - image:
+            src: art_loading
+            align: CENTER
+
+    - id: page_idle
+      bg_color: 0x${idle_background_color}
+      widgets:
+        - image:
+            src: art_idle
+            align: CENTER
+        - button:
+            id: idle_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - script.execute: tap_to_talk
+
+    - id: page_listening
+      bg_color: 0x${listening_background_color}
+      widgets:
+        - image:
+            src: art_listening
+            align: CENTER
+
+    - id: page_thinking
+      bg_color: 0x${thinking_background_color}
+      widgets:
+        - image:
+            src: art_thinking
+            align: CENTER
+        - label:
+            id: request_label
+            align: TOP_MID
+            y: 16
+            width: 280
+            text_font: font_request
+            text_color: 0x000000
+            bg_color: 0xFFFFFF
+            bg_opa: COVER
+            border_width: 1
+            border_color: 0x000000
+            radius: 4
+            pad_all: 6
+            long_mode: dot
+            text: ""
+
+    - id: page_replying
+      bg_color: 0x${replying_background_color}
+      widgets:
+        - image:
+            src: art_replying
+            align: CENTER
+        - label:
+            id: request_label_reply
+            align: TOP_MID
+            y: 16
+            width: 280
+            text_font: font_request
+            text_color: 0x000000
+            bg_color: 0xFFFFFF
+            bg_opa: COVER
+            border_width: 1
+            border_color: 0x000000
+            radius: 4
+            pad_all: 6
+            long_mode: dot
+            text: ""
+        - label:
+            id: response_label
+            align: BOTTOM_MID
+            y: -24
+            width: 280
+            text_font: font_body
+            text_color: 0x000000
+            bg_color: 0xFFFFFF
+            bg_opa: COVER
+            border_width: 1
+            border_color: 0x000000
+            radius: 4
+            pad_all: 6
+            long_mode: dot
+            text: ""
+
+    - id: page_timer_finished
+      bg_color: 0x${idle_background_color}
+      widgets:
+        - image:
+            src: art_timer_finished
+            align: CENTER
+        - button:
+            id: timer_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - switch.turn_off: timer_ringing
+
+    - id: page_error
+      bg_color: 0x${error_background_color}
+      widgets:
+        - image:
+            src: art_error
+            align: CENTER
+
+    - id: page_muted
+      bg_color: 0x000000
+
+    - id: page_no_wifi
+      bg_color: 0x000000
+      widgets:
+        - image:
+            src: art_no_wifi
+            align: CENTER
+
+    - id: page_no_ha
+      bg_color: 0x000000
+      widgets:
+        - image:
+            src: art_no_ha
+            align: CENTER

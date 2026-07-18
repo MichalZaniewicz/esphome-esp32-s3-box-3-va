@@ -1,0 +1,46 @@
+# =============================================================================
+# ESP32-S3-BOX-3 voice assistant — example thin config.
+#
+# Copy this next to your secrets.yaml, edit the substitutions, flash it. The
+# firmware core is pulled from GitHub at compile time, so this file is the only
+# one you keep. After the core changes, run `esphome clean` before rebuilding —
+# otherwise ESPHome reuses its cached copy of the package.
+#
+# Docs: README.md   Pinout: docs/HARDWARE.md
+# =============================================================================
+
+substitutions:
+  # Changing `name` re-creates every entity in Home Assistant.
+  name: esp32-s3-box-3-va
+  friendly_name: "S3 Box 3 Voice"
+
+  # POSIX form, not an IANA name — the device has no timezone database. Only a
+  # fallback until Home Assistant syncs the clock.
+  # https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+  posix_timezone: "CET-1CEST,M3.5.0,M10.5.0/3"
+
+  # Where replies come out. `tts_output_default` is the boot default of the
+  # "TTS output" select; you can change it live in Home Assistant.
+  #   This device / External player / Both        (see README.md)
+  external_media_player_id: media_player.living_room
+  tts_output_default: "This device"
+
+  # Accented characters your language needs on top of GF_Latin_Core. Anything
+  # missing here renders blank on screen.
+  # extra_glyphs: "°²³ęóąśłżźćńĘĄÓŻĆŹŃŚŁ"
+
+  # Swap the artwork without touching the core — any URL or local 320x240 PNG.
+  # idle_illustration_file: https://example.com/idle.png
+
+packages:
+  core:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/core.yaml
+    refresh: 0s
+
+# Optional: encrypt the native API. Add the key to secrets.yaml as well.
+# api:
+#   encryption:
+#     key: !secret api_encryption_key
