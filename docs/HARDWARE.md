@@ -49,6 +49,20 @@ driver from what answers. A config for the older boxes will not drive this one.
 The red circle silkscreened under the screen is **not a GPIO**. It is touch
 button 0 on the GT911, read with `binary_sensor: platform: gt911, index: 0`.
 
+## I2C map
+
+Confirmed by a bus scan on a real BOX-3 (ESPHome 2026.7.0):
+
+| Address | Device | Used here |
+|---|---|---|
+| 0x18 | ES8311 audio codec (DAC) | yes |
+| 0x40 | ES7210 audio ADC | yes |
+| 0x5D | GT911 touchscreen | yes |
+| 0x68 | IMU | no |
+
+The GT911 answering on 0x5D rather than its 0x14 fallback means the reset strap
+resolved as expected without the touchscreen declaring a `reset_pin` — see below.
+
 ## Gotchas
 
 **LVGL replaces `display: pages:`, it does not extend it.** The display block
