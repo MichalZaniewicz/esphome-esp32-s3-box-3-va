@@ -10,10 +10,10 @@ config can point a phase at it without knowing which one is in use.
 
 ![The seven characters across five phases](../assets/characters.png)
 
-Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif)
+Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [iris](../assets/demo/demo-iris.gif) · [rain](../assets/demo/demo-rain.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif)
 
-The preview image above shows only the characters that use artwork; `aura`, `bit`
-and `pixel` draw themselves and are in the clips.
+The preview image above shows only the characters that use artwork; `aura`, `bit`, `pixel`,
+`iris` and `rain` draw themselves and are in the clips.
 
 | Character | Look | Face style |
 |---|---|---|
@@ -25,6 +25,8 @@ and `pixel` draw themselves and are in the clips.
 | **Genie** | Small head, big moustache | The most compact face of the set; the mouth is a hint under the moustache. |
 | **Aura** | No artwork at all | Nine bars on a line: flat at rest, an equaliser while speaking. No eyes and no mouth, so it skips the engine entirely and draws itself. |
 | **Bit** | No artwork at all | Two eyes with pupils and a small mouth on black. Draws itself. Started out as eyes only; the mouth was added because eyes alone cannot show speech, which left `replying` and `listening` looking identical. |
+| **Iris** | No artwork at all | One eye filling the screen. Draws itself. Everything it does is a size change on the iris and pupil plus a height change on two eyelid rectangles, which is why it is the cheapest full-screen character here. |
+| **Rain** | No artwork at all | Falling glyphs, drawing itself. Nothing moves: each column is a still label whose text is rewritten every tick. The brightness gradient down a trail needs LVGL's `recolor` markup, since one label otherwise carries one colour. |
 | **Pixel** | No artwork at all | A 12x8 LED matrix, drawing itself. Dots carry brightness rather than just on and off, and a pupil is an unlit dot inside a lit 3x3 eye, because at that density a separate pupil would not fit. |
 | **Flare** | Burning blob, flames on top | Dark features cut into a bright body, with the pupil lit in the body's own yellow. The only inverted face here, and a useful demonstration that `face_color` need not be the bright one. |
 
@@ -60,7 +62,10 @@ before descending into its nested packages, and earlier-collected values win, so
 the character's geometry beats the engine's defaults rather than the other way
 round.
 
-Aura is the exception and needs no engine at all - it draws itself.
+`aura`, `bit`, `pixel`, `iris` and `rain` are the exceptions: they have no
+artwork and no engine, and draw themselves. Naming one is still all you do, which
+is the point of a character pulling its own dependencies rather than the config
+having to know which of them needs what.
 
 Order still matters between siblings: the language package goes last, since
 later-listed files win substitution conflicts.

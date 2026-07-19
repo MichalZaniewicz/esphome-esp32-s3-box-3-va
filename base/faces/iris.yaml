@@ -1,0 +1,368 @@
+###############################################################################
+# Iris - one enormous eye, filling the screen.
+#
+# No artwork: a sclera, two rings of iris, a pupil, a glint and two eyelids,
+# all LVGL objects. Like `aura`, `bit` and `pixel` it draws itself and does NOT
+# nest base/screens/face.yaml.
+#
+# Everything it does is one of two moves. The iris and pupil CHANGE SIZE, which
+# is how it dilates while listening, contracts while thinking and pulses while
+# speaking. And the eyelids CHANGE HEIGHT, which is how it blinks and squints -
+# they are two black rectangles anchored to the top and bottom edges, growing
+# inwards over everything else, so a blink costs two height writes.
+#
+# Both are properties already proven on this hardware by the face engine, which
+# is why this is the cheapest full-screen character in the set: seven widgets.
+###############################################################################
+
+substitutions:
+  iris_color: '0x3FC1E0'          # the iris itself
+  iris_ring_color: '0x1B6E8A'     # darker rim, so the iris has depth
+  iris_pupil_color: '0x04080C'
+  iris_sclera_color: '0x121824'   # the eye's body, barely lighter than black
+  iris_glint_color: '0xFFFFFF'
+  iris_alarm_color: '0xFF4D4D'
+  iris_dim_color: '0x2E3D49'
+
+  # The eye's body: a rounded rectangle wide enough to run off both edges. The
+  # radius is deliberately larger than half its height, which LVGL clamps, so
+  # the ends come out as full semicircles.
+  iris_sclera_w: '308'
+  iris_sclera_h: '148'
+  iris_sclera_radius: '96'
+
+  # Radii. Widgets take diameters, so every one of these is doubled below.
+  iris_r: '70'
+  iris_r_listen: '74'
+  iris_r_think: '66'
+  iris_ring_w: '12'               # how much of the rim stays visible
+
+  iris_pupil_r: '28'
+  iris_pupil_r_listen: '34'       # dilated: the eye is taking something in
+  iris_pupil_r_think: '16'        # contracted: it has turned inward
+
+  iris_glint_size: '22'
+
+  iris_gaze_dx: '26'              # how far it looks aside while thinking
+  iris_drift: '14'                # the slow wander while idle
+
+  # Eyelids. `base` is the black margin above and below the eye when open, so a
+  # lid of 0 still covers the corners.
+  iris_lid_base: '46'
+  iris_lid_squint: '14'
+  iris_lid_shut: '96'
+
+  iris_idle_cycle: '100'
+  iris_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: iris_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: iris_expr
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: iris_ir
+    type: int
+    restore_value: false
+    initial_value: "${iris_r}"
+  - id: iris_pr
+    type: int
+    restore_value: false
+    initial_value: "${iris_pupil_r}"
+  - id: iris_dx
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: iris_lid
+    type: int
+    restore_value: false
+    initial_value: "0"
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/iris.yaml (full-screen eye, no artwork)"
+
+script:
+  - id: iris_compute
+    then:
+      - lambda: |-
+          const int f = id(iris_frame);
+          const int phase = id(voice_assistant_phase);
+
+          int ir = ${iris_r};
+          int pr = ${iris_pupil_r};
+          int dx = 0;
+          int lid = 0;
+
+          if (phase == ${voice_assist_listening_phase_id}) {
+            ir = ${iris_r_listen};
+            pr = ${iris_pupil_r_listen} + (int) (3.0f * sinf(f * 0.30f));
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            // Contracted, squinting, and looking away from whoever asked.
+            ir = ${iris_r_think};
+            pr = ${iris_pupil_r_think};
+            lid = ${iris_lid_squint};
+            dx = ((f % 30) < 15) ? -${iris_gaze_dx} : ${iris_gaze_dx};
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            // Deterministic noise, same trick as aura and pixel: busy without
+            // flickering.
+            uint32_t n = (uint32_t) (f * 73 + 151);
+            n = (n ^ (n >> 5)) * 2654435761u;
+            const int amp = (int) ((n >> 16) & 0xFF);
+            ir = ${iris_r} + (amp * 10) / 255;
+            pr = ${iris_pupil_r} + (amp * 8) / 255;
+          } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                     phase == ${voice_assist_error_phase_id}) {
+            ir = ${iris_r_listen};
+            pr = ${iris_pupil_r_listen};
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            lid = ${iris_lid_shut};
+          } else {
+            // Idle: blink, blink, then a slow wander that never settles.
+            const int t = f % ${iris_idle_cycle};
+            if (t == 0 || t == 1 || t == 6 || t == 7) lid = ${iris_lid_shut};
+            else if (t == 2 || t == 5) lid = ${iris_lid_shut} / 2;
+            dx = (int) (${iris_drift} * sinf(f * 0.06f));
+          }
+
+          // The pupil must never reach the rim, or it stops reading as an eye.
+          const int pmax = ir - ${iris_ring_w} - 6;
+          if (pr > pmax) pr = pmax;
+          if (pr < 6) pr = 6;
+
+          id(iris_ir) = ir;
+          id(iris_pr) = pr;
+          id(iris_dx) = dx;
+          id(iris_lid) = lid;
+
+  - id: iris_draw
+    then:
+      - lvgl.widget.update:
+          id: iris_outer
+          width: !lambda return id(iris_ir) * 2;
+          height: !lambda return id(iris_ir) * 2;
+          x: !lambda return id(iris_dx);
+      - lvgl.widget.update:
+          id: iris_inner
+          width: !lambda return (id(iris_ir) - ${iris_ring_w}) * 2;
+          height: !lambda return (id(iris_ir) - ${iris_ring_w}) * 2;
+          x: !lambda return id(iris_dx);
+      - lvgl.widget.update:
+          id: iris_pupil
+          width: !lambda return id(iris_pr) * 2;
+          height: !lambda return id(iris_pr) * 2;
+          x: !lambda return id(iris_dx);
+      # The glint rides on the iris rather than on the screen, so it stays put
+      # on the eye's surface as it looks around.
+      - lvgl.widget.update:
+          id: iris_glint
+          x: !lambda return id(iris_dx) - id(iris_ir) / 2;
+      - lvgl.widget.update:
+          id: iris_lid_top
+          height: !lambda return ${iris_lid_base} + id(iris_lid);
+      - lvgl.widget.update:
+          id: iris_lid_bot
+          height: !lambda return ${iris_lid_base} + id(iris_lid);
+
+  - id: iris_tint_normal
+    then:
+      - lvgl.widget.update:
+          id: iris_outer
+          bg_color: ${iris_ring_color}
+      - lvgl.widget.update:
+          id: iris_inner
+          bg_color: ${iris_color}
+
+  - id: iris_tint_alarm
+    then:
+      - lvgl.widget.update:
+          id: iris_outer
+          bg_color: ${iris_ring_color}
+      - lvgl.widget.update:
+          id: iris_inner
+          bg_color: ${iris_alarm_color}
+
+  - id: iris_tint_dim
+    then:
+      - lvgl.widget.update:
+          id: iris_outer
+          bg_color: ${iris_dim_color}
+      - lvgl.widget.update:
+          id: iris_inner
+          bg_color: ${iris_dim_color}
+
+  - id: iris_tick_script
+    mode: single
+    then:
+      - lambda: id(iris_frame)++;
+      - if:
+          condition:
+            lambda: |-
+              const int p = id(voice_assistant_phase);
+              int want = 1;
+              if (p == ${voice_assist_timer_finished_phase_id} || p == ${voice_assist_error_phase_id}) want = 2;
+              if (p == ${voice_assist_muted_phase_id}) want = 3;
+              if (want == id(iris_expr)) return false;
+              id(iris_expr) = want;
+              return true;
+          then:
+            - if:
+                condition:
+                  lambda: return id(iris_expr) == 2;
+                then:
+                  - script.execute: iris_tint_alarm
+            - if:
+                condition:
+                  lambda: return id(iris_expr) == 3;
+                then:
+                  - script.execute: iris_tint_dim
+            - if:
+                condition:
+                  lambda: return id(iris_expr) == 1;
+                then:
+                  - script.execute: iris_tint_normal
+      - script.execute: iris_compute
+      - script.execute: iris_draw
+
+interval:
+  - interval: ${iris_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: iris_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            id: iris_sclera
+            align: CENTER
+            x: 0
+            y: 0
+            width: ${iris_sclera_w}
+            height: ${iris_sclera_h}
+            radius: ${iris_sclera_radius}
+            bg_color: ${iris_sclera_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        # Radius is a big constant on all three discs: LVGL clamps it to half the
+        # smaller side, so they stay circular at every size the animation uses.
+        - obj:
+            id: iris_outer
+            align: CENTER
+            x: 0
+            y: 0
+            width: 140
+            height: 140
+            radius: 120
+            bg_color: ${iris_ring_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: iris_inner
+            align: CENTER
+            x: 0
+            y: 0
+            width: 116
+            height: 116
+            radius: 120
+            bg_color: ${iris_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: iris_pupil
+            align: CENTER
+            x: 0
+            y: 0
+            width: 56
+            height: 56
+            radius: 120
+            bg_color: ${iris_pupil_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: iris_glint
+            align: CENTER
+            x: -35
+            y: -34
+            width: ${iris_glint_size}
+            height: ${iris_glint_size}
+            radius: 120
+            bg_color: ${iris_glint_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        # The lids come LAST so they paint over everything above them.
+        - obj:
+            id: iris_lid_top
+            align: TOP_MID
+            x: 0
+            y: 0
+            width: 100%
+            height: ${iris_lid_base}
+            radius: 0
+            bg_color: 0x000000
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: iris_lid_bot
+            align: BOTTOM_MID
+            x: 0
+            y: 0
+            width: 100%
+            height: ${iris_lid_base}
+            radius: 0
+            bg_color: 0x000000
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: iris_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen

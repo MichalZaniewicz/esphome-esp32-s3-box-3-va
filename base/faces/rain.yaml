@@ -1,0 +1,365 @@
+###############################################################################
+# Rain - falling characters, filling the screen.
+#
+# No artwork: 12 columns of glyphs running down the screen, thin and slow while
+# idle, a full wall while thinking. Like the other drawn characters it does NOT
+# nest base/screens/face.yaml.
+#
+# NOTHING MOVES. Each column is a single label standing still, and the fall is
+# an illusion produced by rewriting its text every tick. That matters because
+# it means the character never touches widget coordinates, only text, which is
+# the cheapest thing a label can be asked to change.
+#
+# The brightness gradient down each trail - a white-hot head fading into a dark
+# tail - comes from LVGL's recolor markup (`recolor: true`), so one label can
+# carry many colours. Without it a label has a single colour and the whole
+# effect collapses into a flat green block.
+#
+# The font is a private one holding ONLY the glyphs below, so a monospace face
+# costs almost nothing in flash next to a full character set.
+###############################################################################
+
+substitutions:
+  rain_head_color: '7CFFA8'      # the leading glyph, brightest
+  rain_mid_color: '2EA85E'
+  rain_tail_color: '103A22'      # the last glyph before it disappears
+  rain_alarm_color: 'FF4D4D'
+  rain_dim_color: '2E4A38'
+
+  rain_font_family: Roboto Mono
+  rain_font_size: '16'
+  rain_line_spacing: '4'         # 12 rows of (16 + 4) exactly fills 240 px
+
+  # How long a trail is, per phase. This is the whole personality: a short trail
+  # reads as drizzle, a trail longer than the screen reads as a downpour.
+  rain_tail_idle: '5'
+  rain_tail_listen: '7'
+  rain_tail_think: '11'
+  rain_tail_reply: '8'
+
+  rain_speed_idle: '1'
+  rain_speed_listen: '2'
+  rain_speed_think: '3'
+  rain_speed_reply: '2'
+
+  rain_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: rain_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # One built string per column, filled by rain_compute and read by rain_draw.
+  - id: rain_text
+    type: std::string[12]
+    restore_value: false
+
+font:
+  - id: font_rain
+    file:
+      type: gfonts
+      family: ${rain_font_family}
+      weight: 500
+    size: ${rain_font_size}
+    # Only what the rain actually prints. A full glyphset here would cost more
+    # flash than every other drawn character put together.
+    glyphs: "0123456789ABCDEF<>|/=+*-"
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/rain.yaml (falling glyphs, no artwork)"
+
+script:
+  - id: rain_compute
+    then:
+      - lambda: |-
+          static const char GLYPHS[] = "0123456789ABCDEF<>|/=+*-";
+          static const int NG = sizeof(GLYPHS) - 1;
+
+          const int f = id(rain_frame);
+          const int phase = id(voice_assistant_phase);
+
+          int tail = ${rain_tail_idle};
+          int speed = ${rain_speed_idle};
+          const char *head = "${rain_head_color}";
+          const char *mid = "${rain_mid_color}";
+          const char *dim = "${rain_tail_color}";
+
+          if (phase == ${voice_assist_listening_phase_id}) {
+            tail = ${rain_tail_listen}; speed = ${rain_speed_listen};
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            tail = ${rain_tail_think}; speed = ${rain_speed_think};
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            tail = ${rain_tail_reply}; speed = ${rain_speed_reply};
+          } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                     phase == ${voice_assist_error_phase_id}) {
+            tail = ${rain_tail_think}; speed = ${rain_speed_think};
+            head = "${rain_alarm_color}"; mid = "${rain_alarm_color}"; dim = "${rain_dim_color}";
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            head = "${rain_dim_color}"; mid = "${rain_dim_color}"; dim = "${rain_dim_color}";
+          }
+
+          // While replying, one row across every column lights up and walks
+          // down the screen, so the wall pulses with the voice.
+          const int band = (phase == ${voice_assist_replying_phase_id})
+                         ? (int) ((f * 3 / 2) % 12) : -1;
+
+          for (int c = 0; c < 12; c++) {
+            // Each column gets its own offset, otherwise the rain falls as one
+            // flat wall and reads like a table rather than weather.
+            uint32_t o = (uint32_t) (c * 151);
+            o = (o ^ (o >> 5)) * 2654435761u;
+            const int lead = ((f * speed + (int) ((o >> 16) & 0x3F)) / 2) % (12 + tail);
+
+            std::string s;
+            s.reserve(12 * 12);
+            for (int r = 0; r < 12; r++) {
+              if (r) s += "\n";
+              const int dist = lead - r;
+              if (dist < 0 || dist > tail) continue;      // empty line, keeps rows aligned
+
+              const char *col = (dist == 0) ? head : (dist <= 2 ? mid : dim);
+              if (r == band) col = head;
+
+              // The glyph changes every few ticks, not every tick: faster and
+              // the trail stops reading as a trail and turns into static.
+              uint32_t g = (uint32_t) ((f / 3) * 31 + r * 7 + c * 101);
+              g = (g ^ (g >> 5)) * 2654435761u;
+
+              s += "#";
+              s += col;
+              s += " ";
+              s += GLYPHS[((g >> 16) + r) % NG];
+              s += "#";
+            }
+            id(rain_text)[c] = s;
+          }
+
+  - id: rain_draw
+    then:
+      - lvgl.label.update:
+          id: rain_col_0
+          text: !lambda return id(rain_text)[0];
+      - lvgl.label.update:
+          id: rain_col_1
+          text: !lambda return id(rain_text)[1];
+      - lvgl.label.update:
+          id: rain_col_2
+          text: !lambda return id(rain_text)[2];
+      - lvgl.label.update:
+          id: rain_col_3
+          text: !lambda return id(rain_text)[3];
+      - lvgl.label.update:
+          id: rain_col_4
+          text: !lambda return id(rain_text)[4];
+      - lvgl.label.update:
+          id: rain_col_5
+          text: !lambda return id(rain_text)[5];
+      - lvgl.label.update:
+          id: rain_col_6
+          text: !lambda return id(rain_text)[6];
+      - lvgl.label.update:
+          id: rain_col_7
+          text: !lambda return id(rain_text)[7];
+      - lvgl.label.update:
+          id: rain_col_8
+          text: !lambda return id(rain_text)[8];
+      - lvgl.label.update:
+          id: rain_col_9
+          text: !lambda return id(rain_text)[9];
+      - lvgl.label.update:
+          id: rain_col_10
+          text: !lambda return id(rain_text)[10];
+      - lvgl.label.update:
+          id: rain_col_11
+          text: !lambda return id(rain_text)[11];
+  - id: rain_tick_script
+    mode: single
+    then:
+      - lambda: id(rain_frame)++;
+      - script.execute: rain_compute
+      - script.execute: rain_draw
+
+interval:
+  - interval: ${rain_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: rain_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: 0x000000
+      widgets:
+        - label:
+            id: rain_col_0
+            align: TOP_LEFT
+            x: 6
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_1
+            align: TOP_LEFT
+            x: 32
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_2
+            align: TOP_LEFT
+            x: 58
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_3
+            align: TOP_LEFT
+            x: 84
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_4
+            align: TOP_LEFT
+            x: 110
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_5
+            align: TOP_LEFT
+            x: 136
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_6
+            align: TOP_LEFT
+            x: 162
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_7
+            align: TOP_LEFT
+            x: 188
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_8
+            align: TOP_LEFT
+            x: 214
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_9
+            align: TOP_LEFT
+            x: 240
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_10
+            align: TOP_LEFT
+            x: 266
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+        - label:
+            id: rain_col_11
+            align: TOP_LEFT
+            x: 292
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${rain_line_spacing}
+            text_color: 0x2EA85E
+            pad_all: 0
+
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: rain_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen

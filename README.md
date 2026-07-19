@@ -186,7 +186,7 @@ Whichever one you name, it exposes the same page id, `page_face`, so
 
 ### The cast
 
-They are not one face on ten bodies: the shape of the eyes, whether there are
+They are not one face on twelve bodies: the shape of the eyes, whether there are
 pupils at all, the colours and the range of every expression belong to the
 character. Name any of them in lower case, exactly as the heading reads.
 
@@ -202,6 +202,14 @@ character. Name any of them in lower case, exactly as the heading reads.
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pixel.gif" width="272" alt="Pixel"></td>
     <td><h3>Pixel</h3>Ninety-six dots pretending to be a face, like a departure board that got curious. Its pupils are unlit dots inside lit eyes, and its thinking is a spark running the perimeter. The heaviest of the set, and the only one with brightness rather than plain on and off.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-iris.gif" width="272" alt="Iris"></td>
+    <td><h3>Iris</h3>One enormous eye and nothing else, watching the room over the top of your cooking. Its pupil widens when you speak to it, shrinks to a pinprick while it thinks, and it blinks when it has nothing better to do. Full screen, seven widgets.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-rain.gif" width="272" alt="Rain"></td>
+    <td><h3>Rain</h3>Characters falling down the screen, from a drizzle while idle to a downpour while it thinks. Nothing on screen actually moves: each column is a label standing still whose text is rewritten every tick, which is why a full-screen effect costs twelve widgets.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>
@@ -238,7 +246,7 @@ animation at its real tick against that character's own numbers, read out of its
 YAML - so a change to a character shows up in its clip. The only edit is a couple
 of seconds trimmed from the idle pause, which on the device is longer and stiller.
 
-The first three need no artwork at all and draw themselves. For the rest, adding
+The first five need no artwork at all and draw themselves. For the rest, adding
 one is `cp pip.yaml yours.yaml`, a faceless 320x240 image, and measuring where its
 eyes and mouth belong. Every expression dimension is a substitution, so a bigger
 or smaller face rescales without touching the engine. Details:
