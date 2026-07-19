@@ -35,3 +35,12 @@ substitutions:
   status_error: "Błąd"
   status_muted: "Mikrofon wyciszony"
   status_timer: "Minęło"
+
+  # --- Terminal (postać `crt`; pozostałe postacie są nieme i nie wymagają tłumaczenia)
+  crt_header: "KONSOLA AGENTA"
+  crt_idle_hint: "czekam na słowo klucz"
+  crt_listen_label: "poziom sygnału"
+  crt_muted_text: "mikrofon wyciszony"
+  crt_timer_text: "** KONIEC ODLICZANIA **"
+  crt_error_text: "** BŁĄD **"
+  crt_think_text: "myślę"

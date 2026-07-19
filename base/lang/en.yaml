@@ -41,3 +41,13 @@ substitutions:
   status_error: "Error"
   status_muted: "Microphone muted"
   status_timer: "Timer"
+
+  # --- Terminal (the `crt` character; every other character is mute and needs
+  # no translation)
+  crt_header: "AGENT CONSOLE"
+  crt_idle_hint: "awaiting wake word"
+  crt_listen_label: "input level"
+  crt_muted_text: "microphone off"
+  crt_timer_text: "** TIMER FINISHED **"
+  crt_error_text: "** ERROR **"
+  crt_think_text: "thinking"
