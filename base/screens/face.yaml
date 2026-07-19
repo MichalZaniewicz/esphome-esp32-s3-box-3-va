@@ -42,12 +42,19 @@ substitutions:
 
   face_color: '0x3AFAE6'        # eyes and mouth - sampled from the artwork
   face_alarm_color: '0xFF4D4D'  # timer ringing, and errors
+  # Usually the same as the eyes, but a character with white cartoon eyes
+  # wants a mouth that is not also white.
+  face_mouth_color: '0x3AFAE6'
 
   # Geometry, in pixels from the centre of the 320x240 screen. These are measured
   # off the original illustrations rather than guessed: eyes 19x27 at x +/-42,
   # mouth 25x10, both sitting BELOW centre because the robot's panel is in the
   # lower half of the frame. `face_eye_offset` is centre-to-eye, so the gap
   # between the eyes is twice it.
+  # Not every character's face sits in the middle of its frame. This shifts the
+  # whole face - eyes, pupils and mouth - sideways to meet the artwork.
+  face_center_x: '0'
+
   face_eye_offset: '42'
   face_eye_y: '36'
   face_eye_w: '20'
@@ -69,9 +76,19 @@ substitutions:
   face_mouth_alarm_w: '30'
   face_mouth_alarm_h: '24'
   face_mouth_error_w: '18'
+  # Pupils. A dark hole in the eye, and the thing that actually looks around:
+  # moving a pupil inside a still eye reads far more naturally than sliding the
+  # whole eye sideways, which is what this used to do.
+  face_pupil_color: '0x0A1A3C'
+  face_pupil_w: '9'
+  face_pupil_h: '19'
+  face_pupil_radius: '5'
+  face_pupil_dilate: '4'   # added to both dimensions while listening
+  face_pupil_shrink: '3'   # taken off while alarmed or in error
+  face_gaze_dx: '6'        # how far the pupil travels inside the eye
+
   face_eye_h_think: '20'   # squinted while thinking
   face_mouth_think_w: '12' # thinking: the mouth shrinks to a dot
-  face_glance_dx: '9'      # how far the eyes look sideways while thinking
   face_listen_pulse: '4'   # how much the eyes breathe while listening
   face_shake_dx: '4'       # alarm shake amplitude
   face_eye_radius: '10'
@@ -123,12 +140,39 @@ script:
           id: face_eye_l
           width: !lambda return w;
           height: !lambda return h;
-          x: !lambda return dx - ${face_eye_offset};
+          x: !lambda return ${face_center_x} + dx - ${face_eye_offset};
       - lvgl.widget.update:
           id: face_eye_r
           width: !lambda return w;
           height: !lambda return h;
-          x: !lambda return dx + ${face_eye_offset};
+          x: !lambda return ${face_center_x} + dx + ${face_eye_offset};
+
+  # Pupils move independently of the eyes: `gx` is the gaze, measured inside the
+  # eye, not a shift of the whole face.
+  - id: face_pupils
+    parameters:
+      w: int
+      h: int
+      gx: int
+    then:
+      - lvgl.widget.show: face_pupil_l
+      - lvgl.widget.show: face_pupil_r
+      - lvgl.widget.update:
+          id: face_pupil_l
+          width: !lambda return w;
+          height: !lambda return h;
+          x: !lambda return ${face_center_x} + gx - ${face_eye_offset};
+      - lvgl.widget.update:
+          id: face_pupil_r
+          width: !lambda return w;
+          height: !lambda return h;
+          x: !lambda return ${face_center_x} + gx + ${face_eye_offset};
+
+  # A squashed eye has no room for a pupil - it would poke out of the slit.
+  - id: face_pupils_hide
+    then:
+      - lvgl.widget.hide: face_pupil_l
+      - lvgl.widget.hide: face_pupil_r
 
   - id: face_mouth
     parameters:
@@ -140,7 +184,7 @@ script:
           id: face_mouth_obj
           width: !lambda return w;
           height: !lambda return h;
-          x: !lambda return dx;
+          x: !lambda return ${face_center_x} + dx;
 
   # Colours are literal rather than templated: three tiny actions beat trusting
   # a lambda to produce an lv_color_t.
@@ -154,7 +198,7 @@ script:
           bg_color: ${face_color}
       - lvgl.widget.update:
           id: face_mouth_obj
-          bg_color: ${face_color}
+          bg_color: ${face_mouth_color}
   - id: face_tint_alarm
     then:
       - lvgl.widget.update:
@@ -172,6 +216,7 @@ script:
   - id: face_blink
     mode: single
     then:
+      - script.execute: face_pupils_hide
       - script.execute:
           id: face_eyes
           w: ${face_eye_w}
@@ -183,6 +228,11 @@ script:
           w: ${face_eye_w}
           h: ${face_eye_h}
           dx: 0
+      - script.execute:
+          id: face_pupils
+          w: ${face_pupil_w}
+          h: ${face_pupil_h}
+          gx: 0
 
   # --- the driver ----------------------------------------------------------
   # One tick: work out which expression the current phase wants, apply its
@@ -192,7 +242,7 @@ script:
     then:
       - lambda: id(face_frame)++;
 
-      # IDLE - open eyes, closed mouth, an occasional blink.
+      # IDLE - open eyes, pupils centred, an occasional blink.
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
@@ -209,18 +259,22 @@ script:
                       h: ${face_eye_h}
                       dx: 0
                   - script.execute:
+                      id: face_pupils
+                      w: ${face_pupil_w}
+                      h: ${face_pupil_h}
+                      gx: 0
+                  - script.execute:
                       id: face_mouth
                       w: ${face_mouth_w}
                       h: ${face_mouth_h}
                       dx: 0
-            # Roughly every 4 s at a 120 ms tick.
             - if:
                 condition:
                   lambda: return id(face_frame) % 33 == 0;
                 then:
                   - script.execute: face_blink
 
-      # LISTENING - eyes wide, mouth a small circle, holding still.
+      # LISTENING - eyes wide and breathing, pupils dilated, small round mouth.
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
@@ -232,13 +286,15 @@ script:
                   - lambda: id(face_expr) = 2;
                   - script.execute: face_tint_normal
                   - script.execute:
+                      id: face_pupils
+                      w: !lambda return ${face_pupil_w} + ${face_pupil_dilate};
+                      h: !lambda return ${face_pupil_h} + ${face_pupil_dilate};
+                      gx: 0
+                  - script.execute:
                       id: face_mouth
                       w: ${face_mouth_o_w}
                       h: ${face_mouth_o_h}
                       dx: 0
-            # Wide eyes holding perfectly still read as a freeze-frame, not as
-            # attention. A slow breath over four steps is enough to look alive
-            # without competing with the thinking or talking animations.
             - script.execute:
                 id: face_eyes
                 w: ${face_eye_w}
@@ -247,7 +303,9 @@ script:
                   return ${face_eye_h_wide} + PULSE[(id(face_frame) / 2) % 4];
                 dx: 0
 
-      # THINKING - eyes glance side to side, mouth flat.
+      # THINKING - the PUPILS look around; the eyes stay put and squint a little.
+      # Sliding whole eyes sideways, which is what this used to do, reads as the
+      # face being dragged rather than as thought.
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_thinking_phase_id};
@@ -259,20 +317,21 @@ script:
                   - lambda: id(face_expr) = 3;
                   - script.execute: face_tint_normal
                   - script.execute:
+                      id: face_eyes
+                      w: ${face_eye_w}
+                      h: ${face_eye_h_think}
+                      dx: 0
+                  - script.execute:
                       id: face_mouth
                       w: ${face_mouth_think_w}
                       h: ${face_mouth_h}
                       dx: 0
-            # Hold each side for three ticks, so it reads as looking around
-            # rather than vibrating. The eyes squint and the mouth shrinks to a
-            # dot as well: a 7 px sideways nudge on its own was invisible during
-            # a phase that often lasts barely a second.
             - script.execute:
-                id: face_eyes
-                w: ${face_eye_w}
-                h: ${face_eye_h_think}
-                dx: !lambda |-
-                  return ((id(face_frame) / 3) % 2) ? ${face_glance_dx} : -${face_glance_dx};
+                id: face_pupils
+                w: ${face_pupil_w}
+                h: ${face_pupil_h}
+                gx: !lambda |-
+                  return ((id(face_frame) / 3) % 2) ? ${face_gaze_dx} : -${face_gaze_dx};
 
       # REPLYING - the mouth does the talking.
       - if:
@@ -290,6 +349,11 @@ script:
                       w: ${face_eye_w}
                       h: ${face_eye_h}
                       dx: 0
+                  - script.execute:
+                      id: face_pupils
+                      w: ${face_pupil_w}
+                      h: ${face_pupil_h}
+                      gx: 0
             - script.execute:
                 id: face_mouth
                 w: ${face_mouth_w}
@@ -297,7 +361,7 @@ script:
                   return (id(face_frame) % 2) ? ${face_mouth_open_h} : ${face_mouth_h};
                 dx: 0
 
-      # TIMER RINGING - red, wide awake, shouting, and shaking about it.
+      # TIMER RINGING - alarm colour, wide eyes, pinprick pupils, shaking.
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_timer_finished_phase_id};
@@ -319,8 +383,14 @@ script:
                 h: ${face_eye_h_wide}
                 dx: !lambda |-
                   return (id(face_frame) % 2) ? ${face_shake_dx} : -${face_shake_dx};
+            - script.execute:
+                id: face_pupils
+                w: !lambda return ${face_pupil_w} - ${face_pupil_shrink};
+                h: !lambda return ${face_pupil_h} - ${face_pupil_shrink};
+                gx: !lambda |-
+                  return (id(face_frame) % 2) ? ${face_shake_dx} : -${face_shake_dx};
 
-      # MUTED - eyes shut.
+      # MUTED - eyes shut. A slit has no room for a pupil.
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id};
@@ -331,6 +401,7 @@ script:
                 then:
                   - lambda: id(face_expr) = 6;
                   - script.execute: face_tint_normal
+                  - script.execute: face_pupils_hide
                   - script.execute:
                       id: face_eyes
                       w: ${face_eye_w}
@@ -342,7 +413,7 @@ script:
                       h: ${face_mouth_h}
                       dx: 0
 
-      # ERROR - narrowed eyes, alarm colour.
+      # ERROR - narrowed eyes, shrunken pupils, alarm colour.
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
@@ -358,6 +429,11 @@ script:
                       w: ${face_eye_w}
                       h: ${face_eye_h_narrow}
                       dx: 0
+                  - script.execute:
+                      id: face_pupils
+                      w: !lambda return ${face_pupil_w} - ${face_pupil_shrink};
+                      h: !lambda return ${face_pupil_h} - ${face_pupil_shrink};
+                      gx: 0
                   - script.execute:
                       id: face_mouth
                       w: ${face_mouth_error_w}
@@ -420,6 +496,31 @@ lvgl:
             border_width: 0
             pad_all: 0
         - obj:
+            id: face_pupil_l
+            align: CENTER
+            x: -${face_eye_offset}
+            y: ${face_eye_y}
+            width: ${face_pupil_w}
+            height: ${face_pupil_h}
+            radius: ${face_pupil_radius}
+            bg_color: ${face_pupil_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: face_pupil_r
+            align: CENTER
+            x: ${face_eye_offset}
+            y: ${face_eye_y}
+            width: ${face_pupil_w}
+            height: ${face_pupil_h}
+            radius: ${face_pupil_radius}
+            bg_color: ${face_pupil_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        - obj:
             id: face_mouth_obj
             align: CENTER
             x: 0
@@ -427,7 +528,7 @@ lvgl:
             width: ${face_mouth_w}
             height: ${face_mouth_h}
             radius: ${face_mouth_radius}
-            bg_color: ${face_color}
+            bg_color: ${face_mouth_color}
             bg_opa: COVER
             border_width: 0
             pad_all: 0

@@ -1,0 +1,65 @@
+# Genie - the wish granter.
+#
+# Small head, big moustache, floating tail. The most compact face of the set.
+#
+# Usage - the character must come AFTER the face engine, because ESPHome
+# resolves later-listed package files at a higher priority:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/face.yaml
+#     - base/faces/genie.yaml
+#
+# See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/genie.yaml"
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/genie.png
+
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0x0E3346'
+  face_pupil_color: '0x10283A'
+  face_alarm_color: '0xFF5A5A'
+
+  # A full-body character, so the head is small and sits high and left. The mouth
+  # is hidden behind the moustache, so what is drawn is a hint under it.
+  face_center_x: '-18'
+  face_eye_offset: '16'
+  face_eye_y: '-48'
+  face_eye_w: '16'
+  face_eye_h: '18'
+  face_mouth_y: '-16'
+  face_mouth_w: '14'
+  face_mouth_h: '4'
+
+  face_pupil_w: '6'
+  face_pupil_h: '9'
+  face_pupil_radius: '3'
+  face_pupil_dilate: '2'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '4'
+
+  face_eye_h_wide: '22'
+  face_eye_h_think: '12'
+  face_eye_h_narrow: '6'
+  face_eye_h_shut: '3'
+  face_mouth_open_h: '10'
+  face_mouth_small_w: '10'
+  face_mouth_think_w: '8'
+  face_mouth_o_w: '10'
+  face_mouth_o_h: '10'
+  face_mouth_alarm_w: '18'
+  face_mouth_alarm_h: '12'
+  face_mouth_error_w: '10'
+  face_listen_pulse: '3'
+  face_shake_dx: '3'
+  face_tick: 120ms
+  face_eye_radius: '7'
+  face_mouth_radius: '2'

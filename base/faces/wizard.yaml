@@ -1,0 +1,66 @@
+# Wizard - the hat with eyes.
+#
+# A void under a purple hat. Nothing but glowing eyes, which is the whole point.
+#
+# Usage - the character must come AFTER the face engine, because ESPHome
+# resolves later-listed package files at a higher priority:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/face.yaml
+#     - base/faces/wizard.yaml
+#
+# See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/wizard.yaml"
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/wizard.png
+
+  face_color: '0xFFD84D'
+  face_mouth_color: '0xFFD84D'
+  face_pupil_color: '0x0A0A0A'
+  face_alarm_color: '0xFF5A5A'
+
+  # The face is an empty black shadow left of and BELOW the hat brim - putting the
+  # eyes at the void's optical centre lands them on the gold band instead. The mouth is deliberately
+  # tiny: a void face is meant to show eyes and nothing else.
+  face_center_x: '-18'
+  face_eye_offset: '24'
+  face_eye_y: '10'
+  face_eye_w: '24'
+  face_eye_h: '28'
+  face_mouth_y: '36'
+  face_mouth_w: '14'
+  face_mouth_h: '5'
+
+  face_pupil_w: '8'
+  face_pupil_h: '13'
+  face_pupil_radius: '4'
+  face_pupil_dilate: '3'
+  face_pupil_shrink: '3'
+  face_gaze_dx: '5'
+
+  face_eye_h_wide: '32'
+  face_eye_h_think: '16'
+  face_eye_h_narrow: '9'
+  face_eye_h_shut: '3'
+  face_mouth_open_h: '12'
+  face_mouth_small_w: '10'
+  face_mouth_think_w: '8'
+  face_mouth_o_w: '12'
+  face_mouth_o_h: '12'
+  face_mouth_alarm_w: '18'
+  face_mouth_alarm_h: '14'
+  face_mouth_error_w: '10'
+  face_listen_pulse: '4'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '8'
+  face_mouth_radius: '3'

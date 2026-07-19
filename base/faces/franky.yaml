@@ -1,0 +1,66 @@
+# Franky - the monster.
+#
+# Flat top, bolts, stitches. White cartoon eyes rather than a glowing screen -
+# he is the only one here whose face is skin, not a display.
+#
+# Usage - the character must come AFTER the face engine, because ESPHome
+# resolves later-listed package files at a higher priority:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/face.yaml
+#     - base/faces/franky.yaml
+#
+# See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/franky.yaml"
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/franky.png
+
+  face_color: '0xF5F5EC'
+  face_mouth_color: '0x241E14'
+  face_pupil_color: '0x14140F'
+  face_alarm_color: '0xFF5A5A'
+
+  # The green face sits LEFT of the frame's centre, hence face_center_x. Eyes go
+  # between the forehead stitching and the cheek blushes.
+  face_center_x: '-20'
+  face_eye_offset: '28'
+  face_eye_y: '-20'
+  face_eye_w: '26'
+  face_eye_h: '30'
+  face_mouth_y: '14'
+  face_mouth_w: '34'
+  face_mouth_h: '7'
+
+  face_pupil_w: '10'
+  face_pupil_h: '15'
+  face_pupil_radius: '5'
+  face_pupil_dilate: '3'
+  face_pupil_shrink: '3'
+  face_gaze_dx: '6'
+
+  face_eye_h_wide: '34'
+  face_eye_h_think: '20'
+  face_eye_h_narrow: '10'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '18'
+  face_mouth_small_w: '18'
+  face_mouth_think_w: '10'
+  face_mouth_o_w: '16'
+  face_mouth_o_h: '16'
+  face_mouth_alarm_w: '30'
+  face_mouth_alarm_h: '20'
+  face_mouth_error_w: '16'
+  face_listen_pulse: '3'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '9'
+  face_mouth_radius: '3'

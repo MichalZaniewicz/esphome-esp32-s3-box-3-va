@@ -9,9 +9,15 @@ features go. Swapping the assistant is one line in `files:`.
 
 | Character | Look | Face style |
 |---|---|---|
-| **Pip** | Round head, antenna, blue panel | Soft cyan ovals, small pill mouth. The reference — every other character was measured against it. |
-| **Astro** | Astronaut, sealed visor, waving arm | Cyan capsule slits. The visor is wide and shallow (139x82), so tall eyes do not fit; the glance carries the expression instead. |
-| **Momo** | Cat ears, big black screen | Amber square pixels, barely rounded. The artwork has no colour of its own, so the face sets the tone. |
+| **Pip** | Round head, antenna, blue panel | Soft cyan ovals. The reference — every other character was measured against it. |
+| **Astro** | Astronaut, sealed visor | Cyan capsule slits. The visor is wide and shallow, profiled row by row; tall eyes do not fit. |
+| **Momo** | Cat ears, black screen | Amber square pixels, barely rounded. The artwork has no colour of its own. |
+| **Franky** | Green monster, bolts, stitches | White cartoon eyes with black pupils — the only face here that is skin rather than a display, so it gets a separate mouth colour. |
+| **Wizard** | Void under a purple hat | Glowing gold eyes and almost no mouth. The void sits below the hat brim, not at the frame's centre. |
+| **Genie** | Small head, big moustache | The most compact face of the set; the mouth is a hint under the moustache. |
+
+Faces are not always centred in their frame — `face_center_x` shifts the whole
+face sideways to meet the artwork. Franky, Wizard and Genie all need it.
 
 Every expression the engine draws, for reference:
 

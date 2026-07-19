@@ -93,7 +93,8 @@ base/
     home.yaml              # optional home screen: clock, date, climate
     face.yaml              # optional animated assistant face (the engine)
   faces/
-    pip / astro / momo     # characters for the face engine; copy one to add yours
+    pip, astro, momo,      # characters for the face engine
+    franky, wizard, genie  #   copy any one of them to add your own
   lang/
     en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
   sounds/
@@ -158,9 +159,10 @@ artwork and the measurements. Swapping the assistant is one line:
 
 ![Three characters](base/assets/characters.png)
 
-Three ship with the repo: **Pip** (soft ovals), **Astro** (visor slits) and
-**Momo** (square pixels). They differ in more than artwork — the shape of the
-eyes and the range of each expression are the character's own.
+Six ship with the repo: **Pip**, **Astro**, **Momo**, **Franky**, **Wizard** and
+**Genie**. They differ in more than artwork — eye shape, pupils, colours and the
+range of every expression belong to the character, and the face does not have to
+sit in the middle of the frame.
 
 Adding a character is `cp pip.yaml yours.yaml`, a faceless 320x240 image, and
 measuring where its eyes and mouth belong. Every expression dimension is a
