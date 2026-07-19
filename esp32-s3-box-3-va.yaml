@@ -1,9 +1,9 @@
 # =============================================================================
-# ESP32-S3-BOX-3 voice assistant — example thin config.
+# ESP32-S3-BOX-3 voice assistant - example thin config.
 #
 # Copy this next to your secrets.yaml, edit the substitutions, flash it. The
 # firmware core is pulled from GitHub at compile time, so this file is the only
-# one you keep. After the core changes, run `esphome clean` before rebuilding —
+# one you keep. After the core changes, run `esphome clean` before rebuilding -
 # otherwise ESPHome reuses its cached copy of the package.
 #
 # Docs: README.md   Pinout: docs/HARDWARE.md   Characters: base/faces/README.md
@@ -14,7 +14,7 @@ substitutions:
   name: esp32-s3-box-3-va
   friendly_name: "S3 Box 3 Voice"
 
-  # POSIX form, not an IANA name — the device has no timezone database. Only a
+  # POSIX form, not an IANA name - the device has no timezone database. Only a
   # fallback until Home Assistant syncs the clock.
   # https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
   posix_timezone: "CET-1CEST,M3.5.0,M10.5.0/3"
@@ -32,7 +32,7 @@ substitutions:
   idle_page: page_home       # clock, date, climate  (needs screens/home.yaml)
   idle_page_alt: page_face   # the robot, idling     (needs screens/face.yaml)
 
-  # Home screen entities. Wrong or missing ones are not an error — the label just
+  # Home screen entities. Wrong or missing ones are not an error - the label just
   # stays "--" until something answers.
   room_temp_entity: sensor.room_temperature
   room_hum_entity: sensor.room_humidity
@@ -51,7 +51,7 @@ packages:
       - base/screens/face.yaml   # the face engine: draws and animates eyes + mouth
       - base/faces/pip.yaml      # the character. Swap for astro, momo, franky,
                                 #   wizard or genie - see base/faces/README.md
-      - base/lang/en.yaml        # en.yaml, pl.yaml, or your own — see base/lang/
+      - base/lang/en.yaml        # en.yaml, pl.yaml, or your own - see base/lang/
     refresh: 0s
 
 # Optional: encrypt the native API. Add the key to secrets.yaml as well.

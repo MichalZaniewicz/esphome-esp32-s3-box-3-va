@@ -9,7 +9,7 @@ one thin config file you actually edit.
 > **Status: initial build.** Ported from the upstream
 > [`wake-word-voice-assistants`](https://github.com/esphome/wake-word-voice-assistants)
 > S3-Box-3 config, rebuilt on LVGL + GT911, with the TTS path reworked (see
-> below). Not yet confirmed on hardware — see [CHANGELOG.md](CHANGELOG.md).
+> below). Not yet confirmed on hardware - see [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -20,7 +20,7 @@ one thin config file you actually edit.
   you install. With none, the core shows plain text status screens; that is the
   floor, not the intended look.
 - **Touchscreen**: the GT911 is wired into LVGL. The **button under the screen**
-  (which is not a GPIO — it is GT911 touch button 0) starts the assistant, and
+  (which is not a GPIO - it is GT911 touch button 0) starts the assistant, and
   silences a ringing timer instead if one is going. The screen itself is left to
   the UI, so widgets get every tap rather than fighting a full-screen
   tap-to-talk target.
@@ -28,22 +28,22 @@ one thin config file you actually edit.
   layer that stays visible across page changes (green while running, blue while
   paused).
 - **TTS routing you choose at runtime**: the reply can come out of the box, out
-  of an external Home Assistant media player, or both — see below.
-- **Swappable assistant**: the on-screen character is a package — artwork plus
-  the measurements of where its face goes — so changing assistants is one line.
+  of an external Home Assistant media player, or both - see below.
+- **Swappable assistant**: the on-screen character is a package - artwork plus
+  the measurements of where its face goes - so changing assistants is one line.
 
 ## The TTS routing, and why it exists
 
 `voice_assistant:` here has **no `media_player:`**, on purpose.
 
-With one attached, ESPHome does not just hand you the TTS URL — at `TTS_END` it
+With one attached, ESPHome does not just hand you the TTS URL - at `TTS_END` it
 *also* calls the media player with that URL itself
 (`voice_assistant.cpp`: `media_player_->make_call().set_media_url(url)`), so the
 box downloads and decodes the audio locally on top of anything you do in
 `on_tts_end`. On long replies that local download-and-decode is what made the
 device reboot mid-answer while an external speaker played the reply through.
 
-Leaving it out changes nothing about the pipeline — the request flags sent to
+Leaving it out changes nothing about the pipeline - the request flags sent to
 Home Assistant don't depend on the media player, so HA still runs TTS and still
 delivers the URL to `on_tts_end`. What changes is that **routing is explicit**,
 in the `TTS output` select:
@@ -57,12 +57,12 @@ in the `TTS output` select:
 This routes **spoken replies only**. The timer alarm always rings on the box:
 there it repeats until silenced and a tap on the screen stops it, neither of
 which a remote speaker can offer, since the box cannot tell when one finishes.
-Home Assistant announcements and Music Assistant are unaffected either way —
+Home Assistant announcements and Music Assistant are unaffected either way -
 they go through the `speaker_media_player` component directly.
 
 ## Quick start
 
-> Requires **ESPHome 2026.7.0+** — that is where `image:` became a platform component.
+> Requires **ESPHome 2026.7.0+** - that is where `image:` became a platform component.
 
 1. Copy `secrets.example.yaml` to `secrets.yaml` and fill in your Wi-Fi.
 2. Copy **`esp32-s3-box-3-va.yaml`** next to it and edit the `substitutions:` at
@@ -79,7 +79,7 @@ they go through the `speaker_media_player` component directly.
    assign an Assist pipeline.
 5. Say "Alexa" (or "OK Nabu"), or just tap the screen.
 
-After changing anything in the core, run `esphome clean` before the next build —
+After changing anything in the core, run `esphome clean` before the next build -
 otherwise ESPHome reuses the cached copy of the remote package.
 
 ## Repository layout
@@ -121,15 +121,15 @@ What lives in the thin config:
 | `name` / `friendly_name` | `esp32-s3-box-3-va` / `S3 Box 3 Voice` | Device name. Changing `name` re-creates every entity in HA. |
 | `posix_timezone` | `UTC0` | Clock zone in POSIX form (the device has no IANA database). Only a pre-sync fallback; HA owns the clock. |
 | `external_media_player_id` | `media_player.living_room` | Where `External player` / `Both` send the reply. |
-| `tts_output_default` | `This device` | Boot default of the `TTS output` select. Routes spoken replies only — the timer alarm always rings on the box. |
+| `tts_output_default` | `This device` | Boot default of the `TTS output` select. Routes spoken replies only - the timer alarm always rings on the box. |
 | `volume_min` / `volume_max` | `0.5` / `0.8` | Media player clamps for the onboard speaker. |
 | `hidden_ssid` | `false` | `true` enables `fast_connect` for a hidden SSID. |
 | `idle_page`, `listening_page`, … | `page_status` | Which page each phase shows. Screen packages claim these; set `idle_page: page_home` by hand if you want the clock while idle and the face only while talking. |
 | `wake_sound_file` | repo `wake.wav` | The beep when the wake word fires, toggled from HA by the `Wake sound` switch. 180 ms deliberately: mic and speaker share one I2S bus, so it must finish before listening starts. |
 | `timer_finished_sound_file` | repo `timer_finished.flac` | The timer alarm, compiled into flash so it rings without network. Always plays on the box's own speaker. Any URL or local MP3/FLAC/WAV. |
-| `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets — `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
+| `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets - `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
 | `screen_restore_mode` | `ALWAYS_ON` | Backlight at boot. `ALWAYS_ON` so the boot screen is always visible; `RESTORE_DEFAULT_OFF` if the device should remember having been switched off. |
-| `mww_gain_factor` | `4` | Input gain for the wake word only (1–64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
+| `mww_gain_factor` | `4` | Input gain for the wake word only (1-64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
 
 Pins are substitutions too, but you should not need them unless you are porting
 to another board.
@@ -137,13 +137,13 @@ to another board.
 ## Screens
 
 The core ships one page per assistant phase. Extra screens are optional packages
-under `base/screens/` — add the file to your `files:` list to compile it in, drop
+under `base/screens/` - add the file to your `files:` list to compile it in, drop
 the line to leave it out. ESPHome merges each package's `lvgl:` block into one UI.
 
 | Screen | What it adds |
 |---|---|
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, as a replacement for the bare idle illustration. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
-| `face.yaml` | An animated assistant: a static character image with eyes and a mouth drawn on top as LVGL rectangles, reshaped per phase — blinking while idle, wide-eyed listening, glancing around while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`: clock when nothing is happening, robot when talking. Only the three small widgets ever redraw, never the background. |
+| `face.yaml` | An animated assistant: a static character image with eyes and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking while idle, wide-eyed listening, glancing around while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`: clock when nothing is happening, robot when talking. Only the three small widgets ever redraw, never the background. |
 
 ### Characters
 
@@ -160,13 +160,13 @@ artwork and the measurements. Swapping the assistant is one line:
 
 ### The cast
 
-Each is one line in `files:`. They are not one face on six bodies — the shape of
+Each is one line in `files:`. They are not one face on six bodies - the shape of
 the eyes, whether there are pupils at all, the colours and the range of every
 expression belong to the character, and the artwork decides all of it.
 
 | | | |
 |---|---|---|
-| ![Pip](base/assets/demo/demo-pip.gif) | **Pip**<br>`base/faces/pip.yaml` | The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals — the reference every other character was measured against. |
+| ![Pip](base/assets/demo/demo-pip.gif) | **Pip**<br>`base/faces/pip.yaml` | The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals - the reference every other character was measured against. |
 | ![Astro](base/assets/demo/demo-astro.gif) | **Astro**<br>`base/faces/astro.yaml` | Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits. |
 | ![Momo](base/assets/demo/demo-momo.gif) | **Momo**<br>`base/faces/momo.yaml` | A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan. |
 | ![Franky](base/assets/demo/demo-franky.gif) | **Franky**<br>`base/faces/franky.yaml` | Assembled from spare parts on somebody's day off. The only one here whose face is skin rather than a screen, so it gets white cartoon eyes and a mouth of its own colour. |
@@ -174,7 +174,7 @@ expression belong to the character, and the artwork decides all of it.
 | ![Genie](base/assets/demo/demo-genie.gif) | **Genie**<br>`base/faces/genie.yaml` | Small, moustachioed and faintly smug: grants timers instead of wishes and considers that an upgrade. The most compact face of the set. |
 
 Every clip above is idle → thinking → replying, generated by replaying the
-animation engine at its real 120 ms tick against that character's own numbers —
+animation engine at its real 120 ms tick against that character's own numbers -
 so a change to a character shows up in its clip. The only edit is a couple of
 seconds trimmed from the idle pause, which on the device is longer and stiller.
 
@@ -182,18 +182,6 @@ Adding one is `cp pip.yaml yours.yaml`, a faceless 320x240 image, and measuring
 where its eyes and mouth belong. Every expression dimension is a substitution, so
 a bigger or smaller face rescales without touching the engine. Details:
 [`base/faces/README.md`](base/faces/README.md).
-
-## No illustrations
-
-Earlier versions shipped a full-screen PNG per phase, ported from upstream. They
-are gone. Each was 225 KB of flash — nine of them, over 2 MB — and installing any
-character package hid every one of them immediately. The repo now compiles
-exactly one image: the character you chose.
-
-What remains in the core is text: three system pages (starting, no Wi-Fi, no
-Home Assistant) and one status page the phases fall back to. It is deliberately
-plain. The core's job is to work before and without any optional package; making
-it pretty is what `base/faces/` is for.
 
 ## Why not the upstream config
 

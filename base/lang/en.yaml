@@ -1,11 +1,11 @@
-# English — the reference translation.
+# English - the reference translation.
 #
 # Listing this file is a no-op: these values are already the defaults baked into
 # the screens themselves, so a config with no language package speaks English.
 # It exists to be COPIED: `cp en.yaml xx.yaml`, translate the right-hand sides,
 # and you have a new language. Keep the keys identical.
 #
-# Usage — the language file must come AFTER the screens it translates, because
+# Usage - the language file must come AFTER the screens it translates, because
 # ESPHome resolves later-listed package files at a higher priority and lets them
 # win substitution conflicts:
 #

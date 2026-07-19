@@ -1,6 +1,6 @@
 # Polski.
 #
-# Musi być wymieniony PO plikach ekranów w `files:` — ESPHome rozstrzyga
+# Musi być wymieniony PO plikach ekranów w `files:` - ESPHome rozstrzyga
 # konflikty substitutions na korzyść pliku wymienionego później:
 #
 #   packages:

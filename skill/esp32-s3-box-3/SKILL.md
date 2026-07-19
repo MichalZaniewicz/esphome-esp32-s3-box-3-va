@@ -18,7 +18,7 @@ cross-checked against the upstream ESPHome voice config. Full detail:
 
 ## Board
 
-- **ESP32-S3**, 240 MHz, **16 MB flash**, **octal PSRAM** (mandatory — see below).
+- **ESP32-S3**, 240 MHz, **16 MB flash**, **octal PSRAM** (mandatory - see below).
 - **320x240 SPI panel**, ILI9341-class. ESPHome: `mipi_spi`, `model: S3BOX`.
 - **GT911** capacitive touch on the shared I2C bus.
 - **ES8311** DAC + amp + speaker (single channel), **ES7210** dual-mic ADC.
@@ -42,7 +42,7 @@ Configs for the older boxes do not drive this one, and `S3BOXLITE` is a differen
 | Touch INT | 3 | | Dock I2C | 40 / 41 |
 
 One I2C bus carries ES7210 + ES8311 + GT911. **GPIO 0, 3, 45 and 46 are strapping
-pins** — each needs `ignore_strapping_warning: true`.
+pins** - each needs `ignore_strapping_warning: true`.
 
 The red circle under the screen is **not a GPIO**: it is GT911 touch button 0,
 read with `binary_sensor: platform: gt911, index: 0`.
@@ -79,7 +79,7 @@ both). Touch that works cold and dies on a warm boot points here.
 
 **Change LVGL pages through the LVGL action, not `lv_scr_load()`.** The ESPHome
 component tracks which page is current; loading a screen behind its back desyncs
-that. Use `lvgl.page.show:` — which means phase→page dispatch is a chain of
+that. Use `lvgl.page.show:` - which means phase→page dispatch is a chain of
 `if:` blocks rather than one tidy C++ `switch`.
 
 **`voice_assistant.get_timers()` returns `const std::vector<Timer> &`**, not a
@@ -113,7 +113,7 @@ does **not** set it, so a straight port inherits `gain_factor: 1`.
 
 Diagnosing: the component only logs successful detections and VAD-blocked ones
 (`Wake word model predicts 'X', but VAD model doesn't.`). A near miss logs
-nothing at all, so absence of logs tells you nothing about how close it got —
+nothing at all, so absence of logs tells you nothing about how close it got -
 lower the model's `probability_cutoff` temporarily if you need to see the edge.
 
 ## Opacity has two scales
@@ -136,7 +136,7 @@ ids, not component schemas.
 ## voice_assistant and TTS: the reboot trap
 
 If `voice_assistant:` has a `media_player:`, ESPHome does not merely hand you the
-URL at `TTS_END` — it *also* plays it itself
+URL at `TTS_END` - it *also* plays it itself
 (`voice_assistant.cpp`: `media_player_->make_call().set_media_url(url)`), on top
 of anything `on_tts_end` does. So a config that forwards TTS to an external HA
 speaker in `on_tts_end` gets **both**: the external speaker plays it, and the box
@@ -146,7 +146,7 @@ decode is a plausible cause of mid-answer reboots.
 Dropping `media_player:` from `voice_assistant:` does **not** disable TTS: the
 pipeline request flags depend only on wake-word and VAD settings, so HA still
 runs TTS and still fires `on_tts_end` with the URL. It just makes playback
-explicit — route it yourself with `media_player.play_media` (local),
+explicit - route it yourself with `media_player.play_media` (local),
 `homeassistant.service` (external), or both. Timer sounds and HA announcements
 keep working through the `speaker_media_player` component, which exists
 independently of the assistant.

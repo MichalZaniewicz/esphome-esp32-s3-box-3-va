@@ -1,4 +1,4 @@
-# ESP32-S3-BOX-3 — hardware notes
+# ESP32-S3-BOX-3 - hardware notes
 
 Everything here is what `base/core.yaml` assumes. The pin map is taken from
 Espressif's own board support package,
@@ -11,7 +11,7 @@ Espressif's own board support package,
 |---|---|
 | SoC | ESP32-S3, 240 MHz, dual core |
 | Flash | 16 MB |
-| PSRAM | octal, 80 MHz — **mandatory**: the `mipi_spi` `S3BOX` model declares `requires: psram`, and the LVGL draw buffer lives there |
+| PSRAM | octal, 80 MHz - **mandatory**: the `mipi_spi` `S3BOX` model declares `requires: psram`, and the LVGL draw buffer lives there |
 | Display | 320x240 SPI, ILI9341-class |
 | Touch | GT911 capacitive, I2C |
 | Audio out | ES8311 DAC + amplifier + speaker |
@@ -20,7 +20,7 @@ Espressif's own board support package,
 
 Note the revision split: the older **ESP32-S3-BOX** and **BOX-Lite** use a
 **TT21100** touch controller and an ST7789 panel. The **BOX-3** uses the GT911
-and an ILI9341-class panel — `esp-box-3.c` probes GT911 first and picks the panel
+and an ILI9341-class panel - `esp-box-3.c` probes GT911 first and picks the panel
 driver from what answers. A config for the older boxes will not drive this one.
 
 ## Pin map
@@ -43,7 +43,7 @@ driver from what answers. A config for the older boxes will not drive this one.
 | I2S DIN | 16 | ES7210 → ESP (microphones) |
 | Amplifier enable | 46 | Active high, strapping pin |
 | Top button | 0 | `INPUT_PULLUP`, `inverted: true`, strapping pin |
-| Mute button | 1 | Present in esp-bsp (`BSP_BUTTON_MUTE_IO`); **not used here** — see below |
+| Mute button | 1 | Present in esp-bsp (`BSP_BUTTON_MUTE_IO`); **not used here** - see below |
 | Dock I2C | 40 / 41 | Only when sitting in an accessory dock |
 
 The red circle silkscreened under the screen is **not a GPIO**. It is touch
@@ -61,13 +61,13 @@ Confirmed by a bus scan on a real BOX-3 (ESPHome 2026.7.0):
 | 0x68 | IMU | no |
 
 The GT911 answering on 0x5D rather than its 0x14 fallback means the reset strap
-resolved as expected without the touchscreen declaring a `reset_pin` — see below.
+resolved as expected without the touchscreen declaring a `reset_pin` - see below.
 
 ## Gotchas
 
 **LVGL replaces `display: pages:`, it does not extend it.** The display block
 must carry `update_interval: never` and `auto_clear_enabled: false`, and must
-have no `lambda:` or `pages:` — LVGL owns the framebuffer. This is why porting
+have no `lambda:` or `pages:` - LVGL owns the framebuffer. This is why porting
 the upstream voice config to a touch UI means rewriting the whole display layer.
 
 **Do not declare `reset_pin: 48` on the touchscreen.** The LCD reset net also
@@ -108,7 +108,7 @@ temperature/humidity, IR and a microSD slot. Nothing in this config touches it.
 `speaker_media_player` persists its **volume and mute state to flash** and
 restores both at boot (`speaker_media_player.cpp`: `pref_.load(&volume_restore_state)`).
 ESPHome preferences survive OTA updates, so a mute set once stays set through
-every reflash — and it silences the timer alarm and any locally-played TTS while
+every reflash - and it silences the timer alarm and any locally-played TTS while
 the logs still cheerfully report `PLAYING`. The giveaway is `Muted: YES` on the
 media player state line. Fix it once from Home Assistant and it sticks.
 

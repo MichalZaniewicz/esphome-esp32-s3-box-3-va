@@ -1,7 +1,7 @@
 # Characters
 
 The assistant on screen is split in two: `base/screens/face.yaml` is the
-**engine** — it draws two eyes and a mouth and animates them per phase — and a
+**engine** - it draws two eyes and a mouth and animates them per phase - and a
 file in here is a **character**: one image plus the numbers that say where its
 features go. Swapping the assistant is one line in `files:`.
 
@@ -11,15 +11,15 @@ Animated, one clip each: [pip](../assets/demo/demo-pip.gif) · [astro](../assets
 
 | Character | Look | Face style |
 |---|---|---|
-| **Pip** | Round head, antenna, blue panel | Soft cyan ovals. The reference — every other character was measured against it. |
+| **Pip** | Round head, antenna, blue panel | Soft cyan ovals. The reference - every other character was measured against it. |
 | **Astro** | Astronaut, sealed visor | Cyan capsule slits. The visor is wide and shallow, profiled row by row; tall eyes do not fit. |
 | **Momo** | Cat ears, black screen | Amber square pixels, barely rounded. The artwork has no colour of its own. |
-| **Franky** | Green monster, bolts, stitches | White cartoon eyes with black pupils — the only face here that is skin rather than a display, so it gets a separate mouth colour. |
+| **Franky** | Green monster, bolts, stitches | White cartoon eyes with black pupils - the only face here that is skin rather than a display, so it gets a separate mouth colour. |
 | **Wizard** | Void under a purple hat | Glowing gold eyes and almost no mouth. The void sits below the hat brim, not at the frame's centre. |
 | **Genie** | Small head, big moustache | The most compact face of the set; the mouth is a hint under the moustache. |
 
 `face_center_x` shifts the whole face sideways when the artwork is not centred.
-Most of these do not need it — five of the six sit on the frame's axis and only
+Most of these do not need it - five of the six sit on the frame's axis and only
 Wizard is off by 3 px. Measure before reaching for it: reading coordinates off a
 scaled screenshot is exactly how a first pass got Franky and Genie wrong by 20 px
 each. Compare the left and right halves of the image and find the axis where they
@@ -42,14 +42,14 @@ packages:
 ```
 
 Order matters: ESPHome resolves later-listed package files at a higher priority,
-so a character listed *before* the engine is silently ignored — you get the
+so a character listed *before* the engine is silently ignored - you get the
 engine's defaults and no error.
 
 ## Adding one
 
 1. **Draw the character with no face.** 320x240 PNG. The eyes and mouth are
    drawn on top at runtime, so leave the space where they belong empty. If you
-   are adapting existing artwork that already has a face, erase it — the blank
+   are adapting existing artwork that already has a face, erase it - the blank
    area needs to match whatever is behind it, or the drawn features will sit on
    a patch.
 2. `cp pip.yaml mycharacter.yaml`, point `face_background_file` at your image,
@@ -80,8 +80,8 @@ as an oval, keep the radius small and it reads as a screen pixel block.
 ## Limits worth knowing before you design one
 
 - **Two eyes and one mouth, all rectangles.** No eyebrows, no pupils, no curves.
-  Expression comes from proportion and motion, which is enough — see the preview
-  above — but a character that needs a frown will need the engine extended.
+  Expression comes from proportion and motion, which is enough - see the preview
+  above - but a character that needs a frown will need the engine extended.
 - **The background never redraws.** That is what keeps the animation cheap on
   this hardware, and it means the artwork cannot animate. Anything that should
   move has to be one of the three widgets.
