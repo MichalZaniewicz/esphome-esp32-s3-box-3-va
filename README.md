@@ -89,6 +89,8 @@ base/
   core.yaml                # the always-on core, pulled as a remote package
   screens/
     home.yaml              # optional home screen: clock, date, climate
+  lang/
+    en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
   sounds/
     timer_finished.flac    # the timer alarm, compiled into the firmware
 docs/
@@ -134,6 +136,24 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | Screen | What it adds |
 |---|---|
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, as a replacement for the bare idle illustration. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
+
+## Languages
+
+Every string a screen draws is a substitution, so a language is just a file that
+sets them. English is the default and needs no package. To use another, add it to
+`files:` **after** the screens — ESPHome resolves later-listed package files at a
+higher priority, so a language file listed first is silently ignored:
+
+```yaml
+      files:
+        - base/core.yaml
+        - base/screens/home.yaml
+        - base/lang/pl.yaml      # <- last
+```
+
+Adding a language is `cp en.yaml xx.yaml` plus translation; `en.yaml` is the
+reference and always carries every key. Details and translator notes:
+[`base/lang/README.md`](base/lang/README.md). Pull requests welcome.
 
 ## Why not the upstream config
 

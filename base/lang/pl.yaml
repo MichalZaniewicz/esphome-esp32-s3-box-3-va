@@ -1,0 +1,25 @@
+# Polski.
+#
+# Musi być wymieniony PO plikach ekranów w `files:` — ESPHome rozstrzyga
+# konflikty substitutions na korzyść pliku wymienionego później:
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/lang/pl.yaml      # <- na końcu
+#
+# Wszystkie znaki poniżej mieszczą się w GF_Latin_Core, więc nie trzeba nic
+# dopisywać do `extra_glyphs`.
+
+substitutions:
+  # --- Ekran domowy --------------------------------------------------------
+  # Tygodnie zaczynają się od niedzieli, miesiące od stycznia. Miesiące w
+  # dopełniaczu, bo data składa się jako "środa, 19 lipca".
+  weekday_names: '"niedziela","poniedziałek","wtorek","środa","czwartek","piątek","sobota"'
+  month_names: '"stycznia","lutego","marca","kwietnia","maja","czerwca","lipca","sierpnia","września","października","listopada","grudnia"'
+
+  home_hint_text: "Dotknij albo powiedz „Alexa”"
+  home_indoor_label: "W domu"
+  home_outdoor_label: "Na zewnątrz"

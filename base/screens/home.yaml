@@ -28,8 +28,12 @@ substitutions:
   room_hum_entity: sensor.room_humidity
   outdoor_temp_entity: sensor.outdoor_temperature
 
-  # Localisation. C's strftime only speaks English, so the names are listed here
-  # instead. Order matters: weekdays start on Sunday, months on January.
+  # Every string below is English by default and overridable by a language
+  # package - add `base/lang/pl.yaml` (or your own) AFTER this file in `files:`
+  # and it wins. See base/lang/README.md.
+  #
+  # C's strftime only speaks English, hence the spelled-out names. Order matters:
+  # weekdays start on Sunday, months on January.
   weekday_names: '"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"'
   month_names: '"January","February","March","April","May","June","July","August","September","October","November","December"'
   # Printed under the clock. Set it to "" to leave the line empty.
