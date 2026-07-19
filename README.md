@@ -111,7 +111,7 @@ What lives in the thin config:
 | `volume_min` / `volume_max` | `0.5` / `0.8` | Media player clamps for the onboard speaker. |
 | `hidden_ssid` | `false` | `true` enables `fast_connect` for a hidden SSID. |
 | `*_illustration_file` | Casita artwork | The 320x240 PNG per phase. Any URL or local path. |
-| `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `°²³` | Characters the UI can render. Add your language's accented characters to `extra_glyphs` or they draw blank. |
+| `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets — `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
 | `mww_gain_factor` | `4` | Input gain for the wake word only (1–64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
 
 Pins are substitutions too, but you should not need them unless you are porting

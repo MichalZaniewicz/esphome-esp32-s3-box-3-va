@@ -129,14 +129,22 @@ substitutions:
   error_background_color: '000000'
 
   # ---------------------------------------------------------------------------
-  # Fonts. `font_glyphsets` covers a language family wholesale; `extra_glyphs`
-  # is for the handful of characters your language needs on top of it (Polish,
-  # Czech, ... ). Every character the assistant may print must be in one or the
-  # other, or it renders blank.
+  # Fonts. Every character the assistant may print must be covered by the
+  # glyphset or listed in `extra_glyphs`, or it renders blank.
+  #
+  # GF_Latin_Core is broader than its name suggests: 319 glyphs, covering Western
+  # AND Central European Latin. Polish, Czech, Hungarian, Turkish accents are all
+  # in there already, so `extra_glyphs` is usually unnecessary - here it only adds
+  # the superscripts for m² / m³, which Core happens to lack.
+  #
+  # Do NOT "upgrade" this to GF_Latin_Plus or GF_Latin_Beyond. The Google Fonts
+  # glyphsets are increments, not supersets: Plus is 110 glyphs and Beyond 134,
+  # and neither contains the Central European accents. Swapping Core for Plus
+  # removes them. To extend coverage, list both.
   # ---------------------------------------------------------------------------
   font_family: Figtree
   font_glyphsets: "GF_Latin_Core"
-  extra_glyphs: "°²³ęóąśłżźćńĘĄÓŻĆŹŃŚŁ"
+  extra_glyphs: "²³"
 
 esphome:
   name: ${name}
