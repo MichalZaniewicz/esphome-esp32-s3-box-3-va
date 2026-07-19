@@ -126,6 +126,14 @@ script:
 # first Home Assistant value arrives.
 esphome:
   on_boot:
+    # Say so in the log. Whether an optional package actually made it into the
+    # build is otherwise invisible - nothing here has a dump_config - and a
+    # stale copy of the thin config is the easiest mistake to make.
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/home.yaml (clock + climate)"
     - priority: 500
       then:
         - script.execute: update_home_clock

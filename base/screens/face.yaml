@@ -87,6 +87,14 @@ substitutions:
   muted_page: page_face
   timer_page: page_face
 
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/face.yaml (animated face, tick ${face_tick})"
+
 globals:
   - id: face_frame
     type: int

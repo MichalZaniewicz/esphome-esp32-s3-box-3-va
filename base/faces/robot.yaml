@@ -14,6 +14,14 @@
 #
 # See base/faces/README.md.
 
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/robot.yaml"
+
 substitutions:
   # The artwork. Must have NO face painted on it — the eyes and mouth are drawn
   # on top. 320x240; anything else is scaled to fit.
