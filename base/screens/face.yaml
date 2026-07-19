@@ -71,7 +71,8 @@ substitutions:
   face_mouth_error_w: '18'
   face_eye_h_think: '20'   # squinted while thinking
   face_mouth_think_w: '12' # thinking: the mouth shrinks to a dot
-  face_glance_dx: '16'     # how far the eyes look sideways while thinking
+  face_glance_dx: '9'      # how far the eyes look sideways while thinking
+  face_listen_pulse: '4'   # how much the eyes breathe while listening
   face_shake_dx: '4'       # alarm shake amplitude
   face_eye_radius: '10'
   face_mouth_radius: '8'
@@ -231,15 +232,20 @@ script:
                   - lambda: id(face_expr) = 2;
                   - script.execute: face_tint_normal
                   - script.execute:
-                      id: face_eyes
-                      w: ${face_eye_w}
-                      h: ${face_eye_h_wide}
-                      dx: 0
-                  - script.execute:
                       id: face_mouth
                       w: ${face_mouth_o_w}
                       h: ${face_mouth_o_h}
                       dx: 0
+            # Wide eyes holding perfectly still read as a freeze-frame, not as
+            # attention. A slow breath over four steps is enough to look alive
+            # without competing with the thinking or talking animations.
+            - script.execute:
+                id: face_eyes
+                w: ${face_eye_w}
+                h: !lambda |-
+                  static const int PULSE[] = {0, ${face_listen_pulse} / 2, ${face_listen_pulse}, ${face_listen_pulse} / 2};
+                  return ${face_eye_h_wide} + PULSE[(id(face_frame) / 2) % 4];
+                dx: 0
 
       # THINKING - eyes glance side to side, mouth flat.
       - if:

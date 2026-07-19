@@ -54,7 +54,9 @@ substitutions:
   face_mouth_error_w: '18'
   face_eye_h_think: '20'
   face_mouth_think_w: '12'
-  face_glance_dx: '16'
+  face_glance_dx: '9'
+  face_listen_pulse: '4'
   face_shake_dx: '4'
+  face_tick: 120ms         # animation rate; lower is smoother and costs redraws
   face_eye_radius: '10'
   face_mouth_radius: '8'
