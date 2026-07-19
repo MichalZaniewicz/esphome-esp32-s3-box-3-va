@@ -35,7 +35,7 @@ substitutions:
   face_eye_y: '-38'
   face_eye_w: '18'
   face_eye_h: '20'
-  face_mouth_y: '-6'
+  face_mouth_y: '-20'
   face_mouth_w: '14'
   face_mouth_h: '4'
 
