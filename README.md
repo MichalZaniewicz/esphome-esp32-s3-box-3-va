@@ -85,6 +85,8 @@ esp32-s3-box-3-va.yaml     # YOUR config: copy + edit this (pulls the rest from 
 secrets.example.yaml       # copy to secrets.yaml
 base/
   core.yaml                # the always-on core, pulled as a remote package
+  screens/
+    home.yaml              # optional home screen: clock, date, climate
   sounds/
     timer_finished.flac    # the timer alarm, compiled into the firmware
 docs/
@@ -113,12 +115,23 @@ What lives in the thin config:
 | `volume_min` / `volume_max` | `0.5` / `0.8` | Media player clamps for the onboard speaker. |
 | `hidden_ssid` | `false` | `true` enables `fast_connect` for a hidden SSID. |
 | `*_illustration_file` | Casita artwork | The 320x240 PNG per phase. Any URL or local path. |
+| `idle_page` | `page_idle` | Which page shows when nothing is happening. Set to `page_home` after adding `base/screens/home.yaml` to your `files:` list. |
 | `timer_finished_sound_file` | repo `timer_finished.flac` | The timer alarm. Compiled into flash for on-device playback (so it rings without network) and handed to Home Assistant when routing to the external player — which means it must be a **URL the external speaker can reach**, not a local path, if you use that routing. MP3/FLAC/WAV. |
 | `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets — `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
 | `mww_gain_factor` | `4` | Input gain for the wake word only (1–64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
 
 Pins are substitutions too, but you should not need them unless you are porting
 to another board.
+
+## Screens
+
+The core ships one page per assistant phase. Extra screens are optional packages
+under `base/screens/` — add the file to your `files:` list to compile it in, drop
+the line to leave it out. ESPHome merges each package's `lvgl:` block into one UI.
+
+| Screen | What it adds |
+|---|---|
+| `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, as a replacement for the bare idle illustration. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
 
 ## Why not the upstream config
 

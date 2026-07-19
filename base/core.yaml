@@ -142,6 +142,12 @@ substitutions:
   error_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/error_320_240.png
   timer_finished_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/timer_finished_320_240.png
 
+  # Which page the assistant sits on when nothing is happening. `page_idle` is
+  # the phase illustration; set it to `page_home` (clock, date, climate) after
+  # adding `base/screens/home.yaml` to your package's `files:` list. Any screen
+  # package can claim this the same way.
+  idle_page: page_idle
+
   # Page background behind each illustration (they have alpha).
   idle_background_color: '000000'
   listening_background_color: 'FFFFFF'
@@ -173,18 +179,20 @@ esphome:
   friendly_name: ${friendly_name}
   min_version: 2026.4.0
   name_add_mac_suffix: false
+  # List form, not a bare mapping: screen packages add their own on_boot, and
+  # ESPHome appends lists while two mappings under one key would collide.
   on_boot:
-    priority: 600
-    then:
-      - script.execute: draw_display
-      # If HA never shows up, stop pretending we are still booting.
-      - delay: 30s
-      - if:
-          condition:
-            lambda: return id(init_in_progress);
-          then:
-            - lambda: id(init_in_progress) = false;
-            - script.execute: draw_display
+    - priority: 600
+      then:
+        - script.execute: draw_display
+        # If HA never shows up, stop pretending we are still booting.
+        - delay: 30s
+        - if:
+            condition:
+              lambda: return id(init_in_progress);
+            then:
+              - lambda: id(init_in_progress) = false;
+              - script.execute: draw_display
 
 esp32:
   board: esp32s3box
@@ -662,7 +670,7 @@ script:
                   && p != ${voice_assist_not_ready_phase_id}
                   && p != ${voice_assist_timer_finished_phase_id};
           then:
-            - lvgl.page.show: page_idle
+            - lvgl.page.show: ${idle_page}
 
   # Push what was said / what was answered onto the labels. The text sensors are
   # the source of truth; LVGL labels do not follow them on their own.

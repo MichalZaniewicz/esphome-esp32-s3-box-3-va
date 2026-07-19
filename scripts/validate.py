@@ -12,6 +12,11 @@ slow and a YAML typo does not deserve one. This catches, locally:
     pip install pyyaml
     python validate.py ../base/core.yaml
 
+Files that only make sense together - a core plus the screen packages that ride
+on its substitutions - are checked as one config with --merge:
+
+    python validate.py --merge ../base/core.yaml ../base/screens/home.yaml
+
 Exit code is 1 if anything failed, so it works in a pre-commit hook.
 """
 import re
@@ -60,12 +65,73 @@ def collect_ids(node, out, path="root", in_action=False):
 
 
 def main() -> int:
-    if len(sys.argv) < 2:
+    args = [a for a in sys.argv[1:] if a != "--merge"]
+    merge = "--merge" in sys.argv
+    if not args:
         print(__doc__)
         return 2
 
+    if merge:
+        return _check_merged(args)
+
+    return _check(args)
+
+
+def _check_merged(args) -> int:
+    """Check several files as the single config ESPHome will assemble.
+
+    Note this cannot be done by concatenating the text: each file has its own
+    `substitutions:` block, and a YAML document with a duplicate top-level key
+    keeps only the last one - which would silently drop the core's entire
+    substitution set. The blocks have to be merged structurally instead.
+    """
+    print(f"(--merge: {', '.join(args)} jako jeden config)")
     problems = 0
-    for arg in sys.argv[1:]:
+    subs, ids, bodies = {}, {}, []
+
+    for arg in args:
+        path = Path(arg)
+        text = path.read_text(encoding="utf-8")
+        try:
+            doc = yaml.safe_load(text)
+        except yaml.YAMLError as exc:
+            print(f"  FAIL  {path}: YAML nie parsuje sie:\n{exc}")
+            return 1
+        if not isinstance(doc, dict):
+            print(f"  FAIL  {path}: top level nie jest mapowaniem")
+            return 1
+        subs.update(doc.get("substitutions") or {})
+        collect_ids(doc, ids, path.name)
+        bodies.append(re.sub(r"^substitutions:.*?(?=^\S)", "", text, flags=re.S | re.M))
+
+    print("  OK    kazdy plik parsuje sie")
+
+    used = set()
+    for body in bodies:
+        used |= {m.group(1) or m.group(2) for m in SUB_REF.finditer(body)}
+
+    undefined = sorted(used - set(subs) - BUILTIN_SUBS)
+    if undefined:
+        print(f"  FAIL  uzyte, nigdzie nie zdefiniowane: {', '.join(undefined)}")
+        problems += 1
+    else:
+        print(f"  OK    kazde ${{...}} ma substitution ({len(subs)} zdefiniowanych)")
+
+    dupes = {k: v for k, v in ids.items() if len(v) > 1}
+    if dupes:
+        for dupe, where in dupes.items():
+            print(f"  FAIL  duplikat id '{dupe}': {'; '.join(where)}")
+        problems += 1
+    else:
+        print(f"  OK    {len(ids)} unikalnych id, bez kolizji")
+
+    print("\n" + ("FAILED" if problems else "ALL GOOD"))
+    return 1 if problems else 0
+
+
+def _check(args) -> int:
+    problems = 0
+    for arg in args:
         path = Path(arg)
         text = path.read_text(encoding="utf-8")
         print(f"\n=== {path} ===")
