@@ -69,7 +69,9 @@ substitutions:
   face_mouth_alarm_w: '30'
   face_mouth_alarm_h: '24'
   face_mouth_error_w: '18'
-  face_glance_dx: '7'      # how far the eyes look sideways while thinking
+  face_eye_h_think: '20'   # squinted while thinking
+  face_mouth_think_w: '12' # thinking: the mouth shrinks to a dot
+  face_glance_dx: '16'     # how far the eyes look sideways while thinking
   face_shake_dx: '4'       # alarm shake amplitude
   face_eye_radius: '10'
   face_mouth_radius: '8'
@@ -252,15 +254,17 @@ script:
                   - script.execute: face_tint_normal
                   - script.execute:
                       id: face_mouth
-                      w: ${face_mouth_small_w}
+                      w: ${face_mouth_think_w}
                       h: ${face_mouth_h}
                       dx: 0
             # Hold each side for three ticks, so it reads as looking around
-            # rather than vibrating.
+            # rather than vibrating. The eyes squint and the mouth shrinks to a
+            # dot as well: a 7 px sideways nudge on its own was invisible during
+            # a phase that often lasts barely a second.
             - script.execute:
                 id: face_eyes
                 w: ${face_eye_w}
-                h: ${face_eye_h}
+                h: ${face_eye_h_think}
                 dx: !lambda |-
                   return ((id(face_frame) / 3) % 2) ? ${face_glance_dx} : -${face_glance_dx};
 

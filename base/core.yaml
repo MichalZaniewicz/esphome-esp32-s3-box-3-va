@@ -127,6 +127,19 @@ substitutions:
   external_media_player_id: media_player.living_room
   tts_output_default: "This device"
 
+  # When TTS plays on an external speaker the box hands over a URL and hears
+  # nothing back, so it has no idea how long the reply lasts - the pipeline ends
+  # in about half a second while the speaker talks on. Anything driven by the
+  # assistant's state (an animated face, a light) would blink and stop.
+  #
+  # So estimate it from the text: hold the replying phase for a base delay plus
+  # this much per character. 70 ms/char is roughly conversational speech; raise
+  # it if the animation finishes early, lower it if it runs long. The cap stops a
+  # runaway estimate holding the device forever.
+  tts_hold_base_ms: '700'
+  tts_hold_ms_per_char: '70'
+  tts_hold_max_ms: '30000'
+
   # ---------------------------------------------------------------------------
   # Phase illustrations. 320x240 PNGs, fetched at compile time and baked into
   # flash, so any URL or local path works. Override them in your thin config to
@@ -479,6 +492,7 @@ voice_assistant:
         state: !lambda return x;
     - script.execute: draw_display
   on_tts_start:
+    - lambda: id(tts_chars) = x.length();
     - text_sensor.template.publish:
         id: text_response
         state: !lambda return x;
@@ -519,6 +533,16 @@ voice_assistant:
                 media_player.is_announcing:
             - not:
                 speaker.is_playing:
+    # Nothing above waits for an EXTERNAL speaker - the box cannot see it. Hold
+    # the replying phase for as long as the reply plausibly takes, so the face
+    # keeps talking and the wake word stays off until the speaker is done.
+    - if:
+        condition:
+          lambda: return id(tts_output).current_option() != "This device";
+        then:
+          - delay: !lambda |-
+              uint32_t ms = ${tts_hold_base_ms} + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
+              return ms > ${tts_hold_max_ms} ? ${tts_hold_max_ms} : ms;
     - if:
         condition:
           - lambda: return id(wake_word_engine_location).current_option() == "On device";
@@ -588,6 +612,11 @@ globals:
     type: bool
     restore_value: false
   - id: timer_percent
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # Length of the reply being spoken, for the external-playback hold above.
+  - id: tts_chars
     type: int
     restore_value: false
     initial_value: "0"
