@@ -17,6 +17,7 @@ Animated, one clip each: [pip](../assets/demo/demo-pip.gif) · [astro](../assets
 | **Franky** | Green monster, bolts, stitches | White cartoon eyes with black pupils - the only face here that is skin rather than a display, so it gets a separate mouth colour. |
 | **Wizard** | Void under a purple hat | Glowing gold eyes and almost no mouth. The void sits below the hat brim, not at the frame's centre. |
 | **Genie** | Small head, big moustache | The most compact face of the set; the mouth is a hint under the moustache. |
+| **Aura** | No artwork at all | Nine bars on a line: flat at rest, an equaliser while speaking. Self-contained - list it **without** `base/screens/face.yaml`, since it has no eyes or mouth for the engine to animate and claims every phase itself. |
 | **Flare** | Burning blob, flames on top | Dark features cut into a bright body, with the pupil lit in the body's own yellow. The only inverted face here, and a useful demonstration that `face_color` need not be the bright one. |
 
 `face_center_x` shifts the whole face sideways when the artwork is not centred.

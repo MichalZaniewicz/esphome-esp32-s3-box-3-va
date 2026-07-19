@@ -8,16 +8,18 @@
 # to flash beyond its own code - which makes it the natural default for anyone
 # who has not picked a character.
 #
-# An OPTIONAL package. Add it to your thin config's `files:` list AFTER
-# base/core.yaml:
+# A character, picked the same way as the others - but the only one that brings
+# its own drawing with it. The rest are artwork plus measurements and need
+# base/screens/face.yaml to animate them; this one has no eyes and no mouth, so
+# the face engine has nothing to work with and is not used at all:
 #
 #   files:
 #     - base/core.yaml
-#     - base/screens/aura.yaml
+#     - base/faces/aura.yaml     # no base/screens/face.yaml
 #
-# It claims every assistant phase including idle. Use it INSTEAD of
-# base/screens/face.yaml, not alongside: both want the same phases, and whichever
-# is listed later wins.
+# Do not list the face engine alongside it. Aura claims every phase including
+# idle, so the engine would be dead weight - and worse, its character's artwork
+# would still be compiled into flash while never being shown.
 #
 # The bars are driven from one lambda into a global array, then pushed to the
 # widgets. That keeps the maths in one readable place instead of spread across

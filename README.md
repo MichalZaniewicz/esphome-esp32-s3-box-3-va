@@ -145,7 +145,6 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | Screen | What it adds |
 |---|---|
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
-| `aura.yaml` | An assistant with no face and no artwork: nine bars on a centre line that settle flat, breathe while listening and break into an equaliser while speaking. Claims every phase, including idle, so it is used **instead of** `face.yaml`. Adds no image to the build. |
 | `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
 
 Install both and the idle screen has two faces: the clock, and the character
@@ -180,7 +179,7 @@ expression belong to the character, and the artwork decides all of it.
 
 | | | |
 |---|---|---|
-| ![Aura](base/assets/demo/demo-aura.gif) | **Aura**<br>`base/screens/aura.yaml` | No face, no artwork, nothing to download: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system. Being a screen rather than a character, it replaces `face.yaml` instead of feeding it. |
+| ![Aura](base/assets/demo/demo-aura.gif) | **Aura**<br>`base/faces/aura.yaml` | No face, no artwork, nothing to download: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system. The only one that draws itself, so it is listed **without** `base/screens/face.yaml`. |
 | ![Pip](base/assets/demo/demo-pip.gif) | **Pip**<br>`base/faces/pip.yaml` | The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals - the reference every other character was measured against. |
 | ![Astro](base/assets/demo/demo-astro.gif) | **Astro**<br>`base/faces/astro.yaml` | Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits. |
 | ![Momo](base/assets/demo/demo-momo.gif) | **Momo**<br>`base/faces/momo.yaml` | A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan. |
