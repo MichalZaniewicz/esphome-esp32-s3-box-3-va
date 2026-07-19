@@ -28,26 +28,26 @@ substitutions:
   face_pupil_color: '0x10283A'
   face_alarm_color: '0xFF5A5A'
 
-  # A full-body character, so the head is small and sits high and left. The mouth
-  # is hidden behind the moustache, so what is drawn is a hint under it.
-  face_center_x: '-18'
+# A full-body character: the head occupies rows -74..-10 and is centred. Eyes go
+  # above the moustache, and the mouth is only a hint below it.
+  face_center_x: '0'
   face_eye_offset: '16'
-  face_eye_y: '-48'
-  face_eye_w: '16'
-  face_eye_h: '18'
-  face_mouth_y: '-16'
+  face_eye_y: '-38'
+  face_eye_w: '18'
+  face_eye_h: '20'
+  face_mouth_y: '-6'
   face_mouth_w: '14'
   face_mouth_h: '4'
 
-  face_pupil_w: '6'
-  face_pupil_h: '9'
+  face_pupil_w: '7'
+  face_pupil_h: '10'
   face_pupil_radius: '3'
   face_pupil_dilate: '2'
   face_pupil_shrink: '2'
   face_gaze_dx: '4'
 
-  face_eye_h_wide: '22'
-  face_eye_h_think: '12'
+  face_eye_h_wide: '24'
+  face_eye_h_think: '13'
   face_eye_h_narrow: '6'
   face_eye_h_shut: '3'
   face_mouth_open_h: '10'

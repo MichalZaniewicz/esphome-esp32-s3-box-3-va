@@ -29,26 +29,27 @@ substitutions:
   face_pupil_color: '0x14140F'
   face_alarm_color: '0xFF5A5A'
 
-  # The green face sits LEFT of the frame's centre, hence face_center_x. Eyes go
-  # between the forehead stitching and the cheek blushes.
-  face_center_x: '-20'
-  face_eye_offset: '28'
-  face_eye_y: '-20'
-  face_eye_w: '26'
-  face_eye_h: '30'
-  face_mouth_y: '14'
-  face_mouth_w: '34'
+# Measured, not guessed: the green face runs from 72 px above centre to 44 below
+  # and is symmetric about the frame, so no sideways shift. Eyes sit between the
+  # forehead stitching and the cheek blushes.
+  face_center_x: '0'
+  face_eye_offset: '32'
+  face_eye_y: '-15'
+  face_eye_w: '28'
+  face_eye_h: '32'
+  face_mouth_y: '18'
+  face_mouth_w: '36'
   face_mouth_h: '7'
 
-  face_pupil_w: '10'
-  face_pupil_h: '15'
+  face_pupil_w: '11'
+  face_pupil_h: '16'
   face_pupil_radius: '5'
   face_pupil_dilate: '3'
   face_pupil_shrink: '3'
   face_gaze_dx: '6'
 
-  face_eye_h_wide: '34'
-  face_eye_h_think: '20'
+  face_eye_h_wide: '36'
+  face_eye_h_think: '22'
   face_eye_h_narrow: '10'
   face_eye_h_shut: '4'
   face_mouth_open_h: '18'

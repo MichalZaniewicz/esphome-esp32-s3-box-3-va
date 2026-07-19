@@ -16,8 +16,12 @@ features go. Swapping the assistant is one line in `files:`.
 | **Wizard** | Void under a purple hat | Glowing gold eyes and almost no mouth. The void sits below the hat brim, not at the frame's centre. |
 | **Genie** | Small head, big moustache | The most compact face of the set; the mouth is a hint under the moustache. |
 
-Faces are not always centred in their frame — `face_center_x` shifts the whole
-face sideways to meet the artwork. Franky, Wizard and Genie all need it.
+`face_center_x` shifts the whole face sideways when the artwork is not centred.
+Most of these do not need it — five of the six sit on the frame's axis and only
+Wizard is off by 3 px. Measure before reaching for it: reading coordinates off a
+scaled screenshot is exactly how a first pass got Franky and Genie wrong by 20 px
+each. Compare the left and right halves of the image and find the axis where they
+mirror; if that lands on 160, the offset is zero.
 
 Every expression the engine draws, for reference:
 
