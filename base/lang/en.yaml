@@ -26,6 +26,6 @@ substitutions:
   month_names: '"January","February","March","April","May","June","July","August","September","October","November","December"'
 
   # Printed under the clock. Set to "" for an empty line.
-  home_hint_text: "Touch, or say the wake word"
+  home_hint_text: "Press the button, or say the wake word"
   home_indoor_label: "Inside"
   home_outdoor_label: "Outside"

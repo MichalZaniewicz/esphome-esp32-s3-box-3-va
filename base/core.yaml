@@ -858,14 +858,24 @@ binary_sensor:
           - button.press: factory_reset_btn
 
   # The red circle silkscreened below the screen is not a GPIO - it is touch
-  # button 0 on the GT911.
+  # button 0 on the GT911. It is the ONLY thing that starts the assistant by
+  # touch: the screen itself belongs to the UI, so widgets get every tap.
+  #
+  # While a timer is ringing the button silences it instead of starting a
+  # pipeline - otherwise reaching out to stop the alarm would also wake the
+  # assistant.
   - platform: gt911
     id: home_button
     internal: true
     index: 0
     on_press:
-      - switch.turn_off: timer_ringing
-      - script.execute: tap_to_talk
+      - if:
+          condition:
+            switch.is_on: timer_ringing
+          then:
+            - switch.turn_off: timer_ringing
+          else:
+            - script.execute: tap_to_talk
 
 button:
   - platform: factory_reset
@@ -1245,21 +1255,14 @@ lvgl:
             src: art_loading
             align: CENTER
 
+    # No full-screen tap target here: the button under the screen starts the
+    # assistant, so screen taps stay free for whatever a page puts on them.
     - id: page_idle
       bg_color: 0x${idle_background_color}
       widgets:
         - image:
             src: art_idle
             align: CENTER
-        - button:
-            id: idle_tap
-            width: 100%
-            height: 100%
-            bg_opa: TRANSP
-            border_width: 0
-            shadow_width: 0
-            on_click:
-              - script.execute: tap_to_talk
 
     - id: page_listening
       bg_color: 0x${listening_background_color}

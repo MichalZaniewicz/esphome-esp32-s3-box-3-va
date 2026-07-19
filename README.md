@@ -19,9 +19,11 @@ one thin config file you actually edit.
 - **LVGL UI**: one page per assistant phase — booting, idle, listening,
   thinking, replying, error, muted, no-Wi-Fi, no-HA, timer ringing — with the
   request and response text drawn over the illustration.
-- **Touchscreen**: the GT911 is wired into LVGL. Tap anywhere on the idle screen
-  for tap-to-talk; tap a ringing timer to silence it. That is deliberately a
-  small surface: it is the base to build a real touch UI on, not the finished UI.
+- **Touchscreen**: the GT911 is wired into LVGL. The **button under the screen**
+  (which is not a GPIO — it is GT911 touch button 0) starts the assistant, and
+  silences a ringing timer instead if one is going. The screen itself is left to
+  the UI, so widgets get every tap rather than fighting a full-screen
+  tap-to-talk target.
 - **Timers**: set by voice, with a countdown and a progress strip on LVGL's top
   layer that stays visible across page changes (green while running, blue while
   paused).

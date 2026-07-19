@@ -37,7 +37,7 @@ substitutions:
   weekday_names: '"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"'
   month_names: '"January","February","March","April","May","June","July","August","September","October","November","December"'
   # Printed under the clock. Set it to "" to leave the line empty.
-  home_hint_text: "Touch, or say the wake word"
+  home_hint_text: "Press the button, or say the wake word"
   home_indoor_label: "Inside"
   home_outdoor_label: "Outside"
 
@@ -206,13 +206,5 @@ lvgl:
             text_font: font_home_small
             text_color: 0xC8C8C8
 
-        # Tap anywhere to talk, same as the illustration idle page.
-        - button:
-            id: home_tap
-            width: 100%
-            height: 100%
-            bg_opa: TRANSP
-            border_width: 0
-            shadow_width: 0
-            on_click:
-              - script.execute: tap_to_talk
+        # Deliberately no full-screen tap target: the button under the screen
+        # starts the assistant, so this page's taps stay available for widgets.

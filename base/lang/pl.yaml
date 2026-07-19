@@ -20,6 +20,6 @@ substitutions:
   weekday_names: '"niedziela","poniedziałek","wtorek","środa","czwartek","piątek","sobota"'
   month_names: '"stycznia","lutego","marca","kwietnia","maja","czerwca","lipca","sierpnia","września","października","listopada","grudnia"'
 
-  home_hint_text: "Dotknij albo powiedz „Alexa”"
+  home_hint_text: "Naciśnij przycisk albo powiedz „Alexa”"
   home_indoor_label: "W domu"
   home_outdoor_label: "Na zewnątrz"
