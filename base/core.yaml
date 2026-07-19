@@ -85,6 +85,13 @@ substitutions:
   # and break a build here without anything changing on our side.
   timer_finished_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/timer_finished.flac
 
+  # 'false' rings the timer WITHOUT playing anything on the box - the screen and
+  # the `Timer ringing` switch still work, so a Home Assistant automation can do
+  # the sound instead (on a speaker group, in your own language, whatever).
+  # Worth doing if HA already handles it: playing locally seizes the I2S bus,
+  # which stops the wake word for the duration of the alarm for nothing.
+  timer_alarm_on_device: 'true'
+
   # Input gain for the wake word only (1-64). See the micro_wake_word block for
   # why this exists and why it is not 1.
   mww_gain_factor: '4'
@@ -896,27 +903,34 @@ switch:
     optimistic: true
     restore_mode: ALWAYS_OFF
     on_turn_on:
-      # Free the I2S bus before asking the speaker for it. The microphone holds
-      # it while the wake word is listening, and `on_announcement` stops the wake
-      # word only once playback has already begun — too late, so the speaker's
-      # first attempt fails with "Parent bus is busy" and retries a second later.
-      - script.execute: stop_wake_word
-      - wait_until:
+      - if:
           condition:
-            not:
-              microphone.is_capturing:
-          timeout: 2s
-      # Repeat the alarm with a 1 s gap until something turns this off.
-      - lambda: |-
-          id(speaker_media_player)
-            ->make_call()
-            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
-            .set_announcement(true)
-            .perform();
-          id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 1000);
-      - media_player.speaker.play_on_device_media_file:
-          media_file: timer_finished_sound
-          announcement: true
+            lambda: return ${timer_alarm_on_device};
+          then:
+            # Free the I2S bus before asking the speaker for it. The microphone
+            # holds it while the wake word is listening, and `on_announcement`
+            # stops the wake word only once playback has already begun — too
+            # late, so the speaker's first attempt fails with "Parent bus is
+            # busy" and retries a second later.
+            - script.execute: stop_wake_word
+            - wait_until:
+                condition:
+                  not:
+                    microphone.is_capturing:
+                timeout: 2s
+            # Repeat the alarm with a 1 s gap until something turns this off.
+            - lambda: |-
+                id(speaker_media_player)
+                  ->make_call()
+                  .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
+                  .set_announcement(true)
+                  .perform();
+                id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 1000);
+            - media_player.speaker.play_on_device_media_file:
+                media_file: timer_finished_sound
+                announcement: true
+      # Safety net for a timer nobody silences. Home Assistant normally turns the
+      # switch off long before this.
       - delay: 15min
       - switch.turn_off: timer_ringing
     on_turn_off:
