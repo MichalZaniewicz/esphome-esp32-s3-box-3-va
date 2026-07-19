@@ -91,6 +91,9 @@ base/
   core.yaml                # the always-on core, pulled as a remote package
   screens/
     home.yaml              # optional home screen: clock, date, climate
+    face.yaml              # optional animated assistant face (the engine)
+  faces/
+    robot.yaml, robot.png  # characters for the face engine; copy one to add yours
   lang/
     en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
   sounds/
@@ -138,6 +141,27 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | Screen | What it adds |
 |---|---|
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, as a replacement for the bare idle illustration. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
+| `face.yaml` | An animated assistant: a static character image with eyes and a mouth drawn on top as LVGL rectangles, reshaped per phase — blinking while idle, wide-eyed listening, glancing around while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`: clock when nothing is happening, robot when talking. Only the three small widgets ever redraw, never the background. |
+
+### Characters
+
+The face engine and the character are separate: `base/screens/face.yaml` draws
+and animates, a file in [`base/faces/`](base/faces/README.md) supplies the
+artwork and the measurements. Swapping the assistant is one line:
+
+```yaml
+      files:
+        - base/core.yaml
+        - base/screens/face.yaml
+        - base/faces/robot.yaml    # <- after the engine
+```
+
+![Expressions](base/assets/face-expressions.png)
+
+Adding a character is `cp robot.yaml yours.yaml`, a faceless 320x240 image, and
+measuring where its eyes and mouth belong. Every expression dimension is a
+substitution, so a bigger or smaller face rescales without touching the engine.
+Details: [`base/faces/README.md`](base/faces/README.md).
 
 ## Languages
 

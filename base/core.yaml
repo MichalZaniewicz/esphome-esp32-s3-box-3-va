@@ -140,11 +140,18 @@ substitutions:
   error_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/error_320_240.png
   timer_finished_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/timer_finished_320_240.png
 
-  # Which page the assistant sits on when nothing is happening. `page_idle` is
-  # the phase illustration; set it to `page_home` (clock, date, climate) after
-  # adding `base/screens/home.yaml` to your package's `files:` list. Any screen
-  # package can claim this the same way.
+  # Which page each assistant phase shows. Defaults are the phase illustrations;
+  # a screen package claims a phase by pointing its substitution elsewhere -
+  # `base/screens/home.yaml` takes the idle one, `base/screens/face.yaml` takes
+  # the active ones. Boot / no-Wi-Fi / no-HA stay fixed: they have to work before
+  # any optional screen is up.
   idle_page: page_idle
+  listening_page: page_listening
+  thinking_page: page_thinking
+  replying_page: page_replying
+  error_page: page_error
+  muted_page: page_muted
+  timer_page: page_timer_finished
 
   # Page background behind each illustration (they have alpha).
   idle_background_color: '000000'
@@ -624,27 +631,27 @@ script:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
           then:
-            - lvgl.page.show: page_listening
+            - lvgl.page.show: ${listening_page}
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_thinking_phase_id};
           then:
-            - lvgl.page.show: page_thinking
+            - lvgl.page.show: ${thinking_page}
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_replying_phase_id};
           then:
-            - lvgl.page.show: page_replying
+            - lvgl.page.show: ${replying_page}
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
           then:
-            - lvgl.page.show: page_error
+            - lvgl.page.show: ${error_page}
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id};
           then:
-            - lvgl.page.show: page_muted
+            - lvgl.page.show: ${muted_page}
       - if:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_not_ready_phase_id};
@@ -654,7 +661,7 @@ script:
           condition:
             lambda: return id(voice_assistant_phase) == ${voice_assist_timer_finished_phase_id};
           then:
-            - lvgl.page.show: page_timer_finished
+            - lvgl.page.show: ${timer_page}
       # Anything else (including the idle phase) lands on idle.
       - if:
           condition:

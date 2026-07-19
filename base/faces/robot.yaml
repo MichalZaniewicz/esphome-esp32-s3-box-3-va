@@ -1,0 +1,50 @@
+# Robot — the reference character.
+#
+# Listing this file changes nothing: these values are the defaults baked into
+# base/screens/face.yaml. It exists to be COPIED as the starting point for a new
+# character, and to show which knobs a character owns.
+#
+# Usage — the character must come AFTER the face engine, because ESPHome
+# resolves later-listed package files at a higher priority:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/face.yaml
+#     - base/faces/robot.yaml      # <- after the engine
+#
+# See base/faces/README.md.
+
+substitutions:
+  # The artwork. Must have NO face painted on it — the eyes and mouth are drawn
+  # on top. 320x240; anything else is scaled to fit.
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/robot.png
+
+  face_color: '0x3AFAE6'
+  face_alarm_color: '0xFF4D4D'
+
+  # Resting geometry, in pixels from the centre of the 320x240 screen. Measured
+  # off the original illustrations: eyes 19x27 at x +/-42, mouth 25x10, both
+  # below centre because this robot's panel sits in the lower half of the frame.
+  face_eye_offset: '42'
+  face_eye_y: '36'
+  face_eye_w: '20'
+  face_eye_h: '28'
+  face_mouth_y: '61'
+  face_mouth_w: '26'
+  face_mouth_h: '10'
+
+  # The rest of the expressions.
+  face_eye_h_wide: '34'
+  face_eye_h_narrow: '12'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '22'
+  face_mouth_small_w: '20'
+  face_mouth_o_w: '20'
+  face_mouth_o_h: '20'
+  face_mouth_alarm_w: '30'
+  face_mouth_alarm_h: '24'
+  face_mouth_error_w: '18'
+  face_glance_dx: '7'
+  face_shake_dx: '4'
+  face_eye_radius: '10'
+  face_mouth_radius: '8'

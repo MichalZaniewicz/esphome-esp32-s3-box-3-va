@@ -1,0 +1,411 @@
+###############################################################################
+# Animated robot face.
+#
+# A static image is the robot; the eyes and mouth are LVGL rectangles drawn on
+# top and reshaped in place. Nothing redraws the background, so a blink costs
+# two small rectangles rather than a full-screen 320x240 repaint - which matters
+# on this board, where the log already warns about LVGL operations near 90 ms.
+#
+# Point `face_background_file` at artwork WITHOUT a face on it and line the
+# features up with the geometry substitutions below.
+#
+# An OPTIONAL package. Add it to your thin config's `files:` list AFTER
+# base/core.yaml:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/face.yaml
+#
+# It claims the active phases (listening / thinking / replying / error / muted /
+# timer). It deliberately does NOT claim idle, so it composes with
+# base/screens/home.yaml: clock while nothing is happening, robot while talking.
+# To have the robot idle on screen as well, add `idle_page: page_face`.
+#
+# Expressions
+#   idle       eyes open, mouth a line, blinks every few seconds
+#   listening  eyes wide, small round mouth
+#   thinking   eyes glance left and right, mouth a line
+#   replying   mouth opens and closes in time with speech
+#   timer      alarm colour, wide eyes, open mouth, the whole face shakes
+#   muted      eyes shut, mouth a line
+#   error      alarm colour, narrowed eyes
+###############################################################################
+
+substitutions:
+  # Everything below describes a CHARACTER, and every value is overridable by a
+  # character package in base/faces/ - see base/faces/README.md. The defaults are
+  # the shipped robot, so this file works on its own.
+  #
+  # Artwork behind the face: the robot with its painted-on face removed, so the
+  # drawn one has somewhere to live.
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/robot.png
+
+  face_color: '0x3AFAE6'        # eyes and mouth - sampled from the artwork
+  face_alarm_color: '0xFF4D4D'  # timer ringing, and errors
+
+  # Geometry, in pixels from the centre of the 320x240 screen. These are measured
+  # off the original illustrations rather than guessed: eyes 19x27 at x +/-42,
+  # mouth 25x10, both sitting BELOW centre because the robot's panel is in the
+  # lower half of the frame. `face_eye_offset` is centre-to-eye, so the gap
+  # between the eyes is twice it.
+  face_eye_offset: '42'
+  face_eye_y: '36'
+  face_eye_w: '20'
+  face_eye_h: '28'         # resting
+  face_mouth_y: '61'
+  face_mouth_w: '26'       # resting
+  face_mouth_h: '10'       # resting
+
+  # Per-expression sizes. They are substitutions rather than literals so a
+  # character with a bigger or smaller face can rescale its whole range of
+  # expression without touching the animation code.
+  face_eye_h_wide: '34'    # listening, alarm
+  face_eye_h_narrow: '12'  # error
+  face_eye_h_shut: '4'     # blink, muted
+  face_mouth_open_h: '22'  # talking, open half of the cycle
+  face_mouth_small_w: '20' # thinking, muted
+  face_mouth_o_w: '20'     # listening: a small round "o"
+  face_mouth_o_h: '20'
+  face_mouth_alarm_w: '30'
+  face_mouth_alarm_h: '24'
+  face_mouth_error_w: '18'
+  face_glance_dx: '7'      # how far the eyes look sideways while thinking
+  face_shake_dx: '4'       # alarm shake amplitude
+  face_eye_radius: '10'
+  face_mouth_radius: '8'
+
+  # Animation tick. Lower is smoother and costs more redraws; the talking mouth
+  # opens and closes on alternate ticks, so 120 ms reads as natural speech.
+  face_tick: 120ms
+
+  # Claim the phases where the robot should be on screen. Idle is left alone on
+  # purpose - see the header.
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: face_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # Which expression the widgets are currently wearing. Static parts (colour,
+  # resting shape) are only re-applied when this changes, so a still face costs
+  # nothing per tick.
+  - id: face_expr
+    type: int
+    restore_value: false
+    initial_value: "0"
+
+script:
+  # --- primitives ----------------------------------------------------------
+  - id: face_eyes
+    parameters:
+      w: int
+      h: int
+      dx: int
+    then:
+      - lvgl.widget.update:
+          id: face_eye_l
+          width: !lambda return w;
+          height: !lambda return h;
+          x: !lambda return dx - ${face_eye_offset};
+      - lvgl.widget.update:
+          id: face_eye_r
+          width: !lambda return w;
+          height: !lambda return h;
+          x: !lambda return dx + ${face_eye_offset};
+
+  - id: face_mouth
+    parameters:
+      w: int
+      h: int
+      dx: int
+    then:
+      - lvgl.widget.update:
+          id: face_mouth_obj
+          width: !lambda return w;
+          height: !lambda return h;
+          x: !lambda return dx;
+
+  # Colours are literal rather than templated: three tiny actions beat trusting
+  # a lambda to produce an lv_color_t.
+  - id: face_tint_normal
+    then:
+      - lvgl.widget.update:
+          id: face_eye_l
+          bg_color: ${face_color}
+      - lvgl.widget.update:
+          id: face_eye_r
+          bg_color: ${face_color}
+      - lvgl.widget.update:
+          id: face_mouth_obj
+          bg_color: ${face_color}
+  - id: face_tint_alarm
+    then:
+      - lvgl.widget.update:
+          id: face_eye_l
+          bg_color: ${face_alarm_color}
+      - lvgl.widget.update:
+          id: face_eye_r
+          bg_color: ${face_alarm_color}
+      - lvgl.widget.update:
+          id: face_mouth_obj
+          bg_color: ${face_alarm_color}
+
+  # A blink is a squash and a restore. `mode: single` so overlapping ticks
+  # cannot leave the eyes shut.
+  - id: face_blink
+    mode: single
+    then:
+      - script.execute:
+          id: face_eyes
+          w: ${face_eye_w}
+          h: ${face_eye_h_shut}
+          dx: 0
+      - delay: 120ms
+      - script.execute:
+          id: face_eyes
+          w: ${face_eye_w}
+          h: ${face_eye_h}
+          dx: 0
+
+  # --- the driver ----------------------------------------------------------
+  # One tick: work out which expression the current phase wants, apply its
+  # resting shape if it just changed, then animate whatever moves.
+  - id: face_tick_script
+    mode: single
+    then:
+      - lambda: id(face_frame)++;
+
+      # IDLE - open eyes, closed mouth, an occasional blink.
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+          then:
+            - if:
+                condition:
+                  lambda: return id(face_expr) != 1;
+                then:
+                  - lambda: id(face_expr) = 1;
+                  - script.execute: face_tint_normal
+                  - script.execute:
+                      id: face_eyes
+                      w: ${face_eye_w}
+                      h: ${face_eye_h}
+                      dx: 0
+                  - script.execute:
+                      id: face_mouth
+                      w: ${face_mouth_w}
+                      h: ${face_mouth_h}
+                      dx: 0
+            # Roughly every 4 s at a 120 ms tick.
+            - if:
+                condition:
+                  lambda: return id(face_frame) % 33 == 0;
+                then:
+                  - script.execute: face_blink
+
+      # LISTENING - eyes wide, mouth a small circle, holding still.
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
+          then:
+            - if:
+                condition:
+                  lambda: return id(face_expr) != 2;
+                then:
+                  - lambda: id(face_expr) = 2;
+                  - script.execute: face_tint_normal
+                  - script.execute:
+                      id: face_eyes
+                      w: ${face_eye_w}
+                      h: ${face_eye_h_wide}
+                      dx: 0
+                  - script.execute:
+                      id: face_mouth
+                      w: ${face_mouth_o_w}
+                      h: ${face_mouth_o_h}
+                      dx: 0
+
+      # THINKING - eyes glance side to side, mouth flat.
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_thinking_phase_id};
+          then:
+            - if:
+                condition:
+                  lambda: return id(face_expr) != 3;
+                then:
+                  - lambda: id(face_expr) = 3;
+                  - script.execute: face_tint_normal
+                  - script.execute:
+                      id: face_mouth
+                      w: ${face_mouth_small_w}
+                      h: ${face_mouth_h}
+                      dx: 0
+            # Hold each side for three ticks, so it reads as looking around
+            # rather than vibrating.
+            - script.execute:
+                id: face_eyes
+                w: ${face_eye_w}
+                h: ${face_eye_h}
+                dx: !lambda |-
+                  return ((id(face_frame) / 3) % 2) ? ${face_glance_dx} : -${face_glance_dx};
+
+      # REPLYING - the mouth does the talking.
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_replying_phase_id};
+          then:
+            - if:
+                condition:
+                  lambda: return id(face_expr) != 4;
+                then:
+                  - lambda: id(face_expr) = 4;
+                  - script.execute: face_tint_normal
+                  - script.execute:
+                      id: face_eyes
+                      w: ${face_eye_w}
+                      h: ${face_eye_h}
+                      dx: 0
+            - script.execute:
+                id: face_mouth
+                w: ${face_mouth_w}
+                h: !lambda |-
+                  return (id(face_frame) % 2) ? ${face_mouth_open_h} : ${face_mouth_h};
+                dx: 0
+
+      # TIMER RINGING - red, wide awake, shouting, and shaking about it.
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_timer_finished_phase_id};
+          then:
+            - if:
+                condition:
+                  lambda: return id(face_expr) != 5;
+                then:
+                  - lambda: id(face_expr) = 5;
+                  - script.execute: face_tint_alarm
+                  - script.execute:
+                      id: face_mouth
+                      w: ${face_mouth_alarm_w}
+                      h: ${face_mouth_alarm_h}
+                      dx: 0
+            - script.execute:
+                id: face_eyes
+                w: ${face_eye_w}
+                h: ${face_eye_h_wide}
+                dx: !lambda |-
+                  return (id(face_frame) % 2) ? ${face_shake_dx} : -${face_shake_dx};
+
+      # MUTED - eyes shut.
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id};
+          then:
+            - if:
+                condition:
+                  lambda: return id(face_expr) != 6;
+                then:
+                  - lambda: id(face_expr) = 6;
+                  - script.execute: face_tint_normal
+                  - script.execute:
+                      id: face_eyes
+                      w: ${face_eye_w}
+                      h: ${face_eye_h_shut}
+                      dx: 0
+                  - script.execute:
+                      id: face_mouth
+                      w: ${face_mouth_small_w}
+                      h: ${face_mouth_h}
+                      dx: 0
+
+      # ERROR - narrowed eyes, alarm colour.
+      - if:
+          condition:
+            lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
+          then:
+            - if:
+                condition:
+                  lambda: return id(face_expr) != 7;
+                then:
+                  - lambda: id(face_expr) = 7;
+                  - script.execute: face_tint_alarm
+                  - script.execute:
+                      id: face_eyes
+                      w: ${face_eye_w}
+                      h: ${face_eye_h_narrow}
+                      dx: 0
+                  - script.execute:
+                      id: face_mouth
+                      w: ${face_mouth_error_w}
+                      h: ${face_mouth_h}
+                      dx: 0
+
+# Only animate while the face is actually on screen - on the home screen this
+# costs nothing.
+interval:
+  - interval: ${face_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: face_tick_script
+
+image:
+  - id: face_bg
+    file: ${face_background_file}
+    resize: 320x240
+    type: RGB565
+    transparency: alpha_channel
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: 0x000000
+      widgets:
+        - image:
+            src: face_bg
+            align: CENTER
+
+        - obj:
+            id: face_eye_l
+            align: CENTER
+            x: -${face_eye_offset}
+            y: ${face_eye_y}
+            width: ${face_eye_w}
+            height: ${face_eye_h}
+            radius: ${face_eye_radius}
+            bg_color: ${face_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: face_eye_r
+            align: CENTER
+            x: ${face_eye_offset}
+            y: ${face_eye_y}
+            width: ${face_eye_w}
+            height: ${face_eye_h}
+            radius: ${face_eye_radius}
+            bg_color: ${face_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: face_mouth_obj
+            align: CENTER
+            x: 0
+            y: ${face_mouth_y}
+            width: ${face_mouth_w}
+            height: ${face_mouth_h}
+            radius: ${face_mouth_radius}
+            bg_color: ${face_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
