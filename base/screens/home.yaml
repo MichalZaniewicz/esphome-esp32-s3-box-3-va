@@ -61,10 +61,17 @@ sensor:
     on_value:
       - script.execute: update_home_climate
 
-# The core's time component, extended with a tick on the minute boundary so the
-# clock changes exactly when it should rather than up to a minute late.
+# The core's time component, extended with two triggers.
+#
+# `on_time_sync` is the important one: the clock is only redrawn on the minute
+# boundary, so without it a freshly booted device shows "--:--" until the next
+# :00 - up to a full minute after Home Assistant has already supplied the time.
+# It looks like a slow sync and is really just a late repaint.
 time:
   - id: !extend ha_time
+    on_time_sync:
+      then:
+        - script.execute: update_home_clock
     on_time:
       - seconds: 0
         then:
