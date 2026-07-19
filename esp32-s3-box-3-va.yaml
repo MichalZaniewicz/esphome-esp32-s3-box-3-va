@@ -49,7 +49,8 @@ packages:
       - base/core.yaml
       - base/screens/home.yaml   # clock + climate; drop it and idle falls back to text
       - base/screens/face.yaml   # the face engine: draws and animates eyes + mouth
-      - base/faces/robot.yaml    # the character: artwork + measurements
+      - base/faces/pip.yaml      # the character. Swap for astro, momo, franky,
+                                #   wizard or genie - see base/faces/README.md
       - base/lang/en.yaml        # en.yaml, pl.yaml, or your own — see base/lang/
     refresh: 0s
 
