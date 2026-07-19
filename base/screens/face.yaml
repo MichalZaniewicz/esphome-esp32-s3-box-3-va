@@ -91,7 +91,10 @@ substitutions:
   # as a living face rather than a nervous one.
   face_idle_cycle: '100'
 
-  face_eye_h_think: '20'   # squinted while thinking
+  # Equal to face_eye_h by default: thinking is carried by the pupils and the
+  # narrowed mouth, not by squinting. Set it lower for a character that should
+  # visibly screw up its eyes.
+  face_eye_h_think: '38'
   face_mouth_think_w: '12' # thinking: the mouth shrinks to a dot
   face_listen_pulse: '4'   # how much the eyes breathe while listening
   face_shake_dx: '4'       # alarm shake amplitude

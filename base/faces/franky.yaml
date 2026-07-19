@@ -49,7 +49,7 @@ substitutions:
   face_gaze_dx: '6'
 
   face_eye_h_wide: '36'
-  face_eye_h_think: '22'
+  face_eye_h_think: '32'
   face_eye_h_narrow: '10'
   face_eye_h_shut: '4'
   face_mouth_open_h: '18'
