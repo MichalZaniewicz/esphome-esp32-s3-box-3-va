@@ -52,9 +52,11 @@ in the `TTS output` select:
 | `External player` | Only `${external_media_player_id}` speaks. The box never fetches the file. |
 | `Both` | Both, at the cost of the local decode. |
 
-Timer sounds, Home Assistant announcements and Music Assistant are unaffected:
-they go through the `speaker_media_player` component directly, which still
-exists.
+This routes **spoken replies only**. The timer alarm always rings on the box:
+there it repeats until silenced and a tap on the screen stops it, neither of
+which a remote speaker can offer, since the box cannot tell when one finishes.
+Home Assistant announcements and Music Assistant are unaffected either way —
+they go through the `speaker_media_player` component directly.
 
 ## Quick start
 
@@ -111,12 +113,12 @@ What lives in the thin config:
 | `name` / `friendly_name` | `esp32-s3-box-3-va` / `S3 Box 3 Voice` | Device name. Changing `name` re-creates every entity in HA. |
 | `posix_timezone` | `UTC0` | Clock zone in POSIX form (the device has no IANA database). Only a pre-sync fallback; HA owns the clock. |
 | `external_media_player_id` | `media_player.living_room` | Where `External player` / `Both` send the reply. |
-| `tts_output_default` | `This device` | Boot default of the `TTS output` select, which routes **both** spoken replies and the timer alarm. |
+| `tts_output_default` | `This device` | Boot default of the `TTS output` select. Routes spoken replies only — the timer alarm always rings on the box. |
 | `volume_min` / `volume_max` | `0.5` / `0.8` | Media player clamps for the onboard speaker. |
 | `hidden_ssid` | `false` | `true` enables `fast_connect` for a hidden SSID. |
 | `*_illustration_file` | Casita artwork | The 320x240 PNG per phase. Any URL or local path. |
 | `idle_page` | `page_idle` | Which page shows when nothing is happening. Set to `page_home` after adding `base/screens/home.yaml` to your `files:` list. |
-| `timer_finished_sound_file` | repo `timer_finished.flac` | The timer alarm. Compiled into flash for on-device playback (so it rings without network) and handed to Home Assistant when routing to the external player — which means it must be a **URL the external speaker can reach**, not a local path, if you use that routing. MP3/FLAC/WAV. |
+| `timer_finished_sound_file` | repo `timer_finished.flac` | The timer alarm, compiled into flash so it rings without network. Always plays on the box's own speaker. Any URL or local MP3/FLAC/WAV. |
 | `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets — `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
 | `mww_gain_factor` | `4` | Input gain for the wake word only (1–64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
 

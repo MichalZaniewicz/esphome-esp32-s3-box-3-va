@@ -85,11 +85,9 @@ substitutions:
   # and break a build here without anything changing on our side.
   timer_finished_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/timer_finished.flac
 
-  # The alarm follows the `TTS output` select, exactly like a spoken reply: it
-  # rings on the box, on the external player, or both. That means the file must
-  # be reachable BY THE EXTERNAL SPEAKER when routing there - a URL, not a local
-  # path. A local path still works for on-device playback (it is compiled in),
-  # it just cannot be handed to Home Assistant.
+  # Always plays on the box, independently of `TTS output` - see the
+  # `timer_ringing` switch for why. A local path works fine, since the file is
+  # compiled in and never handed to Home Assistant.
 
   # Input gain for the wake word only (1-64). See the micro_wake_word block for
   # why this exists and why it is not 1.
@@ -910,47 +908,36 @@ switch:
     optimistic: true
     restore_mode: ALWAYS_OFF
     on_turn_on:
-      # External player: hand the file to Home Assistant. One shot - the box has
-      # no idea when a remote speaker finishes, so repeating it is an HA
-      # automation's job if you want the alarm to nag.
-      - if:
+      # The alarm ALWAYS rings on the box, whatever `TTS output` says. A reply
+      # should come out wherever you listen; an alarm should be interruptible and
+      # insistent, and only the local speaker can be either. On the box it
+      # repeats until something silences it and a tap on the screen stops it - on
+      # a remote speaker it would play once, with no way for the box to know when
+      # it finished or to cut it short.
+      #
+      # NOTE this means a muted `speaker_media_player` entity silences the alarm.
+      #
+      # Free the I2S bus first. The microphone holds it while the wake word is
+      # listening, and `on_announcement` stops the wake word only once playback
+      # has already begun — too late, so the speaker's first attempt fails with
+      # "Parent bus is busy" and retries a second later.
+      - script.execute: stop_wake_word
+      - wait_until:
           condition:
-            lambda: return id(tts_output).current_option() != "This device";
-          then:
-            - homeassistant.service:
-                service: media_player.play_media
-                data:
-                  entity_id: ${external_media_player_id}
-                  media_content_id: ${timer_finished_sound_file}
-                  media_content_type: music
-                  announce: "true"
-      # On the box: repeats until something turns the switch off.
-      - if:
-          condition:
-            lambda: return id(tts_output).current_option() != "External player";
-          then:
-            # Free the I2S bus before asking the speaker for it. The microphone
-            # holds it while the wake word is listening, and `on_announcement`
-            # stops the wake word only once playback has already begun — too
-            # late, so the speaker's first attempt fails with "Parent bus is
-            # busy" and retries a second later.
-            - script.execute: stop_wake_word
-            - wait_until:
-                condition:
-                  not:
-                    microphone.is_capturing:
-                timeout: 2s
-            # Repeat the alarm with a 1 s gap until something turns this off.
-            - lambda: |-
-                id(speaker_media_player)
-                  ->make_call()
-                  .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
-                  .set_announcement(true)
-                  .perform();
-                id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 1000);
-            - media_player.speaker.play_on_device_media_file:
-                media_file: timer_finished_sound
-                announcement: true
+            not:
+              microphone.is_capturing:
+          timeout: 2s
+      # Repeat with a 1 s gap until something turns this off.
+      - lambda: |-
+          id(speaker_media_player)
+            ->make_call()
+            .set_command(media_player::MediaPlayerCommand::MEDIA_PLAYER_COMMAND_REPEAT_ONE)
+            .set_announcement(true)
+            .perform();
+          id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 1000);
+      - media_player.speaker.play_on_device_media_file:
+          media_file: timer_finished_sound
+          announcement: true
       # Safety net for a timer nobody silences. Home Assistant normally turns the
       # switch off long before this.
       - delay: 15min
@@ -1062,9 +1049,9 @@ select:
                       then:
                         - micro_wake_word.start:
 
-  # Where the assistant's audio comes out - spoken replies AND the timer alarm.
-  # "External player" keeps the box from downloading and decoding the TTS at all,
-  # which is what long replies choke on.
+  # Where spoken replies come out. (The timer alarm ignores this and always rings
+  # on the box.) "External player" keeps the box from downloading and decoding
+  # the TTS at all, which is what long replies choke on.
   - platform: template
     id: tts_output
     name: TTS output
