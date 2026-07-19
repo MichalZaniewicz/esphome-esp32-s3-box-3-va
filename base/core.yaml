@@ -937,6 +937,17 @@ switch:
             not:
               microphone.is_capturing:
           timeout: 2s
+      # A muted or turned-down media player makes the alarm play silently, and
+      # both survive reboots: the speaker media player persists volume and mute
+      # to flash and restores them at boot, so a mute set once months ago is
+      # still in force. Say so in the log rather than leaving someone to wonder
+      # why a timer they can see ringing makes no sound.
+      - lambda: |-
+          if (id(speaker_media_player)->is_muted()) {
+            ESP_LOGW("timer", "Alarm is ringing but the media player is MUTED - unmute it in Home Assistant");
+          } else if (id(speaker_media_player)->volume < 0.15f) {
+            ESP_LOGW("timer", "Alarm is ringing at volume %.2f - probably inaudible", id(speaker_media_player)->volume);
+          }
       # Repeat with a 1 s gap until something turns this off.
       - lambda: |-
           id(speaker_media_player)

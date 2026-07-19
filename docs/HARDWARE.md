@@ -103,6 +103,15 @@ before relying on it.
 ESP32-S3-BOX-3-SENSOR dock, reachable over the dock I2C on GPIO40/41, along with
 temperature/humidity, IR and a microSD slot. Nothing in this config touches it.
 
+## The media player remembers being muted
+
+`speaker_media_player` persists its **volume and mute state to flash** and
+restores both at boot (`speaker_media_player.cpp`: `pref_.load(&volume_restore_state)`).
+ESPHome preferences survive OTA updates, so a mute set once stays set through
+every reflash — and it silences the timer alarm and any locally-played TTS while
+the logs still cheerfully report `PLAYING`. The giveaway is `Muted: YES` on the
+media player state line. Fix it once from Home Assistant and it sticks.
+
 ## Audio layout
 
 Unlike boards that wire an ADC and a DAC to separate buses over shared clock
