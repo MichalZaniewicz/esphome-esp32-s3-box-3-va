@@ -75,6 +75,11 @@ screen contents, touch, the assistant itself — is not confirmed yet.
   shuts out 2026.4–2026.6, but the alternative is a warning on every build for
   the next six months and a hard break later.
 
+- **A boot animation.** The starting screen was a line of static text. Three dots
+  now travel under it, the lit one growing and going fully opaque. It costs two
+  properties on three widgets six times a second, and only while that page is
+  showing — after boot the interval does nothing at all.
+
 ### Removed
 
 - **The per-phase illustrations.** Nine full-screen PNGs, every one of them

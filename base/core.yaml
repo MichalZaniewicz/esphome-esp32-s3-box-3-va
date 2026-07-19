@@ -143,6 +143,12 @@ substitutions:
 
   # Bare-core screen text. Overridable by a language package like everything
   # else the UI says - see base/lang/README.md.
+  # UI accent, used by the boot animation. A character package normally sets the
+  # tone for everything else on screen; this is what the core uses before any
+  # such package is even on screen.
+  accent_color: '0x3AFAE6'
+  boot_tick: 150ms
+
   text_starting: "Starting..."
   text_no_wifi: "No Wi-Fi"
   text_no_ha: "No Home Assistant"
@@ -611,6 +617,10 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
+  - id: boot_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
   # Length of the reply being spoken, for the external-playback hold above.
   - id: tts_chars
     type: int
@@ -618,6 +628,37 @@ globals:
     initial_value: "0"
 
 script:
+  # Boot dots: the lit one grows and goes fully opaque, the others sit back.
+  - id: boot_animate
+    mode: single
+    parameters:
+      index: int
+    then:
+      - lvgl.widget.update:
+          id: boot_dot_1
+          width: !lambda |-
+            return index == 0 ? 16 : 10;
+          height: !lambda |-
+            return index == 0 ? 16 : 10;
+          bg_opa: !lambda |-
+            return index == 0 ? 255 : 70;
+      - lvgl.widget.update:
+          id: boot_dot_2
+          width: !lambda |-
+            return index == 1 ? 16 : 10;
+          height: !lambda |-
+            return index == 1 ? 16 : 10;
+          bg_opa: !lambda |-
+            return index == 1 ? 255 : 70;
+      - lvgl.widget.update:
+          id: boot_dot_3
+          width: !lambda |-
+            return index == 2 ? 16 : 10;
+          height: !lambda |-
+            return index == 2 ? 16 : 10;
+          bg_opa: !lambda |-
+            return index == 2 ? 255 : 70;
+
   # Single entry point for "put the right thing on screen". Every state change
   # calls this rather than switching pages itself, so there is one place where
   # the precedence (booting > no wifi > no HA > phase) is decided.
@@ -871,6 +912,20 @@ script:
             - script.execute: stop_wake_word
             - delay: 100ms
             - voice_assistant.start:
+
+# Runs only while the boot page is on screen, which is a few seconds per reboot.
+interval:
+  - interval: ${boot_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_boot
+          then:
+            - lambda: id(boot_frame)++;
+            - script.execute:
+                id: boot_animate
+                index: !lambda |-
+                  return (id(boot_frame) / 2) % 3;
 
 ###############################################################################
 # ENTITIES
@@ -1262,9 +1317,50 @@ lvgl:
       widgets:
         - label:
             align: CENTER
+            y: -26
             text: "${text_starting}"
             text_font: font_body
             text_color: 0x8A8A8A
+        # Three dots, one lit at a time. Two properties on three tiny widgets,
+        # six times a second, and only while this page is showing - the boot
+        # screen is up for seconds at most, and after that the interval does
+        # nothing at all.
+        - obj:
+            id: boot_dot_1
+            align: CENTER
+            x: -24
+            y: 24
+            width: 10
+            height: 10
+            radius: 6
+            bg_color: ${accent_color}
+            bg_opa: 90
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: boot_dot_2
+            align: CENTER
+            x: 0
+            y: 24
+            width: 10
+            height: 10
+            radius: 6
+            bg_color: ${accent_color}
+            bg_opa: 90
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: boot_dot_3
+            align: CENTER
+            x: 24
+            y: 24
+            width: 10
+            height: 10
+            radius: 6
+            bg_color: ${accent_color}
+            bg_opa: 90
+            border_width: 0
+            pad_all: 0
 
     - id: page_no_wifi
       bg_color: 0x000000
