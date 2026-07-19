@@ -6,10 +6,13 @@ touchscreen** instead of the static full-screen images the stock config paints.
 Pure ESPHome, no custom C firmware: an always-on core you pull as a package, plus
 one thin config file you actually edit.
 
-> **Status: initial build.** Ported from the upstream
-> [`wake-word-voice-assistants`](https://github.com/esphome/wake-word-voice-assistants)
-> S3-Box-3 config, rebuilt on LVGL + GT911, with the TTS path reworked (see
-> below). Not yet confirmed on hardware - see [CHANGELOG.md](CHANGELOG.md).
+> **Status: running on an ESP32-S3-BOX-3.** Wake word, the full Assist pipeline,
+> voice timers with their alarm, the touchscreen and the animated character are
+> all confirmed on device with ESPHome 2026.7.0. Flash usage 25.5%, RAM 37%.
+> The newest additions - the wake sound, the third wake word model and the idle
+> animation loop - are in the repo but have had less time on hardware than the
+> rest. [CHANGELOG.md](CHANGELOG.md) has the detail, including what turned out to
+> be wrong along the way.
 
 ## What it does
 

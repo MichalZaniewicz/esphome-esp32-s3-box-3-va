@@ -6,8 +6,9 @@ First build. A port of the upstream
 [`esphome/wake-word-voice-assistants`](https://github.com/esphome/wake-word-voice-assistants)
 ESP32-S3-BOX-3 config, rebuilt as a package + thin-config repo.
 
-**Builds and boots on hardware** (ESPHome 2026.7.0, OTA). Functional behaviour -
-screen contents, touch, the assistant itself - is not confirmed yet.
+**Confirmed working on hardware** (ESPHome 2026.7.0, flashed over OTA): wake
+word, speech to text, replies routed to an external speaker, voice timers and
+their alarm, the touchscreen, the home screen and the animated character.
 
 ### Changed from upstream
 
