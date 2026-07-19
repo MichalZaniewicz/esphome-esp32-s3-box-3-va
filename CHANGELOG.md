@@ -76,7 +76,9 @@ screen contents, touch, the assistant itself — is not confirmed yet.
   the next six months and a hard break later.
 
 - **A boot animation.** The starting screen was a line of static text. Three dots
-  now travel under it, the lit one growing and going fully opaque. It costs two
+  now travel under it, the lit one growing and going fully opaque, all three
+  cross-fading through a palette a third of a cycle apart so no two share a
+  colour. `boot_palette` takes any number of `0xRRGGBB` entries. It costs two
   properties on three widgets six times a second, and only while that page is
   showing — after boot the interval does nothing at all.
 

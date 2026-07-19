@@ -152,6 +152,12 @@ substitutions:
   # Backlight behaviour at boot - see the `Screen` light below.
   screen_restore_mode: ALWAYS_ON
 
+  # Boot dot colours. Any number of 0xRRGGBB entries; the animation cross-fades
+  # between consecutive ones and wraps around, and each dot starts at a different
+  # point in the cycle so they are never the same colour at once.
+  boot_palette: '0x3AFAE6, 0x4FA8FF, 0x9B6BFF, 0xFF6BC8, 0xFFB347, 0x5CFF9E'
+  boot_fade_steps: '6'     # ticks per colour; 6 x boot_tick = 900 ms per hue
+
   text_starting: "Starting..."
   text_no_wifi: "No Wi-Fi"
   text_no_ha: "No Home Assistant"
@@ -637,7 +643,8 @@ globals:
     initial_value: "0"
 
 script:
-  # Boot dots: the lit one grows and goes fully opaque, the others sit back.
+  # Boot dots: the lit one grows and goes fully opaque, the others sit back, and
+  # all three cross-fade through the palette a third of a cycle apart.
   - id: boot_animate
     mode: single
     parameters:
@@ -650,7 +657,19 @@ script:
           height: !lambda |-
             return index == 0 ? 16 : 10;
           bg_opa: !lambda |-
-            return index == 0 ? 255 : 70;
+            return index == 0 ? 255 : 110;
+          bg_color: !lambda |-
+            static const uint32_t PAL[] = {${boot_palette}};
+            const int N = sizeof(PAL) / sizeof(PAL[0]);
+            const int STEPS = ${boot_fade_steps};
+            const uint32_t f = (uint32_t) id(boot_frame) + 0;
+            const int i = (f / STEPS) % N;
+            const int j = (i + 1) % N;
+            const int t = f % STEPS;
+            const uint8_t r = (((PAL[i] >> 16) & 0xFF) * (STEPS - t) + ((PAL[j] >> 16) & 0xFF) * t) / STEPS;
+            const uint8_t g = (((PAL[i] >>  8) & 0xFF) * (STEPS - t) + ((PAL[j] >>  8) & 0xFF) * t) / STEPS;
+            const uint8_t b = (((PAL[i]      ) & 0xFF) * (STEPS - t) + ((PAL[j]      ) & 0xFF) * t) / STEPS;
+            return lv_color_make(r, g, b);
       - lvgl.widget.update:
           id: boot_dot_2
           width: !lambda |-
@@ -658,7 +677,19 @@ script:
           height: !lambda |-
             return index == 1 ? 16 : 10;
           bg_opa: !lambda |-
-            return index == 1 ? 255 : 70;
+            return index == 1 ? 255 : 110;
+          bg_color: !lambda |-
+            static const uint32_t PAL[] = {${boot_palette}};
+            const int N = sizeof(PAL) / sizeof(PAL[0]);
+            const int STEPS = ${boot_fade_steps};
+            const uint32_t f = (uint32_t) id(boot_frame) + 4;
+            const int i = (f / STEPS) % N;
+            const int j = (i + 1) % N;
+            const int t = f % STEPS;
+            const uint8_t r = (((PAL[i] >> 16) & 0xFF) * (STEPS - t) + ((PAL[j] >> 16) & 0xFF) * t) / STEPS;
+            const uint8_t g = (((PAL[i] >>  8) & 0xFF) * (STEPS - t) + ((PAL[j] >>  8) & 0xFF) * t) / STEPS;
+            const uint8_t b = (((PAL[i]      ) & 0xFF) * (STEPS - t) + ((PAL[j]      ) & 0xFF) * t) / STEPS;
+            return lv_color_make(r, g, b);
       - lvgl.widget.update:
           id: boot_dot_3
           width: !lambda |-
@@ -666,7 +697,19 @@ script:
           height: !lambda |-
             return index == 2 ? 16 : 10;
           bg_opa: !lambda |-
-            return index == 2 ? 255 : 70;
+            return index == 2 ? 255 : 110;
+          bg_color: !lambda |-
+            static const uint32_t PAL[] = {${boot_palette}};
+            const int N = sizeof(PAL) / sizeof(PAL[0]);
+            const int STEPS = ${boot_fade_steps};
+            const uint32_t f = (uint32_t) id(boot_frame) + 8;
+            const int i = (f / STEPS) % N;
+            const int j = (i + 1) % N;
+            const int t = f % STEPS;
+            const uint8_t r = (((PAL[i] >> 16) & 0xFF) * (STEPS - t) + ((PAL[j] >> 16) & 0xFF) * t) / STEPS;
+            const uint8_t g = (((PAL[i] >>  8) & 0xFF) * (STEPS - t) + ((PAL[j] >>  8) & 0xFF) * t) / STEPS;
+            const uint8_t b = (((PAL[i]      ) & 0xFF) * (STEPS - t) + ((PAL[j]      ) & 0xFF) * t) / STEPS;
+            return lv_color_make(r, g, b);
 
   # Single entry point for "put the right thing on screen". Every state change
   # calls this rather than switching pages itself, so there is one place where

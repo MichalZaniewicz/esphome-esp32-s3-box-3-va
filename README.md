@@ -181,6 +181,15 @@ Adding a language is `cp en.yaml xx.yaml` plus translation; `en.yaml` is the
 reference and always carries every key. Details and translator notes:
 [`base/lang/README.md`](base/lang/README.md). Pull requests welcome.
 
+### Boot screen
+
+![Boot dots](base/assets/boot-animation.png)
+
+Three dots cross-fading through a palette, each a third of a cycle apart, with
+the travelling highlight showing progress. Costs three widgets updated six times
+a second and only while that page is showing. Recolour it with `boot_palette` —
+any number of `0xRRGGBB` entries — or slow it with `boot_tick`.
+
 ## No illustrations
 
 Earlier versions shipped a full-screen PNG per phase, ported from upstream. They
