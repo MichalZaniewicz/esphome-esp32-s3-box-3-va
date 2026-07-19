@@ -126,6 +126,7 @@ What lives in the thin config:
 | `idle_page`, `listening_page`, … | `page_status` | Which page each phase shows. Screen packages claim these; set `idle_page: page_home` by hand if you want the clock while idle and the face only while talking. |
 | `timer_finished_sound_file` | repo `timer_finished.flac` | The timer alarm, compiled into flash so it rings without network. Always plays on the box's own speaker. Any URL or local MP3/FLAC/WAV. |
 | `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets — `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
+| `screen_restore_mode` | `ALWAYS_ON` | Backlight at boot. `ALWAYS_ON` so the boot screen is always visible; `RESTORE_DEFAULT_OFF` if the device should remember having been switched off. |
 | `mww_gain_factor` | `4` | Input gain for the wake word only (1–64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
 
 Pins are substitutions too, but you should not need them unless you are porting

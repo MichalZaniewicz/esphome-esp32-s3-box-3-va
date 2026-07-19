@@ -149,6 +149,9 @@ substitutions:
   accent_color: '0x3AFAE6'
   boot_tick: 150ms
 
+  # Backlight behaviour at boot - see the `Screen` light below.
+  screen_restore_mode: ALWAYS_ON
+
   text_starting: "Starting..."
   text_no_wifi: "No Wi-Fi"
   text_no_ha: "No Home Assistant"
@@ -319,7 +322,13 @@ light:
     icon: "mdi:television"
     entity_category: config
     output: backlight_output
-    restore_mode: RESTORE_DEFAULT_ON
+    # ALWAYS_ON, not RESTORE_DEFAULT_ON. The latter restores the saved state and
+    # only falls back to on, so a screen switched off once from Home Assistant
+    # stays off through every reboot afterwards - including the boot screen,
+    # which is then invisible exactly when you need it. Set
+    # `screen_restore_mode: RESTORE_DEFAULT_OFF` if you would rather the device
+    # remember being switched off.
+    restore_mode: ${screen_restore_mode}
     default_transition_length: 250ms
 
 ###############################################################################
