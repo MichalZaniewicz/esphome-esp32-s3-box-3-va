@@ -23,3 +23,15 @@ substitutions:
   home_hint_text: "Naciśnij przycisk albo powiedz „Alexa”"
   home_indoor_label: "W domu"
   home_outdoor_label: "Na zewnątrz"
+
+  # --- Ekrany statusu gołego rdzenia (gdy żaden pakiet postaci nie przejmie fazy)
+  text_starting: "Uruchamianie..."
+  text_no_wifi: "Brak Wi-Fi"
+  text_no_ha: "Brak Home Assistant"
+  status_idle: "Gotowy"
+  status_listening: "Słucham"
+  status_thinking: "Myślę"
+  status_replying: "Mówię"
+  status_error: "Błąd"
+  status_muted: "Mikrofon wyciszony"
+  status_timer: "Minęło"

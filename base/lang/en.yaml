@@ -29,3 +29,15 @@ substitutions:
   home_hint_text: "Press the button, or say the wake word"
   home_indoor_label: "Inside"
   home_outdoor_label: "Outside"
+
+  # --- Bare-core status screens (shown when no character package claims a phase)
+  text_starting: "Starting..."
+  text_no_wifi: "No Wi-Fi"
+  text_no_ha: "No Home Assistant"
+  status_idle: "Ready"
+  status_listening: "Listening"
+  status_thinking: "Thinking"
+  status_replying: "Speaking"
+  status_error: "Error"
+  status_muted: "Microphone muted"
+  status_timer: "Timer"

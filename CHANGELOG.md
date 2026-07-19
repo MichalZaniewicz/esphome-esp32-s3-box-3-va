@@ -69,6 +69,15 @@ screen contents, touch, the assistant itself — is not confirmed yet.
   finished or to cut it short. Note this means a muted `speaker_media_player`
   entity silences the alarm.
 
+### Removed
+
+- **The per-phase illustrations.** Nine full-screen PNGs at 225 KB of flash each,
+  over 2 MB in total, every one of them hidden the moment a character package is
+  installed. The core now compiles a single image — the character — and falls
+  back to plain text status pages when no package claims a phase. Those pages are
+  meant to be plain: the core has to work before any optional screen is up, and
+  looking good is `base/faces/`' job.
+
 ### Added
 
 - Tap-to-talk: a tap anywhere on the idle page, or on the GT911 "home" button

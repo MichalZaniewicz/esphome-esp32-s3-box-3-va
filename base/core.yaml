@@ -140,39 +140,33 @@ substitutions:
   tts_hold_ms_per_char: '70'
   tts_hold_max_ms: '30000'
 
-  # ---------------------------------------------------------------------------
-  # Phase illustrations. 320x240 PNGs, fetched at compile time and baked into
-  # flash, so any URL or local path works. Override them in your thin config to
-  # reskin the assistant without touching this file.
-  # ---------------------------------------------------------------------------
-  loading_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/loading_320_240.png
-  idle_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/idle_320_240.png
-  listening_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/listening_320_240.png
-  thinking_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/thinking_320_240.png
-  replying_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/replying_320_240.png
-  error_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/error_320_240.png
-  timer_finished_illustration_file: https://github.com/esphome/wake-word-voice-assistants/raw/main/casita/timer_finished_320_240.png
+
+  # Bare-core screen text. Overridable by a language package like everything
+  # else the UI says - see base/lang/README.md.
+  text_starting: "Starting..."
+  text_no_wifi: "No Wi-Fi"
+  text_no_ha: "No Home Assistant"
+  status_idle: "Ready"
+  status_listening: "Listening"
+  status_thinking: "Thinking"
+  status_replying: "Speaking"
+  status_error: "Error"
+  status_muted: "Microphone muted"
+  status_timer: "Timer"
 
   # Which page each assistant phase shows. Defaults are the phase illustrations;
   # a screen package claims a phase by pointing its substitution elsewhere -
   # `base/screens/home.yaml` takes the idle one, `base/screens/face.yaml` takes
   # the active ones. Boot / no-Wi-Fi / no-HA stay fixed: they have to work before
   # any optional screen is up.
-  idle_page: page_idle
-  listening_page: page_listening
-  thinking_page: page_thinking
-  replying_page: page_replying
-  error_page: page_error
-  muted_page: page_muted
-  timer_page: page_timer_finished
+  idle_page: page_status
+  listening_page: page_status
+  thinking_page: page_status
+  replying_page: page_status
+  error_page: page_status
+  muted_page: page_status
+  timer_page: page_status
 
-  # Page background behind each illustration (they have alpha).
-  idle_background_color: '000000'
-  listening_background_color: 'FFFFFF'
-  thinking_background_color: 'FFFFFF'
-  replying_background_color: 'FFFFFF'
-  loading_background_color: '000000'
-  error_background_color: '000000'
 
   # ---------------------------------------------------------------------------
   # Fonts. Every character the assistant may print must be covered by the
@@ -714,11 +708,20 @@ script:
           id: request_label
           text: !lambda return id(text_request).state;
       - lvgl.label.update:
-          id: request_label_reply
-          text: !lambda return id(text_request).state;
-      - lvgl.label.update:
           id: response_label
           text: !lambda return id(text_response).state;
+      - lvgl.label.update:
+          id: status_phase
+          text: !lambda |-
+            switch (id(voice_assistant_phase)) {
+              case ${voice_assist_listening_phase_id}: return std::string("${status_listening}");
+              case ${voice_assist_thinking_phase_id}:  return std::string("${status_thinking}");
+              case ${voice_assist_replying_phase_id}:  return std::string("${status_replying}");
+              case ${voice_assist_error_phase_id}:     return std::string("${status_error}");
+              case ${voice_assist_muted_phase_id}:     return std::string("${status_muted}");
+              case ${voice_assist_timer_finished_phase_id}: return std::string("${status_timer}");
+              default: return std::string("${status_idle}");
+            }
 
   # Walks the timer list once and caches what the UI needs: is there a timer at
   # all, is one actually counting, which one finishes first, and how far along
@@ -1141,55 +1144,6 @@ sensor:
 # ASSETS
 ###############################################################################
 
-image:
-  # RGB565 matches LVGL's 16-bit colour depth, so nothing is converted at draw
-  # time and each illustration costs ~150 KB of flash instead of ~230 KB.
-  - id: art_loading
-    file: ${loading_illustration_file}
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-  - id: art_idle
-    file: ${idle_illustration_file}
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-  - id: art_listening
-    file: ${listening_illustration_file}
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-  - id: art_thinking
-    file: ${thinking_illustration_file}
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-  - id: art_replying
-    file: ${replying_illustration_file}
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-  - id: art_error
-    file: ${error_illustration_file}
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-  - id: art_timer_finished
-    file: ${timer_finished_illustration_file}
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-  - id: art_no_wifi
-    file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-wifi.png
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-  - id: art_no_ha
-    file: https://github.com/esphome/wake-word-voice-assistants/raw/main/error_box_illustrations/error-no-ha.png
-    resize: 320x240
-    type: RGB565
-    transparency: alpha_channel
-
 font:
   - id: font_body
     file:
@@ -1295,124 +1249,64 @@ lvgl:
           pad_all: 6
 
   pages:
+    # No artwork here on purpose. Phase visuals come from a character package
+    # (base/screens/face.yaml + base/faces/*), and shipping full-screen
+    # illustrations that any such package immediately hides cost 225 KB of flash
+    # each for nothing. What is left is the bare minimum that has to work before
+    # - or without - any optional screen: three system pages and one status page
+    # the phases fall back to.
     - id: page_boot
-      bg_color: 0x${loading_background_color}
+      bg_color: 0x000000
       widgets:
-        - image:
-            src: art_loading
+        - label:
             align: CENTER
+            text: "${text_starting}"
+            text_font: font_body
+            text_color: 0x8A8A8A
 
-    # No full-screen tap target here: the button under the screen starts the
-    # assistant, so screen taps stay free for whatever a page puts on them.
-    - id: page_idle
-      bg_color: 0x${idle_background_color}
+    - id: page_no_wifi
+      bg_color: 0x000000
       widgets:
-        - image:
-            src: art_idle
+        - label:
             align: CENTER
+            text: "${text_no_wifi}"
+            text_font: font_body
+            text_color: 0xFF4D4D
 
-    - id: page_listening
-      bg_color: 0x${listening_background_color}
+    - id: page_no_ha
+      bg_color: 0x000000
       widgets:
-        - image:
-            src: art_listening
+        - label:
             align: CENTER
+            text: "${text_no_ha}"
+            text_font: font_body
+            text_color: 0xFF4D4D
 
-    - id: page_thinking
-      bg_color: 0x${thinking_background_color}
+    # Every assistant phase lands here unless a package claims it.
+    - id: page_status
+      bg_color: 0x000000
       widgets:
-        - image:
-            src: art_thinking
+        - label:
+            id: status_phase
             align: CENTER
+            text: ""
+            text_font: font_timer
+            text_color: 0xFFFFFF
         - label:
             id: request_label
             align: TOP_MID
             y: 16
             width: 280
-            text_font: font_request
-            text_color: 0x000000
-            bg_color: 0xFFFFFF
-            bg_opa: COVER
-            border_width: 1
-            border_color: 0x000000
-            radius: 4
-            pad_all: 6
             long_mode: dot
             text: ""
-
-    - id: page_replying
-      bg_color: 0x${replying_background_color}
-      widgets:
-        - image:
-            src: art_replying
-            align: CENTER
-        - label:
-            id: request_label_reply
-            align: TOP_MID
-            y: 16
-            width: 280
             text_font: font_request
-            text_color: 0x000000
-            bg_color: 0xFFFFFF
-            bg_opa: COVER
-            border_width: 1
-            border_color: 0x000000
-            radius: 4
-            pad_all: 6
-            long_mode: dot
-            text: ""
+            text_color: 0xC8C8C8
         - label:
             id: response_label
             align: BOTTOM_MID
-            y: -24
+            y: -28
             width: 280
-            text_font: font_body
-            text_color: 0x000000
-            bg_color: 0xFFFFFF
-            bg_opa: COVER
-            border_width: 1
-            border_color: 0x000000
-            radius: 4
-            pad_all: 6
             long_mode: dot
             text: ""
-
-    - id: page_timer_finished
-      bg_color: 0x${idle_background_color}
-      widgets:
-        - image:
-            src: art_timer_finished
-            align: CENTER
-        - button:
-            id: timer_tap
-            width: 100%
-            height: 100%
-            bg_opa: TRANSP
-            border_width: 0
-            shadow_width: 0
-            on_click:
-              - switch.turn_off: timer_ringing
-
-    - id: page_error
-      bg_color: 0x${error_background_color}
-      widgets:
-        - image:
-            src: art_error
-            align: CENTER
-
-    - id: page_muted
-      bg_color: 0x000000
-
-    - id: page_no_wifi
-      bg_color: 0x000000
-      widgets:
-        - image:
-            src: art_no_wifi
-            align: CENTER
-
-    - id: page_no_ha
-      bg_color: 0x000000
-      widgets:
-        - image:
-            src: art_no_ha
-            align: CENTER
+            text_font: font_body
+            text_color: 0xC8C8C8

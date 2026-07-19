@@ -16,9 +16,9 @@ one thin config file you actually edit.
 - **Voice assistant**: on-device wake word (`alexa`, `okay_nabu`) via
   `micro_wake_word`, the full Home Assistant Assist pipeline (STT / LLM / TTS),
   and a mic that mutes from HA.
-- **LVGL UI**: one page per assistant phase — booting, idle, listening,
-  thinking, replying, error, muted, no-Wi-Fi, no-HA, timer ringing — with the
-  request and response text drawn over the illustration.
+- **LVGL UI**: a page per assistant phase, claimed by whichever screen package
+  you install. With none, the core shows plain text status screens; that is the
+  floor, not the intended look.
 - **Touchscreen**: the GT911 is wired into LVGL. The **button under the screen**
   (which is not a GPIO — it is GT911 touch button 0) starts the assistant, and
   silences a ringing timer instead if one is going. The screen itself is left to
@@ -29,8 +29,8 @@ one thin config file you actually edit.
   paused).
 - **TTS routing you choose at runtime**: the reply can come out of the box, out
   of an external Home Assistant media player, or both — see below.
-- **Reskinnable**: every phase illustration is a substitution, so you can swap
-  the artwork without touching the core.
+- **Swappable assistant**: the on-screen character is a package — artwork plus
+  the measurements of where its face goes — so changing assistants is one line.
 
 ## The TTS routing, and why it exists
 
@@ -123,8 +123,7 @@ What lives in the thin config:
 | `tts_output_default` | `This device` | Boot default of the `TTS output` select. Routes spoken replies only — the timer alarm always rings on the box. |
 | `volume_min` / `volume_max` | `0.5` / `0.8` | Media player clamps for the onboard speaker. |
 | `hidden_ssid` | `false` | `true` enables `fast_connect` for a hidden SSID. |
-| `*_illustration_file` | Casita artwork | The 320x240 PNG per phase. Any URL or local path. |
-| `idle_page` | `page_idle` | Which page shows when nothing is happening. Set to `page_home` after adding `base/screens/home.yaml` to your `files:` list. |
+| `idle_page`, `listening_page`, … | `page_status` | Which page each phase shows. Screen packages claim these; set `idle_page: page_home` by hand if you want the clock while idle and the face only while talking. |
 | `timer_finished_sound_file` | repo `timer_finished.flac` | The timer alarm, compiled into flash so it rings without network. Always plays on the box's own speaker. Any URL or local MP3/FLAC/WAV. |
 | `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets — `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
 | `mww_gain_factor` | `4` | Input gain for the wake word only (1–64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
@@ -180,6 +179,18 @@ higher priority, so a language file listed first is silently ignored:
 Adding a language is `cp en.yaml xx.yaml` plus translation; `en.yaml` is the
 reference and always carries every key. Details and translator notes:
 [`base/lang/README.md`](base/lang/README.md). Pull requests welcome.
+
+## No illustrations
+
+Earlier versions shipped a full-screen PNG per phase, ported from upstream. They
+are gone. Each was 225 KB of flash — nine of them, over 2 MB — and installing any
+character package hid every one of them immediately. The repo now compiles
+exactly one image: the character you chose.
+
+What remains in the core is text: three system pages (starting, no Wi-Fi, no
+Home Assistant) and one status page the phases fall back to. It is deliberately
+plain. The core's job is to work before and without any optional package; making
+it pretty is what `base/faces/` is for.
 
 ## Why not the upstream config
 
