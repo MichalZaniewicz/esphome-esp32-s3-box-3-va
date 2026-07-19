@@ -71,12 +71,16 @@ screen contents, touch, the assistant itself — is not confirmed yet.
 
 ### Removed
 
-- **The per-phase illustrations.** Nine full-screen PNGs at 225 KB of flash each,
-  over 2 MB in total, every one of them hidden the moment a character package is
-  installed. The core now compiles a single image — the character — and falls
-  back to plain text status pages when no package claims a phase. Those pages are
-  meant to be plain: the core has to work before any optional screen is up, and
-  looking good is `base/faces/`' job.
+- **The per-phase illustrations.** Nine full-screen PNGs, every one of them
+  hidden the moment a character package is installed. The core now compiles a
+  single image — the character — and falls back to plain text status pages when
+  no package claims a phase. Those pages are meant to be plain: the core has to
+  work before any optional screen is up, and looking good is `base/faces/`' job.
+
+  Measured on an S3-Box-3: **51% → 25.5% of flash** (2,075,531 of 8,126,464
+  bytes), RAM 37%. Worth being clear that this was not a rescue — at 51% there
+  was plenty of room. It buys headroom for screens to come, and stops the repo
+  shipping 2 MB of artwork nobody sees.
 
 ### Added
 
