@@ -21,9 +21,10 @@ one thin config file you actually edit.
   floor, not the intended look.
 - **Touchscreen**: the GT911 is wired into LVGL. The **button under the screen**
   (which is not a GPIO - it is GT911 touch button 0) starts the assistant, and
-  silences a ringing timer instead if one is going. The screen itself is left to
-  the UI, so widgets get every tap rather than fighting a full-screen
-  tap-to-talk target.
+  silences a ringing timer instead if one is going. **Tapping the screen while
+  idle swaps between the clock and the character**, and back; the choice survives
+  a reboot. Starting the assistant is left to the button so that screen taps
+  belong to the UI rather than fighting a full-screen tap-to-talk target.
 - **Timers**: set by voice, with a countdown and a progress strip on LVGL's top
   layer that stays visible across page changes (green while running, blue while
   paused).
@@ -140,7 +141,18 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | Screen | What it adds |
 |---|---|
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, as a replacement for the bare idle illustration. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
-| `face.yaml` | An animated assistant: a static character image with eyes and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking while idle, wide-eyed listening, glancing around while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`: clock when nothing is happening, robot when talking. Only the three small widgets ever redraw, never the background. |
+| `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
+
+Install both and the idle screen has two faces: the clock, and the character
+idling. **Tap the screen to swap between them** - `idle_page` is what you see
+after a reboot, `idle_page_alt` is what a tap switches to, and the last choice is
+remembered. Set them to the same page to turn the tap off.
+
+```yaml
+  idle_page: page_home      # clock, date, temperatures
+  idle_page_alt: page_face  # the character, blinking and looking around
+```
+
 
 ### Characters
 
