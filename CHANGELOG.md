@@ -34,13 +34,19 @@ screen contents, touch, the assistant itself — is not confirmed yet.
 ### Fixed
 
 - **The wake word never fired** while tap-to-talk dictation worked perfectly.
-  `micro_wake_word` runs inference on the raw microphone stream, so it gets none
-  of `voice_assistant`'s `auto_gain` / `volume_multiplier` — those are applied by
-  Home Assistant to the STT stream. On a quiet mic that means clean transcription
-  and a wake word that never reaches its cutoff. Now sets `gain_factor: 4` on
-  mWW's microphone source, matching `home-assistant-voice-pe`; tunable via the
-  `mww_gain_factor` substitution. Upstream does not set it, so any straight port
-  of that config inherits the default of 1.
+  Fixed by dropping `vad:`. The evidence: with the cutoff lowered to 0.50 the
+  component logged nothing at all, but with VAD removed the same utterance logs
+  `sliding average probability is 0.56 and max probability is 1.00`. The model
+  recognises the word perfectly — `max` hits 1.00 — but the cutoff is compared
+  against the average over the sliding window, and three networks per frame
+  (alexa + okay_nabu + VAD) appear not to fit the real-time budget, so dropped
+  frames held that average below even a 0.50 cutoff. Note the default cutoff is
+  0.90, which this hardware never reaches.
+- Wake word input gain (`gain_factor: 4` on mWW's microphone source, tunable via
+  `mww_gain_factor`) matching `home-assistant-voice-pe`. This was first committed
+  as a fix for the above and **was not the cause** — the wake word failed
+  identically at 1 and 4. Kept because the reference hardware ships it, but its
+  effect here is unmeasured.
 
 - **A ringing timer blanked the screen** instead of showing the timer-finished
   page. The alarm is itself an announcement, so `media_player: on_announcement:`
