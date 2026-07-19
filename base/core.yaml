@@ -374,7 +374,13 @@ micro_wake_word:
     microphone: box_mic
     channels: 0
     gain_factor: ${mww_gain_factor}
-  vad:
+  # NOTE: `vad:` is currently off. The VAD model gates every detection - a wake
+  # word the VAD disagrees with is suppressed - and it is a third network to run
+  # per frame. Upstream's S3-Box-3 config does not use it at all. It is off here
+  # while the "wake word never fires" problem is open; turn it back on once the
+  # wake word works, and check that detections still get through.
+  # vad:
+
   # Cutoffs are exposed because they are the only way to see how close a wake
   # word is getting: the component logs a detection and its probability, but
   # logs NOTHING for a near miss. Drop the cutoff temporarily and the log starts
@@ -382,8 +388,10 @@ micro_wake_word:
   # number. Defaults are the model manifests' own values.
   models:
     - model: alexa
+      id: mww_alexa
       probability_cutoff: ${alexa_probability_cutoff}
     - model: okay_nabu
+      id: mww_okay_nabu
       probability_cutoff: ${okay_nabu_probability_cutoff}
   on_wake_word_detected:
     - voice_assistant.start:
@@ -887,6 +895,43 @@ switch:
           announcement: true
       - script.execute: set_idle_or_mute_phase
       - script.execute: draw_display
+
+  # ---------------------------------------------------------------------------
+  # DIAGNOSTICS. Both exist to A/B a wake word that never fires, from Home
+  # Assistant, without a reflash between arms. Remove them once it works.
+  # ---------------------------------------------------------------------------
+
+  # Theory: LVGL starves the audio path. The main loop is regularly logged
+  # blocking for ~70 ms ("lvgl took a long time for an operation"), and the
+  # microphone ring buffer only holds ~120 ms, so dropped frames would leave the
+  # wake word deaf while Home Assistant's own STT still copes. Pausing LVGL
+  # freezes the screen on its last frame; the assistant keeps running.
+  - platform: template
+    id: diag_pause_lvgl
+    name: "Diag: pause LVGL"
+    icon: "mdi:television-pause"
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    entity_category: diagnostic
+    on_turn_on:
+      - lvgl.pause:
+    on_turn_off:
+      - lvgl.resume:
+
+  # Theory: two wake word models plus feature extraction do not fit the frame
+  # budget, so inference falls behind real time. The previous, working config ran
+  # a single model. This drops back to one at runtime.
+  - platform: template
+    id: diag_single_model
+    name: "Diag: only the alexa model"
+    icon: "mdi:numeric-1-box"
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+    entity_category: diagnostic
+    on_turn_on:
+      - micro_wake_word.disable_model: mww_okay_nabu
+    on_turn_off:
+      - micro_wake_word.enable_model: mww_okay_nabu
 
 select:
   - platform: template
