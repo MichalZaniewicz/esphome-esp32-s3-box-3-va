@@ -61,6 +61,12 @@ screen contents, touch, the assistant itself — is not confirmed yet.
   `timer_ringing` switch now stops the wake word and waits for the microphone to
   release the bus before playing.
 
+- **The timer alarm now follows the same routing as spoken replies.** It rang on
+  the box unconditionally, which is wrong for anyone whose audio lives on an
+  external speaker: the alarm played to a speaker nobody listens to while seizing
+  the I2S bus, so the wake word went deaf for the duration. It now honours the
+  `TTS output` select — box, external player, or both.
+
 ### Added
 
 - Tap-to-talk: a tap anywhere on the idle page, or on the GT911 "home" button

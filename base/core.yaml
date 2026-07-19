@@ -85,12 +85,11 @@ substitutions:
   # and break a build here without anything changing on our side.
   timer_finished_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/timer_finished.flac
 
-  # 'false' rings the timer WITHOUT playing anything on the box - the screen and
-  # the `Timer ringing` switch still work, so a Home Assistant automation can do
-  # the sound instead (on a speaker group, in your own language, whatever).
-  # Worth doing if HA already handles it: playing locally seizes the I2S bus,
-  # which stops the wake word for the duration of the alarm for nothing.
-  timer_alarm_on_device: 'true'
+  # The alarm follows the `TTS output` select, exactly like a spoken reply: it
+  # rings on the box, on the external player, or both. That means the file must
+  # be reachable BY THE EXTERNAL SPEAKER when routing there - a URL, not a local
+  # path. A local path still works for on-device playback (it is compiled in),
+  # it just cannot be handed to Home Assistant.
 
   # Input gain for the wake word only (1-64). See the micro_wake_word block for
   # why this exists and why it is not 1.
@@ -903,9 +902,24 @@ switch:
     optimistic: true
     restore_mode: ALWAYS_OFF
     on_turn_on:
+      # External player: hand the file to Home Assistant. One shot - the box has
+      # no idea when a remote speaker finishes, so repeating it is an HA
+      # automation's job if you want the alarm to nag.
       - if:
           condition:
-            lambda: return ${timer_alarm_on_device};
+            lambda: return id(tts_output).current_option() != "This device";
+          then:
+            - homeassistant.service:
+                service: media_player.play_media
+                data:
+                  entity_id: ${external_media_player_id}
+                  media_content_id: ${timer_finished_sound_file}
+                  media_content_type: music
+                  announce: "true"
+      # On the box: repeats until something turns the switch off.
+      - if:
+          condition:
+            lambda: return id(tts_output).current_option() != "External player";
           then:
             # Free the I2S bus before asking the speaker for it. The microphone
             # holds it while the wake word is listening, and `on_announcement`
@@ -1040,8 +1054,9 @@ select:
                       then:
                         - micro_wake_word.start:
 
-  # Where the assistant's replies come out. "External player" keeps the box from
-  # downloading and decoding the TTS at all, which is what long replies choke on.
+  # Where the assistant's audio comes out - spoken replies AND the timer alarm.
+  # "External player" keeps the box from downloading and decoding the TTS at all,
+  # which is what long replies choke on.
   - platform: template
     id: tts_output
     name: TTS output
