@@ -111,8 +111,8 @@ skill/
 ## Configuration
 
 Day-to-day settings are Home Assistant entities, not config edits: microphone
-mute, screen brightness, TTS output, wake word engine location, and the timer
-switch.
+mute, wake sound, screen brightness, TTS output, wake word engine location, and
+the timer switch.
 
 What lives in the thin config:
 
@@ -125,6 +125,7 @@ What lives in the thin config:
 | `volume_min` / `volume_max` | `0.5` / `0.8` | Media player clamps for the onboard speaker. |
 | `hidden_ssid` | `false` | `true` enables `fast_connect` for a hidden SSID. |
 | `idle_page`, `listening_page`, … | `page_status` | Which page each phase shows. Screen packages claim these; set `idle_page: page_home` by hand if you want the clock while idle and the face only while talking. |
+| `wake_sound_file` | repo `wake.wav` | The beep when the wake word fires, toggled from HA by the `Wake sound` switch. 180 ms deliberately: mic and speaker share one I2S bus, so it must finish before listening starts. |
 | `timer_finished_sound_file` | repo `timer_finished.flac` | The timer alarm, compiled into flash so it rings without network. Always plays on the box's own speaker. Any URL or local MP3/FLAC/WAV. |
 | `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets — `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
 | `screen_restore_mode` | `ALWAYS_ON` | Backlight at boot. `ALWAYS_ON` so the boot screen is always visible; `RESTORE_DEFAULT_OFF` if the device should remember having been switched off. |

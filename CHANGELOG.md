@@ -95,6 +95,12 @@ screen contents, touch, the assistant itself — is not confirmed yet.
   was plenty of room. It buys headroom for screens to come, and stops the repo
   shipping 2 MB of artwork nobody sees.
 
+- **A wake sound**, with a `Wake sound` switch in Home Assistant. It is 180 ms
+  and generated for this repo rather than borrowed from Voice PE, whose own wake
+  sound is 0.95 s: mic and speaker share a single I2S bus here, so the beep has
+  to finish before the assistant can open the microphone, and a second of that
+  is a second of the user's sentence lost.
+
 ### Added
 
 - Tap-to-talk: a tap anywhere on the idle page, or on the GT911 "home" button

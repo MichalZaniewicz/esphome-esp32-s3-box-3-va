@@ -85,6 +85,13 @@ substitutions:
   # and break a build here without anything changing on our side.
   timer_finished_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/timer_finished.flac
 
+  # Played when the wake word fires, if the "Wake sound" switch is on. 180 ms on
+  # purpose: the microphone and speaker share one I2S bus on this board, so the
+  # beep has to finish BEFORE listening starts. Home Assistant Voice PE's own
+  # wake sound is 0.95 s, which would put nearly a second between the wake word
+  # and the assistant hearing anything.
+  wake_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/wake.wav
+
   # Always plays on the box, independently of `TTS output` - see the
   # `timer_ringing` switch for why. A local path works fine, since the file is
   # compiled in and never handed to Home Assistant.
@@ -405,6 +412,8 @@ media_player:
     files:
       - id: timer_finished_sound
         file: ${timer_finished_sound_file}
+      - id: wake_sound
+        file: ${wake_sound_file}
     on_announcement:
       # The mic cannot capture while the speaker holds the bus, so drop the wake
       # word for the duration of any announcement.
@@ -430,6 +439,7 @@ media_player:
               - not:
                   voice_assistant.is_running:
               - switch.is_off: timer_ringing
+              - lambda: return !id(wake_sound_active);
           then:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
             - script.execute: draw_display
@@ -483,6 +493,27 @@ micro_wake_word:
       probability_cutoff: ${okay_nabu_probability_cutoff}
       sliding_window_size: ${okay_nabu_sliding_window}
   on_wake_word_detected:
+    # The beep has to finish before the assistant opens the microphone: one I2S
+    # bus, so capture and playback cannot overlap. `wait_until` rather than a
+    # fixed delay, so a longer replacement sound still works.
+    - if:
+        condition:
+          switch.is_on: wake_sound_enabled
+        then:
+          - lambda: id(wake_sound_active) = true;
+          - media_player.speaker.play_on_device_media_file:
+              media_file: wake_sound
+              announcement: true
+          - wait_until:
+              condition:
+                media_player.is_announcing:
+              timeout: 300ms
+          - wait_until:
+              condition:
+                not:
+                  media_player.is_announcing:
+              timeout: 3s
+          - lambda: id(wake_sound_active) = false;
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
 
@@ -641,6 +672,13 @@ globals:
   - id: idle_alt
     type: bool
     restore_value: true
+    initial_value: "false"
+  # Set while the wake beep plays. Without it the media player's on_announcement
+  # handler would treat the beep as user-initiated playback and flash the muted
+  # screen between the wake word and the listening face.
+  - id: wake_sound_active
+    type: bool
+    restore_value: false
     initial_value: "false"
   - id: boot_frame
     type: int
@@ -1063,6 +1101,14 @@ switch:
     restore_mode: RESTORE_DEFAULT_ON
     entity_category: config
     disabled_by_default: true
+
+  - platform: template
+    id: wake_sound_enabled
+    name: Wake sound
+    icon: "mdi:bell-ring"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
 
   - platform: template
     id: mute
