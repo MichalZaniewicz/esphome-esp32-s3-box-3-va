@@ -112,6 +112,7 @@ What lives in the thin config:
 | `hidden_ssid` | `false` | `true` enables `fast_connect` for a hidden SSID. |
 | `*_illustration_file` | Casita artwork | The 320x240 PNG per phase. Any URL or local path. |
 | `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `°²³` | Characters the UI can render. Add your language's accented characters to `extra_glyphs` or they draw blank. |
+| `mww_gain_factor` | `4` | Input gain for the wake word only (1–64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
 
 Pins are substitutions too, but you should not need them unless you are porting
 to another board.

@@ -73,6 +73,10 @@ substitutions:
   volume_min: '0.5'
   volume_max: '0.8'
 
+  # Input gain for the wake word only (1-64). See the micro_wake_word block for
+  # why this exists and why it is not 1.
+  mww_gain_factor: '4'
+
   # Clock timezone in POSIX form - the device has no IANA database. It is only a
   # fallback: HA's time platform syncs the clock at runtime. Grab yours from
   # https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
@@ -325,11 +329,15 @@ media_player:
                       - not:
                           voice_assistant.is_running:
       # No pipeline running means this is user- or HA-initiated playback, not a
-      # reply: show the muted (blank) page while it plays.
+      # reply: show the muted (blank) page while it plays. A ringing timer is the
+      # exception — it is an announcement too, and without this guard it would
+      # blank the timer-finished screen the moment its own alarm starts playing.
       - if:
           condition:
-            not:
-              voice_assistant.is_running:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - switch.is_off: timer_ringing
           then:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
             - script.execute: draw_display
@@ -349,6 +357,18 @@ media_player:
 
 micro_wake_word:
   id: mww
+  # The wake word runs its inference locally on the RAW microphone stream, so it
+  # gets none of the `auto_gain` / `volume_multiplier` above — those are sent to
+  # Home Assistant and applied there, to the speech-to-text stream only. On a
+  # quiet mic that splits the two apart: dictation transcribes perfectly while
+  # the wake word never reaches its probability cutoff. `gain_factor` is the fix,
+  # and 4 is what Home Assistant Voice PE ships for exactly this reason.
+  # Raise it (up to 64) if the wake word needs shouting at, lower it if random
+  # kitchen noise starts triggering it.
+  microphone:
+    microphone: box_mic
+    channels: 0
+    gain_factor: ${mww_gain_factor}
   vad:
   models:
     - model: alexa
@@ -820,6 +840,16 @@ switch:
     optimistic: true
     restore_mode: ALWAYS_OFF
     on_turn_on:
+      # Free the I2S bus before asking the speaker for it. The microphone holds
+      # it while the wake word is listening, and `on_announcement` stops the wake
+      # word only once playback has already begun — too late, so the speaker's
+      # first attempt fails with "Parent bus is busy" and retries a second later.
+      - script.execute: stop_wake_word
+      - wait_until:
+          condition:
+            not:
+              microphone.is_capturing:
+          timeout: 2s
       # Repeat the alarm with a 1 s gap until something turns this off.
       - lambda: |-
           id(speaker_media_player)

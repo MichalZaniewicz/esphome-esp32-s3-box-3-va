@@ -85,6 +85,37 @@ that. Use `lvgl.page.show:` — which means phase→page dispatch is a chain of
 **`voice_assistant.get_timers()` returns `const std::vector<Timer> &`**, not a
 map. Iterate the timers directly; `pair.second` does not compile.
 
+## Wake word never fires, but dictation works perfectly
+
+Classic and misleading: `micro_wake_word` sits in `DETECTING_WAKE_WORD`, the mic
+is demonstrably fine (tap-to-talk transcribes speech correctly), and yet no
+`Detected '<word>'` line ever appears.
+
+The cause is that the two paths get different audio. `voice_assistant`'s
+`noise_suppression_level`, `auto_gain` and `volume_multiplier` are **sent to Home
+Assistant and applied there**, to the STT stream. `micro_wake_word` runs its
+inference **on-device, on the raw microphone stream**, so it sees none of that
+boost. A quiet mic therefore transcribes fine and never wakes.
+
+The knob is `gain_factor` on mWW's own microphone source, default **1**:
+
+```yaml
+micro_wake_word:
+  microphone:
+    microphone: box_mic
+    channels: 0        # defaults to 0 anyway
+    gain_factor: 4     # what home-assistant-voice-pe ships
+```
+
+Range is 1-64. Too low and the wake word needs shouting at; too high and room
+noise triggers it. Note the upstream `wake-word-voice-assistants` S3-Box-3 config
+does **not** set it, so a straight port inherits `gain_factor: 1`.
+
+Diagnosing: the component only logs successful detections and VAD-blocked ones
+(`Wake word model predicts 'X', but VAD model doesn't.`). A near miss logs
+nothing at all, so absence of logs tells you nothing about how close it got —
+lower the model's `probability_cutoff` temporarily if you need to see the edge.
+
 ## voice_assistant and TTS: the reboot trap
 
 If `voice_assistant:` has a `media_player:`, ESPHome does not merely hand you the

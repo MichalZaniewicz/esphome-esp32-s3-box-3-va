@@ -31,6 +31,30 @@ screen contents, touch, the assistant itself — is not confirmed yet.
 - **The `Timer ringing` switch is exposed** to Home Assistant rather than
   `internal:`, so an automation can silence a timer ringing in an empty room.
 
+### Fixed
+
+- **The wake word never fired** while tap-to-talk dictation worked perfectly.
+  `micro_wake_word` runs inference on the raw microphone stream, so it gets none
+  of `voice_assistant`'s `auto_gain` / `volume_multiplier` — those are applied by
+  Home Assistant to the STT stream. On a quiet mic that means clean transcription
+  and a wake word that never reaches its cutoff. Now sets `gain_factor: 4` on
+  mWW's microphone source, matching `home-assistant-voice-pe`; tunable via the
+  `mww_gain_factor` substitution. Upstream does not set it, so any straight port
+  of that config inherits the default of 1.
+
+- **A ringing timer blanked the screen** instead of showing the timer-finished
+  page. The alarm is itself an announcement, so `media_player: on_announcement:`
+  treated it as user-initiated playback and switched to the muted (black) page,
+  clobbering the phase `on_timer_finished` had just set. Upstream avoided this by
+  waiting for `media_player.is_announcing` before setting the phase; this instead
+  guards the announcement handler on `timer_ringing` being off, which does not
+  depend on event ordering.
+- **`Parent bus is busy` when a timer started ringing.** The microphone still held
+  the I2S bus — `on_announcement` stops the wake word only once playback has
+  begun — so the speaker's first start failed and retried a second later. The
+  `timer_ringing` switch now stops the wake word and waits for the microphone to
+  release the bus before playing.
+
 ### Added
 
 - Tap-to-talk: a tap anywhere on the idle page, or on the GT911 "home" button
