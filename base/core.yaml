@@ -911,7 +911,11 @@ switch:
     name: "Diag: pause LVGL"
     icon: "mdi:television-pause"
     optimistic: true
-    restore_mode: ALWAYS_OFF
+    # DISABLED, not ALWAYS_OFF: any restore mode that sets a state at boot makes
+    # the switch fire its own on_turn_off during setup(), i.e. `lvgl.resume:`
+    # against an LVGL that does not exist yet. That crashed the device in a
+    # 40-second loop. Same trap as the template selects in the Waveshare project.
+    restore_mode: DISABLED
     entity_category: diagnostic
     on_turn_on:
       - lvgl.pause:
@@ -926,7 +930,7 @@ switch:
     name: "Diag: only the alexa model"
     icon: "mdi:numeric-1-box"
     optimistic: true
-    restore_mode: ALWAYS_OFF
+    restore_mode: DISABLED   # see diag_pause_lvgl above - fires in setup() otherwise
     entity_category: diagnostic
     on_turn_on:
       - micro_wake_word.disable_model: mww_okay_nabu
