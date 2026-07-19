@@ -149,6 +149,11 @@ substitutions:
   # this much per character. 70 ms/char is roughly conversational speech; raise
   # it if the animation finishes early, lower it if it runs long. The cap stops a
   # runaway estimate holding the device forever.
+  # A cast speaker does not start the instant it is handed a URL - there is a
+  # second or so of buffering, during which the box is already animating. This is
+  # added to the hold so the mouth is still moving when the speaker finishes,
+  # rather than stopping early by exactly that lag.
+  tts_hold_lead_ms: '1200'
   tts_hold_base_ms: '700'
   tts_hold_ms_per_char: '70'
   tts_hold_max_ms: '30000'
@@ -447,14 +452,17 @@ media_player:
                   voice_assistant.is_running:
               - switch.is_off: timer_ringing
               - lambda: return !id(wake_sound_active);
+              - lambda: return !id(tts_reply_active);
           then:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
             - script.execute: draw_display
     on_idle:
       - if:
           condition:
-            not:
-              voice_assistant.is_running:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - lambda: return !id(tts_reply_active);
           then:
             - script.execute: start_wake_word
             - script.execute: set_idle_or_mute_phase
@@ -566,7 +574,9 @@ voice_assistant:
         state: !lambda return x;
     - script.execute: draw_display
   on_tts_start:
-    - lambda: id(tts_chars) = x.length();
+    - lambda: |-
+        id(tts_chars) = x.length();
+        id(tts_reply_active) = true;
     - text_sensor.template.publish:
         id: text_response
         state: !lambda return x;
@@ -618,8 +628,10 @@ voice_assistant:
           lambda: return id(tts_output).current_option() != "This device";
         then:
           - delay: !lambda |-
-              uint32_t ms = ${tts_hold_base_ms} + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
+              uint32_t ms = ${tts_hold_lead_ms} + ${tts_hold_base_ms}
+                          + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
               return ms > ${tts_hold_max_ms} ? ${tts_hold_max_ms} : ms;
+    - lambda: id(tts_reply_active) = false;
     - if:
         condition:
           - lambda: return id(wake_word_engine_location).current_option() == "On device";
@@ -698,6 +710,16 @@ globals:
     type: bool
     restore_value: true
     initial_value: "false"
+  # Set from the moment a reply starts until the talking animation is done with
+  # it. The media player's own handlers must not touch the screen or the wake
+  # word in that window: at TTS_END the assistant has already gone IDLE, so
+  # without this they treat the reply as ordinary playback - on_announcement
+  # flips to the muted screen and on_idle ends the talking face early.
+  - id: tts_reply_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
+
   # Set while the wake beep plays. Without it the media player's on_announcement
   # handler would treat the beep as user-initiated playback and flash the muted
   # screen between the wake word and the listening face.

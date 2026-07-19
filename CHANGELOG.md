@@ -34,6 +34,18 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **The talking face stopped a moment after the reply started**, while the
+  external speaker had not begun yet. Attaching the media player again woke two
+  handlers that nothing had been triggering before: at `TTS_END` the assistant is
+  already `IDLE`, so `on_announcement` treated the reply as ordinary playback and
+  switched to the muted screen, and stopping that playback fired `on_idle`, which
+  ended the talking face and restarted the wake word. Both are now gated on a
+  reply being in progress, which also stops the wake word listening to the
+  speaker's own voice.
+- **Cast latency.** A speaker handed a URL takes about a second to start, and the
+  box was already animating. `tts_hold_lead_ms` adds that to the hold so the
+  mouth is still moving when the reply ends.
+
 - **The wake word never fired** while tap-to-talk dictation worked perfectly.
   Fixed by dropping `vad:`. The evidence: with the cutoff lowered to 0.50 the
   component logged nothing at all, but with VAD removed the same utterance logs
