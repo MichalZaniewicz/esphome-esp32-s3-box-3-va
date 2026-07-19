@@ -1,0 +1,425 @@
+###############################################################################
+# Aura - an assistant with no face and no artwork.
+#
+# Nine bars on a centre line, growing symmetrically. At rest they settle into a
+# thin line; while the assistant listens the line breathes, while it thinks a
+# peak travels along it, and while it speaks the line breaks into an equaliser.
+# Nothing is drawn from an image, so this package needs no PNG and adds nothing
+# to flash beyond its own code - which makes it the natural default for anyone
+# who has not picked a character.
+#
+# An OPTIONAL package. Add it to your thin config's `files:` list AFTER
+# base/core.yaml:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/aura.yaml
+#
+# It claims every assistant phase including idle. Use it INSTEAD of
+# base/screens/face.yaml, not alongside: both want the same phases, and whichever
+# is listed later wins.
+#
+# The bars are driven from one lambda into a global array, then pushed to the
+# widgets. That keeps the maths in one readable place instead of spread across
+# nine copies of the same expression.
+###############################################################################
+
+substitutions:
+  aura_color: '0xFF8A5B'        # warm, in the spirit of the film this borrows from
+  aura_alarm_color: '0xFF4D4D'
+  aura_dim_color: '0x4A3A34'    # muted
+
+  # 16 wide on an 18 px pitch: at rest the bars almost touch, so the thing reads
+  # as a line rather than a row of dots, and they still separate into distinct
+  # bars once the equaliser runs. The pitch itself is baked into each widget's
+  # x offset below.
+  aura_bar_w: '16'
+  aura_bar_radius: '8'
+  aura_y: '0'                   # the line's vertical position, from screen centre
+
+  aura_h_rest: '4'              # flat line
+  aura_h_max: '84'              # tallest a bar ever gets
+  aura_tick: 100ms              # faster than the face: an equaliser needs it
+
+  # Claim every phase.
+  idle_page: page_aura
+  idle_page_alt: page_aura
+  listening_page: page_aura
+  thinking_page: page_aura
+  replying_page: page_aura
+  error_page: page_aura
+  muted_page: page_aura
+  timer_page: page_aura
+
+globals:
+  - id: aura_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # Heights for the nine bars, filled by aura_compute and read by aura_draw.
+  - id: aura_h
+    type: int[9]
+    restore_value: false
+    initial_value: "{4, 4, 4, 4, 4, 4, 4, 4, 4}"
+  - id: aura_expr
+    type: int
+    restore_value: false
+    initial_value: "0"
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/aura.yaml (drawn assistant, no artwork)"
+
+script:
+  # One lambda decides the whole shape. `i` runs 0..8, so `i - 4` is the distance
+  # from the middle bar, which is what makes the line taper at its ends.
+  - id: aura_compute
+    then:
+      - lambda: |-
+          const int f = id(aura_frame);
+          const int REST = ${aura_h_rest};
+          const int MAXH = ${aura_h_max};
+          const int phase = id(voice_assistant_phase);
+
+          for (int i = 0; i < 9; i++) {
+            const int d = i - 4;                 // -4 .. +4
+            const int edge = 4 - (d < 0 ? -d : d);   // 0 at the ends, 4 in the middle
+            int h = REST;
+
+            if (phase == ${voice_assist_listening_phase_id}) {
+              // A slow swell travelling outwards from the centre.
+              const float w = sinf((f * 0.22f) - (d < 0 ? -d : d) * 0.6f);
+              h = REST + (int) ((0.35f + 0.35f * w) * MAXH * (0.35f + 0.16f * edge));
+            } else if (phase == ${voice_assist_thinking_phase_id}) {
+              // A single peak sweeping left and right, everything else flat.
+              const int span = 16;                       // ticks for one sweep
+              int p = f % (span * 2);
+              if (p >= span) p = span * 2 - p;           // bounce back
+              const int pos = (p * 8) / span;            // 0..8
+              const int dist = pos > i ? pos - i : i - pos;
+              h = REST + (dist <= 1 ? (MAXH / 3) >> dist : 0);
+            } else if (phase == ${voice_assist_replying_phase_id}) {
+              // Equaliser. Deterministic noise, so it looks busy without being
+              // random enough to flicker: a cheap hash of frame and bar index.
+              uint32_t n = (uint32_t) (f * 73 + i * 151);
+              n = (n ^ (n >> 5)) * 2654435761u;
+              const int amp = (int) ((n >> 16) & 0xFF);  // 0..255
+              h = REST + (amp * MAXH * (2 + edge)) / (255 * 8);
+            } else if (phase == ${voice_assist_timer_finished_phase_id}) {
+              // Everything up, alternating, insistent.
+              h = REST + ((f + i) % 2 ? MAXH * 2 / 3 : MAXH / 3);
+            } else if (phase == ${voice_assist_muted_phase_id} ||
+                       phase == ${voice_assist_error_phase_id}) {
+              h = REST;
+            } else {
+              // Idle: a barely-there breath, so the line is alive but still.
+              const float w = sinf(f * 0.08f - i * 0.35f);
+              h = REST + (int) ((1.0f + w) * 3.0f);
+            }
+            id(aura_h)[i] = h < REST ? REST : h;
+          }
+
+  - id: aura_draw
+    then:
+      - lvgl.widget.update:
+          id: aura_bar_0
+          height: !lambda return id(aura_h)[0];
+      - lvgl.widget.update:
+          id: aura_bar_1
+          height: !lambda return id(aura_h)[1];
+      - lvgl.widget.update:
+          id: aura_bar_2
+          height: !lambda return id(aura_h)[2];
+      - lvgl.widget.update:
+          id: aura_bar_3
+          height: !lambda return id(aura_h)[3];
+      - lvgl.widget.update:
+          id: aura_bar_4
+          height: !lambda return id(aura_h)[4];
+      - lvgl.widget.update:
+          id: aura_bar_5
+          height: !lambda return id(aura_h)[5];
+      - lvgl.widget.update:
+          id: aura_bar_6
+          height: !lambda return id(aura_h)[6];
+      - lvgl.widget.update:
+          id: aura_bar_7
+          height: !lambda return id(aura_h)[7];
+      - lvgl.widget.update:
+          id: aura_bar_8
+          height: !lambda return id(aura_h)[8];
+
+  # Colour is literal per state and only repainted when the state changes,
+  # so it costs nothing per tick.
+  - id: aura_tint_normal
+    then:
+      - lvgl.widget.update:
+          id: aura_bar_0
+          bg_color: ${aura_color}
+      - lvgl.widget.update:
+          id: aura_bar_1
+          bg_color: ${aura_color}
+      - lvgl.widget.update:
+          id: aura_bar_2
+          bg_color: ${aura_color}
+      - lvgl.widget.update:
+          id: aura_bar_3
+          bg_color: ${aura_color}
+      - lvgl.widget.update:
+          id: aura_bar_4
+          bg_color: ${aura_color}
+      - lvgl.widget.update:
+          id: aura_bar_5
+          bg_color: ${aura_color}
+      - lvgl.widget.update:
+          id: aura_bar_6
+          bg_color: ${aura_color}
+      - lvgl.widget.update:
+          id: aura_bar_7
+          bg_color: ${aura_color}
+      - lvgl.widget.update:
+          id: aura_bar_8
+          bg_color: ${aura_color}
+
+  - id: aura_tint_alarm
+    then:
+      - lvgl.widget.update:
+          id: aura_bar_0
+          bg_color: ${aura_alarm_color}
+      - lvgl.widget.update:
+          id: aura_bar_1
+          bg_color: ${aura_alarm_color}
+      - lvgl.widget.update:
+          id: aura_bar_2
+          bg_color: ${aura_alarm_color}
+      - lvgl.widget.update:
+          id: aura_bar_3
+          bg_color: ${aura_alarm_color}
+      - lvgl.widget.update:
+          id: aura_bar_4
+          bg_color: ${aura_alarm_color}
+      - lvgl.widget.update:
+          id: aura_bar_5
+          bg_color: ${aura_alarm_color}
+      - lvgl.widget.update:
+          id: aura_bar_6
+          bg_color: ${aura_alarm_color}
+      - lvgl.widget.update:
+          id: aura_bar_7
+          bg_color: ${aura_alarm_color}
+      - lvgl.widget.update:
+          id: aura_bar_8
+          bg_color: ${aura_alarm_color}
+
+  - id: aura_tint_dim
+    then:
+      - lvgl.widget.update:
+          id: aura_bar_0
+          bg_color: ${aura_dim_color}
+      - lvgl.widget.update:
+          id: aura_bar_1
+          bg_color: ${aura_dim_color}
+      - lvgl.widget.update:
+          id: aura_bar_2
+          bg_color: ${aura_dim_color}
+      - lvgl.widget.update:
+          id: aura_bar_3
+          bg_color: ${aura_dim_color}
+      - lvgl.widget.update:
+          id: aura_bar_4
+          bg_color: ${aura_dim_color}
+      - lvgl.widget.update:
+          id: aura_bar_5
+          bg_color: ${aura_dim_color}
+      - lvgl.widget.update:
+          id: aura_bar_6
+          bg_color: ${aura_dim_color}
+      - lvgl.widget.update:
+          id: aura_bar_7
+          bg_color: ${aura_dim_color}
+      - lvgl.widget.update:
+          id: aura_bar_8
+          bg_color: ${aura_dim_color}
+
+  - id: aura_tick_script
+    mode: single
+    then:
+      - lambda: id(aura_frame)++;
+      # Repaint the colour only on a phase change.
+      - if:
+          condition:
+            lambda: |-
+              const int p = id(voice_assistant_phase);
+              int want = 1;
+              if (p == ${voice_assist_timer_finished_phase_id} || p == ${voice_assist_error_phase_id}) want = 2;
+              if (p == ${voice_assist_muted_phase_id}) want = 3;
+              if (want == id(aura_expr)) return false;
+              id(aura_expr) = want;
+              return true;
+          then:
+            - if:
+                condition:
+                  lambda: return id(aura_expr) == 2;
+                then:
+                  - script.execute: aura_tint_alarm
+            - if:
+                condition:
+                  lambda: return id(aura_expr) == 3;
+                then:
+                  - script.execute: aura_tint_dim
+            - if:
+                condition:
+                  lambda: return id(aura_expr) == 1;
+                then:
+                  - script.execute: aura_tint_normal
+      - script.execute: aura_compute
+      - script.execute: aura_draw
+
+interval:
+  - interval: ${aura_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_aura
+          then:
+            - script.execute: aura_tick_script
+
+lvgl:
+  pages:
+    - id: page_aura
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            id: aura_bar_0
+            align: CENTER
+            x: -72
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: aura_bar_1
+            align: CENTER
+            x: -54
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: aura_bar_2
+            align: CENTER
+            x: -36
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: aura_bar_3
+            align: CENTER
+            x: -18
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: aura_bar_4
+            align: CENTER
+            x: 0
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: aura_bar_5
+            align: CENTER
+            x: 18
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: aura_bar_6
+            align: CENTER
+            x: 36
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: aura_bar_7
+            align: CENTER
+            x: 54
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: aura_bar_8
+            align: CENTER
+            x: 72
+            y: ${aura_y}
+            width: ${aura_bar_w}
+            height: ${aura_h_rest}
+            radius: ${aura_bar_radius}
+            bg_color: ${aura_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        # Same contract as the character screens: a tap silences a ringing timer,
+        # or swaps idle screens if the config defines a second one.
+        - button:
+            id: aura_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen
