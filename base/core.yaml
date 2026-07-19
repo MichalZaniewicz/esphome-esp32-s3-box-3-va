@@ -118,6 +118,8 @@ substitutions:
   alexa_sliding_window: '3'
   okay_nabu_probability_cutoff: '0.7'
   okay_nabu_sliding_window: '3'
+  hey_jarvis_probability_cutoff: '0.7'
+  hey_jarvis_sliding_window: '3'
 
   # Clock timezone in POSIX form - the device has no IANA database. It is only a
   # fallback: HA's time platform syncs the clock at runtime. Grab yours from
@@ -471,6 +473,12 @@ micro_wake_word:
     microphone: box_mic
     channels: 0
     gain_factor: ${mww_gain_factor}
+  # Three models, so Home Assistant offers a choice in its wake word picker: the
+  # device reports every model here as an available wake word, and allows one
+  # active at a time. Each costs inference per frame, which is the budget the
+  # wake word competes for - if detection starts getting flaky after adding a
+  # fourth, that is the first thing to suspect.
+  #
   # NOTE: `vad:` is currently off. The VAD model gates every detection - a wake
   # word the VAD disagrees with is suppressed - and it is a third network to run
   # per frame. Upstream's S3-Box-3 config does not use it at all. It is off here
@@ -492,6 +500,10 @@ micro_wake_word:
       id: mww_okay_nabu
       probability_cutoff: ${okay_nabu_probability_cutoff}
       sliding_window_size: ${okay_nabu_sliding_window}
+    - model: hey_jarvis
+      id: mww_hey_jarvis
+      probability_cutoff: ${hey_jarvis_probability_cutoff}
+      sliding_window_size: ${hey_jarvis_sliding_window}
   on_wake_word_detected:
     # The beep has to finish before the assistant opens the microphone: one I2S
     # bus, so capture and playback cannot overlap. `wait_until` rather than a
