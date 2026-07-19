@@ -183,16 +183,6 @@ where its eyes and mouth belong. Every expression dimension is a substitution, s
 a bigger or smaller face rescales without touching the engine. Details:
 [`base/faces/README.md`](base/faces/README.md).
 
-## Why not the upstream config
-
-[`esphome/wake-word-voice-assistants`](https://github.com/esphome/wake-word-voice-assistants)
-ships a perfectly good S3-Box-3 config, and this started as a port of it. It
-paints the screen with `display:` + `pages:` + full-screen PNGs and never
-touches the touch panel. LVGL and `display: pages:` cannot coexist in one
-ESPHome config, so anything touch-driven means replacing that layer rather than
-extending it. A copy of the upstream file is worth keeping around for reference
-while you do.
-
 ## Claude Code skill
 
 This repo ships a [Claude Code](https://claude.com/claude-code) skill at
