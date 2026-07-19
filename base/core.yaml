@@ -87,9 +87,13 @@ substitutions:
   #
   # If the wake word starts getting missed, lower the cutoff before widening the
   # window. If it fires at random kitchen noise, raise the cutoff.
-  alexa_probability_cutoff: '0.7'
+  # Measured on hardware with window 3: averages of 0.71 0.71 0.80 0.86 0.89 0.94.
+  # The cutoff sits below the weakest of those with room to spare, because a
+  # near miss logs NOTHING - a threshold that only just clears the observed
+  # samples silently drops the ones you never see.
+  alexa_probability_cutoff: '0.6'
   alexa_sliding_window: '3'
-  okay_nabu_probability_cutoff: '0.8'
+  okay_nabu_probability_cutoff: '0.7'
   okay_nabu_sliding_window: '3'
 
   # Clock timezone in POSIX form - the device has no IANA database. It is only a
