@@ -1,0 +1,69 @@
+# Flare - the fireball.
+#
+# A face cut into a burning blob, jack-o-lantern style. Everyone else here glows
+# on a dark panel; this one is the inverse - dark features on a bright body, with
+# the pupil lit in the body's own colour so the eyes read as embers.
+#
+# Usage - the character must come AFTER the face engine, because ESPHome
+# resolves later-listed package files at a higher priority:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/face.yaml
+#     - base/faces/flare.yaml
+#
+# See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/flare.yaml"
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/flare.png
+
+  face_color: '0x33160A'        # dark, cut into the flame
+  face_mouth_color: '0x33160A'
+  face_pupil_color: '0xFEBC1D'  # the body's own yellow, so the pupil glows
+  face_alarm_color: '0xC81E1E'
+
+  # The blob runs from 28 px above centre to 98 below and is widest (+/-59)
+  # around +44, measured row by row. The face sits in that wide belly, well clear
+  # of the flames licking off the top.
+  face_center_x: '0'
+  face_eye_offset: '26'
+  face_eye_y: '38'
+  face_eye_w: '26'
+  face_eye_h: '30'
+  face_mouth_y: '72'
+  face_mouth_w: '40'
+  face_mouth_h: '10'
+
+  face_pupil_w: '10'
+  face_pupil_h: '15'
+  face_pupil_radius: '5'
+  face_pupil_dilate: '4'
+  face_pupil_shrink: '3'
+  face_gaze_dx: '6'
+  face_idle_cycle: '100'
+
+  face_eye_h_wide: '36'
+  face_eye_h_think: '30'
+  face_eye_h_narrow: '12'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '22'
+  face_mouth_small_w: '22'
+  face_mouth_think_w: '14'
+  face_mouth_o_w: '18'
+  face_mouth_o_h: '18'
+  face_mouth_alarm_w: '44'
+  face_mouth_alarm_h: '24'
+  face_mouth_error_w: '20'
+  face_listen_pulse: '4'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '10'
+  face_mouth_radius: '6'

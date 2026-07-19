@@ -5,9 +5,9 @@ The assistant on screen is split in two: `base/screens/face.yaml` is the
 file in here is a **character**: one image plus the numbers that say where its
 features go. Swapping the assistant is one line in `files:`.
 
-![The six characters across five phases](../assets/characters.png)
+![The seven characters across five phases](../assets/characters.png)
 
-Animated, one clip each: [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif)
+Animated, one clip each: [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif)
 
 | Character | Look | Face style |
 |---|---|---|
@@ -17,6 +17,7 @@ Animated, one clip each: [pip](../assets/demo/demo-pip.gif) · [astro](../assets
 | **Franky** | Green monster, bolts, stitches | White cartoon eyes with black pupils - the only face here that is skin rather than a display, so it gets a separate mouth colour. |
 | **Wizard** | Void under a purple hat | Glowing gold eyes and almost no mouth. The void sits below the hat brim, not at the frame's centre. |
 | **Genie** | Small head, big moustache | The most compact face of the set; the mouth is a hint under the moustache. |
+| **Flare** | Burning blob, flames on top | Dark features cut into a bright body, with the pupil lit in the body's own yellow. The only inverted face here, and a useful demonstration that `face_color` need not be the bright one. |
 
 `face_center_x` shifts the whole face sideways when the artwork is not centred.
 Most of these do not need it - five of the six sit on the frame's axis and only

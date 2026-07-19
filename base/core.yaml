@@ -13,16 +13,19 @@
 # touchscreen underneath to build on. The full-screen illustrations that came
 # with the port are gone; a character package draws the phases now.
 #
-# WHY TTS IS NOT WIRED INTO voice_assistant
-# `voice_assistant:` deliberately has NO `media_player:`. With one set, ESPHome
-# itself streams and decodes the TTS URL on the device at TTS_END
-# (voice_assistant.cpp: `media_player_->make_call().set_media_url(url)`), on top
-# of whatever you do in `on_tts_end`. On long replies that local download+decode
-# is what rebooted the box while the external speaker happily played on. Without
-# it, HA still runs TTS and still delivers the URL to `on_tts_end` (the pipeline
-# flags do not depend on the media player), so routing is ours to decide - see
-# the `tts_output` select. Timer sounds and HA announcements keep working: they
-# go through the `speaker_media_player` component directly.
+# HOW TTS IS ROUTED
+# `voice_assistant:` has a `media_player:`, so ESPHome plays the TTS URL itself at
+# TTS_END (voice_assistant.cpp: `media_player_->make_call().set_media_url(url)`).
+# That attachment is not only about audio: `get_feature_flags()` only advertises
+# ANNOUNCE when a media player is present, and Home Assistant only asks a
+# satellite for its configuration - the wake word list - inside
+# `if feature_flags & ANNOUNCE`. No media player therefore means no wake word
+# picker in HA and a satellite that never returns to `idle`.
+#
+# The cost is that a long reply is downloaded and decoded on the device, which is
+# the suspected cause of mid-answer reboots. So when `TTS output` is `External
+# player`, `on_tts_end` cancels that local playback the moment it starts: the
+# external speaker gets the URL and the box stops fetching it.
 #
 # Pinout and hardware notes: docs/HARDWARE.md.
 ###############################################################################
@@ -539,8 +542,9 @@ voice_assistant:
   id: va
   microphone: box_mic
   micro_wake_word: mww
-  # No `media_player:` on purpose - see the header. TTS routing is handled in
-  # on_tts_end so a long reply never forces a local download+decode.
+  # See the header: this is what makes Home Assistant offer the wake word picker
+  # and lets the satellite entity leave `responding`.
+  media_player: speaker_media_player
   noise_suppression_level: 2
   auto_gain: 31dBFS
   volume_multiplier: 2.0
@@ -571,6 +575,9 @@ voice_assistant:
   # `x` is the TTS media URL. This trigger also fires for HA's "announce" API
   # when no media player is attached, so announcements follow the same routing.
   on_tts_end:
+    # ESPHome has already started playing `x` on speaker_media_player by the time
+    # this runs. So local playback needs no action here - only the external hop,
+    # and cancelling the local one when the reply is not meant for this speaker.
     - if:
         condition:
           lambda: return id(tts_output).current_option() != "This device";
@@ -584,11 +591,11 @@ voice_assistant:
                 announce: "true"
     - if:
         condition:
-          lambda: return id(tts_output).current_option() != "External player";
+          lambda: return id(tts_output).current_option() == "External player";
         then:
-          - media_player.play_media:
-              id: speaker_media_player
-              media_url: !lambda 'return x;'
+          # Stop the download ESPHome just began. This is what keeps the box off
+          # the hook for a long reply while still advertising ANNOUNCE.
+          - media_player.stop:
               announcement: true
   on_end:
     # Give a local announcement a moment to start, then let it finish before
