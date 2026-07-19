@@ -5,7 +5,9 @@ The assistant on screen is split in two: `base/screens/face.yaml` is the
 file in here is a **character**: one image plus the numbers that say where its
 features go. Swapping the assistant is one line in `files:`.
 
-![The three characters across five phases](../assets/characters.png)
+![The six characters across five phases](../assets/characters.png)
+
+Animated, one clip each: [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif)
 
 | Character | Look | Face style |
 |---|---|---|
