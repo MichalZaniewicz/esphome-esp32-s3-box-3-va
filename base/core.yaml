@@ -77,10 +77,20 @@ substitutions:
   # why this exists and why it is not 1.
   mww_gain_factor: '4'
 
-  # Wake word probability cutoffs (0-1), defaults taken from the model manifests.
-  # Lower them to diagnose a wake word that never fires - see micro_wake_word.
-  alexa_probability_cutoff: '0.9'
-  okay_nabu_probability_cutoff: '0.97'
+  # Wake word tuning. The cutoff is compared against the average probability over
+  # the sliding window, NOT the peak - which is why the window size matters more
+  # than it looks. Measured on an S3-Box-3: the peak hits 1.00 on every single
+  # utterance, but averaged over the stock 5 windows it lands around 0.6, because
+  # the quiet frames either side of the word dilute it. The stock 0.90 cutoff is
+  # therefore unreachable here. A shorter window keeps the peak frames and drops
+  # the padding, which buys back enough headroom to run a selective cutoff.
+  #
+  # If the wake word starts getting missed, lower the cutoff before widening the
+  # window. If it fires at random kitchen noise, raise the cutoff.
+  alexa_probability_cutoff: '0.7'
+  alexa_sliding_window: '3'
+  okay_nabu_probability_cutoff: '0.8'
+  okay_nabu_sliding_window: '3'
 
   # Clock timezone in POSIX form - the device has no IANA database. It is only a
   # fallback: HA's time platform syncs the clock at runtime. Grab yours from
@@ -390,9 +400,11 @@ micro_wake_word:
     - model: alexa
       id: mww_alexa
       probability_cutoff: ${alexa_probability_cutoff}
+      sliding_window_size: ${alexa_sliding_window}
     - model: okay_nabu
       id: mww_okay_nabu
       probability_cutoff: ${okay_nabu_probability_cutoff}
+      sliding_window_size: ${okay_nabu_sliding_window}
   on_wake_word_detected:
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
@@ -893,8 +905,16 @@ switch:
           id(speaker_media_player)->set_playlist_delay_ms(speaker::AudioPipelineType::ANNOUNCEMENT, 0);
       - media_player.stop:
           announcement: true
-      - script.execute: set_idle_or_mute_phase
-      - script.execute: draw_display
+      # `restore_mode: ALWAYS_OFF` makes this automation run once during setup(),
+      # so the screen work has to be gated - `draw_display` in setup() would paint
+      # an LVGL that may not be up yet. Same trap that crashed the diagnostic
+      # switches; harmless here only by luck of component ordering.
+      - if:
+          condition:
+            lambda: return !id(init_in_progress);
+          then:
+            - script.execute: set_idle_or_mute_phase
+            - script.execute: draw_display
 
   # ---------------------------------------------------------------------------
   # DIAGNOSTICS. Both exist to A/B a wake word that never fires, from Home
