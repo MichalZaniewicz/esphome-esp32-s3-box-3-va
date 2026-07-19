@@ -85,6 +85,8 @@ esp32-s3-box-3-va.yaml     # YOUR config: copy + edit this (pulls the rest from 
 secrets.example.yaml       # copy to secrets.yaml
 base/
   core.yaml                # the always-on core, pulled as a remote package
+  sounds/
+    timer_finished.flac    # the timer alarm, compiled into the firmware
 docs/
   HARDWARE.md              # pinout, I2C map, gotchas
 scripts/
@@ -111,7 +113,7 @@ What lives in the thin config:
 | `volume_min` / `volume_max` | `0.5` / `0.8` | Media player clamps for the onboard speaker. |
 | `hidden_ssid` | `false` | `true` enables `fast_connect` for a hidden SSID. |
 | `*_illustration_file` | Casita artwork | The 320x240 PNG per phase. Any URL or local path. |
-| `timer_finished_sound_file` | Voice PE `timer_finished.flac` | The timer alarm, baked into flash at compile time (so it rings without network). Any URL or local MP3/FLAC/WAV. The default points at another project's `dev` branch — override it for reproducible builds. |
+| `timer_finished_sound_file` | repo `timer_finished.flac` | The timer alarm, baked into flash at compile time (so it rings without network) and played on the box's own speaker whatever `TTS output` says. Any URL or local MP3/FLAC/WAV. |
 | `font_glyphsets` / `extra_glyphs` | `GF_Latin_Core` / `²³` | Characters the UI can render. `GF_Latin_Core` is 319 glyphs and already covers Western *and* Central European accents, so most languages need nothing here. Note the Google Fonts glyphsets are increments, not supersets — `GF_Latin_Plus` (110 glyphs) is not a bigger `Core`, and swapping one for the other loses the accents. |
 | `mww_gain_factor` | `4` | Input gain for the wake word only (1–64). Raise it if the wake word needs shouting at, lower it if room noise triggers it. |
 

@@ -78,10 +78,12 @@ substitutions:
   # own speaker, whatever `TTS output` is set to. Any URL or local path;
   # MP3/FLAC/WAV all decode.
   #
-  # NOTE the default points at another project's `dev` branch, so upstream can
-  # move or change it under you and break a future build. Override it with your
-  # own file - or vendor a copy into this repo - if you want reproducible builds.
-  timer_finished_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+  # Ships with this repo (48 kHz mono 16-bit, 2.73 s, 85 KB - the exact format
+  # the announcement pipeline runs at, so nothing is resampled). It is a copy of
+  # Home Assistant Voice PE's timer_finished.flac, vendored deliberately: the
+  # original lives on that project's `dev` branch, where it can move or change
+  # and break a build here without anything changing on our side.
+  timer_finished_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/timer_finished.flac
 
   # Input gain for the wake word only (1-64). See the micro_wake_word block for
   # why this exists and why it is not 1.
