@@ -6,10 +6,8 @@
 # Usage - the character must come AFTER the face engine, because ESPHome
 # resolves later-listed package files at a higher priority:
 #
-#   files:
-#     - base/core.yaml
-#     - base/screens/face.yaml
-#     - base/faces/pip.yaml
+#   substitutions:
+#     assistant: pip.yaml
 #
 # See base/faces/README.md.
 
@@ -20,6 +18,17 @@ esphome:
         - logger.log:
             level: INFO
             format: "package: faces/pip.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
 
 substitutions:
   face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/pip.png

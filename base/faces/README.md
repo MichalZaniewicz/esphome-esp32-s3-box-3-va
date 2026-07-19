@@ -34,18 +34,28 @@ Every expression the engine draws, for reference:
 ## Using one
 
 ```yaml
+substitutions:
+  assistant: pip
+
 packages:
   core:
     url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
     files:
       - base/core.yaml
-      - base/screens/face.yaml
-      - base/faces/pip.yaml        # <- after the engine
+      - base/faces/${assistant}.yaml
+    refresh: 0s
 ```
 
-Order matters: ESPHome resolves later-listed package files at a higher priority,
-so a character listed *before* the engine is silently ignored - you get the
-engine's defaults and no error.
+Naming the file is enough because a character declares its own `packages:` block
+pulling `base/screens/face.yaml`. ESPHome collects a package's substitutions
+before descending into its nested packages, and earlier-collected values win, so
+the character's geometry beats the engine's defaults rather than the other way
+round.
+
+Aura is the exception and needs no engine at all - it draws itself.
+
+Order still matters between siblings: the language package goes last, since
+later-listed files win substitution conflicts.
 
 ## Adding one
 

@@ -10,6 +10,12 @@
 # =============================================================================
 
 substitutions:
+  # Pick an assistant and a language by name. Characters:
+  #   pip, astro, momo, franky, wizard, genie, flare, aura
+  # Languages: en, pl - or add your own, see base/lang/README.md
+  assistant: pip
+  language: en
+
   # Changing `name` re-creates every entity in Home Assistant.
   name: esp32-s3-box-3-va
   friendly_name: "S3 Box 3 Voice"
@@ -42,16 +48,11 @@ packages:
   core:
     url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
     ref: main
-    # ORDER MATTERS. Each entry is its own package and later ones win
-    # substitution conflicts, so screens come after the core, the character
-    # after the face engine, and the language last of all.
     files:
       - base/core.yaml
-      - base/screens/home.yaml   # clock + climate; drop it and idle falls back to text
-      - base/screens/face.yaml   # the face engine: draws and animates eyes + mouth
-      - base/faces/pip.yaml      # the character. Swap for astro, momo, franky,
-                                #   wizard or genie - see base/faces/README.md
-      - base/lang/en.yaml        # en.yaml, pl.yaml, or your own - see base/lang/
+      - base/screens/home.yaml        # optional: clock, date, climate
+      - base/faces/${assistant}.yaml  # the assistant; it pulls in what it needs
+      - base/lang/${language}.yaml    # keep the language last
     refresh: 0s
 
 # Optional: encrypt the native API. Add the key to secrets.yaml as well.
