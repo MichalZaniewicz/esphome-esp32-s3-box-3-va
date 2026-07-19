@@ -10,7 +10,10 @@ config can point a phase at it without knowing which one is in use.
 
 ![The seven characters across five phases](../assets/characters.png)
 
-Animated, one clip each: [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif)
+Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif)
+
+The preview image above shows only the characters that use artwork; `aura`, `bit`
+and `pixel` draw themselves and are in the clips.
 
 | Character | Look | Face style |
 |---|---|---|
@@ -20,7 +23,9 @@ Animated, one clip each: [pip](../assets/demo/demo-pip.gif) · [astro](../assets
 | **Franky** | Green monster, bolts, stitches | White cartoon eyes with black pupils - the only face here that is skin rather than a display, so it gets a separate mouth colour. |
 | **Wizard** | Void under a purple hat | Glowing gold eyes and almost no mouth. The void sits below the hat brim, not at the frame's centre. |
 | **Genie** | Small head, big moustache | The most compact face of the set; the mouth is a hint under the moustache. |
-| **Aura** | No artwork at all | Nine bars on a line: flat at rest, an equaliser while speaking. The one character with no eyes and no mouth, so it skips the engine entirely and draws itself. |
+| **Aura** | No artwork at all | Nine bars on a line: flat at rest, an equaliser while speaking. No eyes and no mouth, so it skips the engine entirely and draws itself. |
+| **Bit** | No artwork at all | Two eyes with pupils and a small mouth on black. Draws itself. Started out as eyes only; the mouth was added because eyes alone cannot show speech, which left `replying` and `listening` looking identical. |
+| **Pixel** | No artwork at all | A 12x8 LED matrix, drawing itself. Dots carry brightness rather than just on and off, and a pupil is an unlit dot inside a lit 3x3 eye, because at that density a separate pupil would not fit. |
 | **Flare** | Burning blob, flames on top | Dark features cut into a bright body, with the pupil lit in the body's own yellow. The only inverted face here, and a useful demonstration that `face_color` need not be the bright one. |
 
 `face_center_x` shifts the whole face sideways when the artwork is not centred.

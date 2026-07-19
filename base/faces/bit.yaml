@@ -1,0 +1,377 @@
+###############################################################################
+# Bit - a face with no body and no artwork.
+#
+# Two eyes with pupils and a small mouth, drawn straight onto black. Nothing is
+# loaded from an image, so like `aura` this package costs nothing in flash
+# beyond its own code and deliberately does NOT nest base/screens/face.yaml:
+# the engine exists to paint features over a character's PNG, and there is no
+# PNG here.
+#
+# Why it has a mouth at all. The first sketch was eyes only, and it failed on
+# one phase: eyes can show attention and thought, but they cannot show speech,
+# so `replying` and `listening` looked identical. The mouth is the smallest
+# addition that makes every phase legible.
+#
+# The shape of every feature is a substitution, so this doubles as the easiest
+# character to restyle without touching a drawing program.
+###############################################################################
+
+substitutions:
+  bit_color: '0x8FD4FF'
+  bit_pupil_color: '0x122A3D'   # near-black, reads as a hole in the eye
+  bit_alarm_color: '0xFF4D4D'
+  bit_dim_color: '0x2E3D49'     # muted, for when the microphone is off
+
+  # Geometry, all measured from the centre of a 320x240 screen. The eyes sit
+  # slightly above centre and the mouth below, which is what makes a pair of
+  # rectangles read as a face rather than as three bars.
+  bit_eye_offset: '62'
+  bit_eye_y: '-18'
+  bit_eye_w: '54'
+  bit_eye_h: '66'
+  bit_eye_radius: '26'          # static: LVGL clamps it to half the smaller side,
+                                # so one value gives ovals when the eye is tall
+                                # and capsules when it is squeezed shut
+  bit_pupil_size: '20'
+  bit_pupil_radius: '10'
+
+  bit_mouth_y: '48'
+  bit_mouth_w: '46'
+  bit_mouth_h: '8'
+  bit_mouth_radius: '10'
+
+  bit_gaze_dx: '14'             # how far the pupils travel sideways
+  bit_idle_cycle: '100'         # ticks for one blink-and-glance loop
+  bit_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: bit_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: bit_expr
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # Filled by bit_compute, read by bit_draw. Keeping the maths in one lambda
+  # beats spreading the same expression across five widget updates.
+  - id: bit_ew
+    type: int
+    restore_value: false
+    initial_value: "${bit_eye_w}"
+  - id: bit_eh
+    type: int
+    restore_value: false
+    initial_value: "${bit_eye_h}"
+  - id: bit_pw
+    type: int
+    restore_value: false
+    initial_value: "${bit_pupil_size}"
+  - id: bit_ph
+    type: int
+    restore_value: false
+    initial_value: "${bit_pupil_size}"
+  - id: bit_gx
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: bit_mw
+    type: int
+    restore_value: false
+    initial_value: "${bit_mouth_w}"
+  - id: bit_mh
+    type: int
+    restore_value: false
+    initial_value: "${bit_mouth_h}"
+  - id: bit_pupils_on
+    type: bool
+    restore_value: false
+    initial_value: "true"
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/bit.yaml (drawn face, no artwork)"
+
+script:
+  - id: bit_compute
+    then:
+      - lambda: |-
+          const int f = id(bit_frame);
+          const int phase = id(voice_assistant_phase);
+
+          int ew = ${bit_eye_w};
+          int eh = ${bit_eye_h};
+          int gx = 0;
+          int mw = ${bit_mouth_w};
+          int mh = ${bit_mouth_h};
+          bool pup = true;
+
+          if (phase == ${voice_assist_listening_phase_id}) {
+            // Wide awake, mouth a small open circle.
+            ew += 6; eh += 14; mw = 26; mh = 26;
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            // Narrowed, looking away, mouth pulled to a dot.
+            const int t = f % 40;
+            gx = (t < 20) ? -${bit_gaze_dx} : ${bit_gaze_dx};
+            ew -= 4; eh = 36; mw = 14; mh = 14;
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            // The mouth carries the speech. Deterministic noise, same trick as
+            // aura: busy without flickering.
+            uint32_t n = (uint32_t) (f * 73 + 151);
+            n = (n ^ (n >> 5)) * 2654435761u;
+            const int amp = (int) ((n >> 16) & 0xFF);
+            eh -= 8; mw = 40; mh = 8 + (amp * 42) / 255;
+          } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                     phase == ${voice_assist_error_phase_id}) {
+            mw = 52; mh = 40;
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            eh = 6; mw = 46; mh = 8; pup = false;
+          } else {
+            // Idle: two blinks, then the pupils glance left and right.
+            const int t = f % ${bit_idle_cycle};
+            if (t == 0 || t == 1 || t == 5 || t == 6) {
+              eh = 6; pup = false;
+            } else if (t >= 30 && t < 40) {
+              gx = -${bit_gaze_dx};
+            } else if (t >= 50 && t < 60) {
+              gx = ${bit_gaze_dx};
+            }
+          }
+
+          // A pupil must fit inside the eye TOGETHER with the gaze offset.
+          // Without this it pokes out of the white when the eye narrows, which
+          // is exactly the bug the artwork characters hit on Astro's visor.
+          int pw = ${bit_pupil_size};
+          int ph = ${bit_pupil_size};
+          if (pw > ew - 14) pw = ew - 14;
+          if (ph > eh - 10) ph = eh - 10;
+          if (pw < 4 || ph < 4) pup = false;
+          const int lim = (ew - pw) / 2 - 2;
+          if (gx > lim) gx = lim;
+          if (gx < -lim) gx = -lim;
+
+          id(bit_ew) = ew;
+          id(bit_eh) = eh;
+          id(bit_pw) = pw;
+          id(bit_ph) = ph;
+          id(bit_gx) = gx;
+          id(bit_mw) = mw;
+          id(bit_mh) = mh;
+          id(bit_pupils_on) = pup;
+
+  - id: bit_draw
+    then:
+      - lvgl.widget.update:
+          id: bit_eye_l
+          width: !lambda return id(bit_ew);
+          height: !lambda return id(bit_eh);
+      - lvgl.widget.update:
+          id: bit_eye_r
+          width: !lambda return id(bit_ew);
+          height: !lambda return id(bit_eh);
+      - lvgl.widget.update:
+          id: bit_mouth
+          width: !lambda return id(bit_mw);
+          height: !lambda return id(bit_mh);
+      - if:
+          condition:
+            lambda: return id(bit_pupils_on);
+          then:
+            - lvgl.widget.show: bit_pupil_l
+            - lvgl.widget.show: bit_pupil_r
+            - lvgl.widget.update:
+                id: bit_pupil_l
+                width: !lambda return id(bit_pw);
+                height: !lambda return id(bit_ph);
+                x: !lambda return id(bit_gx) - ${bit_eye_offset};
+            - lvgl.widget.update:
+                id: bit_pupil_r
+                width: !lambda return id(bit_pw);
+                height: !lambda return id(bit_ph);
+                x: !lambda return id(bit_gx) + ${bit_eye_offset};
+          else:
+            - lvgl.widget.hide: bit_pupil_l
+            - lvgl.widget.hide: bit_pupil_r
+
+  # Colours are repainted only when the phase group changes, so they cost
+  # nothing per tick.
+  - id: bit_tint_normal
+    then:
+      - lvgl.widget.update:
+          id: bit_eye_l
+          bg_color: ${bit_color}
+      - lvgl.widget.update:
+          id: bit_eye_r
+          bg_color: ${bit_color}
+      - lvgl.widget.update:
+          id: bit_mouth
+          bg_color: ${bit_color}
+
+  - id: bit_tint_alarm
+    then:
+      - lvgl.widget.update:
+          id: bit_eye_l
+          bg_color: ${bit_alarm_color}
+      - lvgl.widget.update:
+          id: bit_eye_r
+          bg_color: ${bit_alarm_color}
+      - lvgl.widget.update:
+          id: bit_mouth
+          bg_color: ${bit_alarm_color}
+
+  - id: bit_tint_dim
+    then:
+      - lvgl.widget.update:
+          id: bit_eye_l
+          bg_color: ${bit_dim_color}
+      - lvgl.widget.update:
+          id: bit_eye_r
+          bg_color: ${bit_dim_color}
+      - lvgl.widget.update:
+          id: bit_mouth
+          bg_color: ${bit_dim_color}
+
+  - id: bit_tick_script
+    mode: single
+    then:
+      - lambda: id(bit_frame)++;
+      - if:
+          condition:
+            lambda: |-
+              const int p = id(voice_assistant_phase);
+              int want = 1;
+              if (p == ${voice_assist_timer_finished_phase_id} || p == ${voice_assist_error_phase_id}) want = 2;
+              if (p == ${voice_assist_muted_phase_id}) want = 3;
+              if (want == id(bit_expr)) return false;
+              id(bit_expr) = want;
+              return true;
+          then:
+            - if:
+                condition:
+                  lambda: return id(bit_expr) == 2;
+                then:
+                  - script.execute: bit_tint_alarm
+            - if:
+                condition:
+                  lambda: return id(bit_expr) == 3;
+                then:
+                  - script.execute: bit_tint_dim
+            - if:
+                condition:
+                  lambda: return id(bit_expr) == 1;
+                then:
+                  - script.execute: bit_tint_normal
+      - script.execute: bit_compute
+      - script.execute: bit_draw
+
+interval:
+  - interval: ${bit_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: bit_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: 0x000000
+      widgets:
+        - obj:
+            id: bit_eye_l
+            align: CENTER
+            x: -${bit_eye_offset}
+            y: ${bit_eye_y}
+            width: ${bit_eye_w}
+            height: ${bit_eye_h}
+            radius: ${bit_eye_radius}
+            bg_color: ${bit_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: bit_eye_r
+            align: CENTER
+            x: ${bit_eye_offset}
+            y: ${bit_eye_y}
+            width: ${bit_eye_w}
+            height: ${bit_eye_h}
+            radius: ${bit_eye_radius}
+            bg_color: ${bit_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: bit_pupil_l
+            align: CENTER
+            x: -${bit_eye_offset}
+            y: ${bit_eye_y}
+            width: ${bit_pupil_size}
+            height: ${bit_pupil_size}
+            radius: ${bit_pupil_radius}
+            bg_color: ${bit_pupil_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: bit_pupil_r
+            align: CENTER
+            x: ${bit_eye_offset}
+            y: ${bit_eye_y}
+            width: ${bit_pupil_size}
+            height: ${bit_pupil_size}
+            radius: ${bit_pupil_radius}
+            bg_color: ${bit_pupil_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: bit_mouth
+            align: CENTER
+            x: 0
+            y: ${bit_mouth_y}
+            width: ${bit_mouth_w}
+            height: ${bit_mouth_h}
+            radius: ${bit_mouth_radius}
+            bg_color: ${bit_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: bit_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen

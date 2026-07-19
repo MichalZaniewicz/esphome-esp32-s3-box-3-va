@@ -186,29 +186,32 @@ Whichever one you name, it exposes the same page id, `page_face`, so
 
 ### The cast
 
-They are not one face on eight bodies: the shape of the eyes, whether there are
+They are not one face on ten bodies: the shape of the eyes, whether there are
 pupils at all, the colours and the range of every expression belong to the
-character, and the artwork decides all of it.
+character. Name any of them in lower case, exactly as the heading reads.
 
-| | | |
-|---|---|---|
-| ![Aura](base/assets/demo/demo-aura.gif) | **Aura**<br>`assistant: aura` | No face, no artwork, nothing to download: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system. The only one that draws itself, with no image in flash at all. |
-| ![Pip](base/assets/demo/demo-pip.gif) | **Pip**<br>`assistant: pip` | The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals - the reference every other character was measured against. |
-| ![Astro](base/assets/demo/demo-astro.gif) | **Astro**<br>`assistant: astro` | Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits. |
-| ![Momo](base/assets/demo/demo-momo.gif) | **Momo**<br>`assistant: momo` | A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan. |
-| ![Franky](base/assets/demo/demo-franky.gif) | **Franky**<br>`assistant: franky` | Assembled from spare parts on somebody's day off. The only one here whose face is skin rather than a screen, so it gets white cartoon eyes and a mouth of its own colour. |
-| ![Wizard](base/assets/demo/demo-wizard.gif) | **Wizard**<br>`assistant: wizard` | There is nothing under the hat but two burning eyes, and it would rather you did not ask. Almost no mouth, by design. |
-| ![Genie](base/assets/demo/demo-genie.gif) | **Genie**<br>`assistant: genie` | Small, moustachioed and faintly smug: grants timers instead of wishes and considers that an upgrade. The most compact face of the set. |
-| ![Flare](base/assets/demo/demo-flare.gif) | **Flare**<br>`assistant: flare` | A fireball with a face cut into it, jack-o-lantern style. The inverse of everyone else: dark features on a bright body, pupils lit in the flame's own colour so the eyes read as embers. |
+| | |
+|---|---|
+| ![Aura](base/assets/demo/demo-aura.gif) | ### Aura<br>No face and no artwork: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system. |
+| ![Bit](base/assets/demo/demo-bit.gif) | ### Bit<br>A face with no body and no artwork, floating in the dark. Everything it has to say it says by blinking, glancing about and working its small mouth. The cheapest character in the set, and the easiest to restyle: every feature is a number. |
+| ![Pixel](base/assets/demo/demo-pixel.gif) | ### Pixel<br>Ninety-six dots pretending to be a face, like a departure board that got curious. Its pupils are unlit dots inside lit eyes, and its thinking is a spark running the perimeter. The heaviest of the set, and the only one with brightness rather than plain on and off. |
+| ![Pip](base/assets/demo/demo-pip.gif) | ### Pip<br>The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals - the reference every other character was measured against. |
+| ![Astro](base/assets/demo/demo-astro.gif) | ### Astro<br>Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits. |
+| ![Momo](base/assets/demo/demo-momo.gif) | ### Momo<br>A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan. |
+| ![Franky](base/assets/demo/demo-franky.gif) | ### Franky<br>Assembled from spare parts on somebody's day off. The only one here whose face is skin rather than a screen, so it gets white cartoon eyes and a mouth of its own colour. |
+| ![Wizard](base/assets/demo/demo-wizard.gif) | ### Wizard<br>There is nothing under the hat but two burning eyes, and it would rather you did not ask. Almost no mouth, by design. |
+| ![Genie](base/assets/demo/demo-genie.gif) | ### Genie<br>Small, moustachioed and faintly smug: grants timers instead of wishes and considers that an upgrade. The most compact face of the set. |
+| ![Flare](base/assets/demo/demo-flare.gif) | ### Flare<br>A fireball with a face cut into it, jack-o-lantern style. The inverse of everyone else: dark features on a bright body, pupils lit in the flame's own colour so the eyes read as embers. |
 
 Every clip above is idle → thinking → replying, generated by replaying the
-animation engine at its real 120 ms tick against that character's own numbers -
-so a change to a character shows up in its clip. The only edit is a couple of
-seconds trimmed from the idle pause, which on the device is longer and stiller.
+animation at its real tick against that character's own numbers, read out of its
+YAML - so a change to a character shows up in its clip. The only edit is a couple
+of seconds trimmed from the idle pause, which on the device is longer and stiller.
 
-Adding one is `cp pip.yaml yours.yaml`, a faceless 320x240 image, and measuring
-where its eyes and mouth belong. Every expression dimension is a substitution, so
-a bigger or smaller face rescales without touching the engine. Details:
+The first three need no artwork at all and draw themselves. For the rest, adding
+one is `cp pip.yaml yours.yaml`, a faceless 320x240 image, and measuring where its
+eyes and mouth belong. Every expression dimension is a substitution, so a bigger
+or smaller face rescales without touching the engine. Details:
 [`base/faces/README.md`](base/faces/README.md).
 
 ## Claude Code skill
