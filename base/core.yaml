@@ -77,6 +77,11 @@ substitutions:
   # why this exists and why it is not 1.
   mww_gain_factor: '4'
 
+  # Wake word probability cutoffs (0-1), defaults taken from the model manifests.
+  # Lower them to diagnose a wake word that never fires - see micro_wake_word.
+  alexa_probability_cutoff: '0.9'
+  okay_nabu_probability_cutoff: '0.97'
+
   # Clock timezone in POSIX form - the device has no IANA database. It is only a
   # fallback: HA's time platform syncs the clock at runtime. Grab yours from
   # https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
@@ -370,9 +375,16 @@ micro_wake_word:
     channels: 0
     gain_factor: ${mww_gain_factor}
   vad:
+  # Cutoffs are exposed because they are the only way to see how close a wake
+  # word is getting: the component logs a detection and its probability, but
+  # logs NOTHING for a near miss. Drop the cutoff temporarily and the log starts
+  # reporting the actual probabilities, which turns "it doesn't work" into a
+  # number. Defaults are the model manifests' own values.
   models:
     - model: alexa
+      probability_cutoff: ${alexa_probability_cutoff}
     - model: okay_nabu
+      probability_cutoff: ${okay_nabu_probability_cutoff}
   on_wake_word_detected:
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
