@@ -190,18 +190,48 @@ They are not one face on ten bodies: the shape of the eyes, whether there are
 pupils at all, the colours and the range of every expression belong to the
 character. Name any of them in lower case, exactly as the heading reads.
 
-| | |
-|---|---|
-| ![Aura](base/assets/demo/demo-aura.gif) | ### Aura<br>No face and no artwork: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system. |
-| ![Bit](base/assets/demo/demo-bit.gif) | ### Bit<br>A face with no body and no artwork, floating in the dark. Everything it has to say it says by blinking, glancing about and working its small mouth. The cheapest character in the set, and the easiest to restyle: every feature is a number. |
-| ![Pixel](base/assets/demo/demo-pixel.gif) | ### Pixel<br>Ninety-six dots pretending to be a face, like a departure board that got curious. Its pupils are unlit dots inside lit eyes, and its thinking is a spark running the perimeter. The heaviest of the set, and the only one with brightness rather than plain on and off. |
-| ![Pip](base/assets/demo/demo-pip.gif) | ### Pip<br>The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals - the reference every other character was measured against. |
-| ![Astro](base/assets/demo/demo-astro.gif) | ### Astro<br>Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits. |
-| ![Momo](base/assets/demo/demo-momo.gif) | ### Momo<br>A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan. |
-| ![Franky](base/assets/demo/demo-franky.gif) | ### Franky<br>Assembled from spare parts on somebody's day off. The only one here whose face is skin rather than a screen, so it gets white cartoon eyes and a mouth of its own colour. |
-| ![Wizard](base/assets/demo/demo-wizard.gif) | ### Wizard<br>There is nothing under the hat but two burning eyes, and it would rather you did not ask. Almost no mouth, by design. |
-| ![Genie](base/assets/demo/demo-genie.gif) | ### Genie<br>Small, moustachioed and faintly smug: grants timers instead of wishes and considers that an upgrade. The most compact face of the set. |
-| ![Flare](base/assets/demo/demo-flare.gif) | ### Flare<br>A fireball with a face cut into it, jack-o-lantern style. The inverse of everyone else: dark features on a bright body, pupils lit in the flame's own colour so the eyes read as embers. |
+<table>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-aura.gif" width="272" alt="Aura"></td>
+    <td><h3>Aura</h3>No face and no artwork: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-bit.gif" width="272" alt="Bit"></td>
+    <td><h3>Bit</h3>A face with no body and no artwork, floating in the dark. Everything it has to say it says by blinking, glancing about and working its small mouth. The cheapest character in the set, and the easiest to restyle: every feature is a number.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-pixel.gif" width="272" alt="Pixel"></td>
+    <td><h3>Pixel</h3>Ninety-six dots pretending to be a face, like a departure board that got curious. Its pupils are unlit dots inside lit eyes, and its thinking is a spark running the perimeter. The heaviest of the set, and the only one with brightness rather than plain on and off.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>
+    <td><h3>Pip</h3>The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals, the reference every other character was measured against.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-astro.gif" width="272" alt="Astro"></td>
+    <td><h3>Astro</h3>Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-momo.gif" width="272" alt="Momo"></td>
+    <td><h3>Momo</h3>A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-franky.gif" width="272" alt="Franky"></td>
+    <td><h3>Franky</h3>Assembled from spare parts on somebody's day off. The only one here whose face is skin rather than a screen, so it gets white cartoon eyes and a mouth of its own colour.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-wizard.gif" width="272" alt="Wizard"></td>
+    <td><h3>Wizard</h3>There is nothing under the hat but two burning eyes, and it would rather you did not ask. Almost no mouth, by design.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-genie.gif" width="272" alt="Genie"></td>
+    <td><h3>Genie</h3>Small, moustachioed and faintly smug: grants timers instead of wishes and considers that an upgrade. The most compact face of the set.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-flare.gif" width="272" alt="Flare"></td>
+    <td><h3>Flare</h3>A fireball with a face cut into it, jack-o-lantern style. The inverse of everyone else: dark features on a bright body, pupils lit in the flame's own colour so the eyes read as embers.</td>
+  </tr>
+</table>
 
 Every clip above is idle → thinking → replying, generated by replaying the
 animation at its real tick against that character's own numbers, read out of its
