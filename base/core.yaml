@@ -73,6 +73,16 @@ substitutions:
   volume_min: '0.5'
   volume_max: '0.8'
 
+  # The timer alarm. Fetched at COMPILE time and baked into flash as a byte
+  # array, so it needs no network at ring time and always comes out of the box's
+  # own speaker, whatever `TTS output` is set to. Any URL or local path;
+  # MP3/FLAC/WAV all decode.
+  #
+  # NOTE the default points at another project's `dev` branch, so upstream can
+  # move or change it under you and break a future build. Override it with your
+  # own file - or vendor a copy into this repo - if you want reproducible builds.
+  timer_finished_sound_file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+
   # Input gain for the wake word only (1-64). See the micro_wake_word block for
   # why this exists and why it is not 1.
   mww_gain_factor: '4'
@@ -339,7 +349,7 @@ media_player:
       num_channels: 1
     files:
       - id: timer_finished_sound
-        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+        file: ${timer_finished_sound_file}
     on_announcement:
       # The mic cannot capture while the speaker holds the bus, so drop the wake
       # word for the duration of any announcement.
