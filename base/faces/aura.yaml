@@ -8,18 +8,15 @@
 # to flash beyond its own code - which makes it the natural default for anyone
 # who has not picked a character.
 #
-# A character, picked the same way as the others - but the only one that brings
-# its own drawing with it. The rest are artwork plus measurements and need
-# base/screens/face.yaml to animate them; this one has no eyes and no mouth, so
-# the face engine has nothing to work with and is not used at all:
+# Picked the same way as the others, with `assistant: aura` - but the only one
+# that brings its own drawing with it. The rest are artwork plus measurements and
+# nest base/screens/face.yaml to animate them; this one has no eyes and no mouth,
+# so the engine has nothing to work with and is deliberately NOT nested here.
 #
-#   files:
-#     - base/core.yaml
-#     - base/faces/aura.yaml     # no base/screens/face.yaml
-#
-# Do not list the face engine alongside it. Aura claims every phase including
-# idle, so the engine would be dead weight - and worse, its character's artwork
-# would still be compiled into flash while never being shown.
+# That is the whole reason characters pull their own dependencies: the config
+# does not have to know which of them needs an engine. Adding the engine here by
+# hand would compile a second set of widgets and the reference character's
+# artwork into flash, neither of which would ever be shown.
 #
 # The bars are driven from one lambda into a global array, then pushed to the
 # widgets. That keeps the maths in one readable place instead of spread across
@@ -43,15 +40,18 @@ substitutions:
   aura_h_max: '84'              # tallest a bar ever gets
   aura_tick: 100ms              # faster than the face: an equaliser needs it
 
-  # Claim every phase.
-  idle_page: page_aura
-  idle_page_alt: page_aura
-  listening_page: page_aura
-  thinking_page: page_aura
-  replying_page: page_aura
-  error_page: page_aura
-  muted_page: page_aura
-  timer_page: page_aura
+  # Claim every phase. The page id is `page_face` even though nothing here draws
+  # a face: every character package exposes that one id, so a config can point
+  # `idle_page_alt` (or any phase) at the character without knowing which one is
+  # installed. Rename it and every config that names a page breaks on swap.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
 
 globals:
   - id: aura_frame
@@ -286,13 +286,13 @@ interval:
     then:
       - if:
           condition:
-            lvgl.page.is_showing: page_aura
+            lvgl.page.is_showing: page_face
           then:
             - script.execute: aura_tick_script
 
 lvgl:
   pages:
-    - id: page_aura
+    - id: page_face
       bg_color: 0x000000
       widgets:
         - obj:

@@ -35,8 +35,9 @@ substitutions:
   # --- Screens ---------------------------------------------------------------
   # Each phase shows the page named here. The packages below claim most of them;
   # these two decide what the idle screen is, and what tapping it switches to.
-  idle_page: page_home       # clock, date, climate  (needs screens/home.yaml)
-  idle_page_alt: page_face   # the robot, idling     (needs screens/face.yaml)
+  idle_page: page_home       # clock, date, climate   (needs screens/home.yaml)
+  idle_page_alt: page_face   # the character, idling  (every character uses this
+                             # same id, so a swap does not touch this line)
 
   # Home screen entities. Wrong or missing ones are not an error - the label just
   # stays "--" until something answers.

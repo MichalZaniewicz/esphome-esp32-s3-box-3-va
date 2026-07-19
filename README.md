@@ -39,25 +39,29 @@ one thin config file you actually edit.
 
 ## The TTS routing, and why it exists
 
-`voice_assistant:` here has **no `media_player:`**, on purpose.
-
-With one attached, ESPHome does not just hand you the TTS URL - at `TTS_END` it
-*also* calls the media player with that URL itself
-(`voice_assistant.cpp`: `media_player_->make_call().set_media_url(url)`), so the
-box downloads and decodes the audio locally on top of anything you do in
-`on_tts_end`. On long replies that local download-and-decode is what made the
-device reboot mid-answer while an external speaker played the reply through.
-
-Leaving it out changes nothing about the pipeline - the request flags sent to
-Home Assistant don't depend on the media player, so HA still runs TTS and still
-delivers the URL to `on_tts_end`. What changes is that **routing is explicit**,
-in the `TTS output` select:
+A reply can come out of the box, out of a Home Assistant media player elsewhere
+in the house, or both, chosen at runtime in the `TTS output` select:
 
 | Option | What happens |
 |---|---|
 | `This device` | The box speaks. Upstream behaviour, local decode included. |
-| `External player` | Only `${external_media_player_id}` speaks. The box never fetches the file. |
+| `External player` | Only `${external_media_player_id}` speaks. The box starts the local playback and immediately stops it. |
 | `Both` | Both, at the cost of the local decode. |
+
+The awkward bit in that middle row is deliberate, and worth knowing before you
+"simplify" it. With a `media_player:` attached, ESPHome does not just hand you
+the TTS URL at `TTS_END` - it *also* calls the media player with it
+(`voice_assistant.cpp`: `media_player_->make_call().set_media_url(url)`), so the
+box downloads and decodes the audio locally whatever `on_tts_end` does. On long
+replies that local download-and-decode is the suspected cause of mid-answer
+reboots, so detaching the media player looks like the clean fix.
+
+It is not, because the attachment does more than audio: `get_feature_flags()`
+only advertises `ANNOUNCE` when a media player is present, and Home Assistant
+only asks a satellite for its wake word list *inside* `if feature_flags &
+ANNOUNCE`. No media player therefore means **no wake word picker in HA** and a
+satellite that never leaves `responding`. So the player stays attached and
+`on_tts_end` cancels the local playback instead.
 
 This routes **spoken replies only**. The timer alarm always rings on the box:
 there it repeats until silenced and a tap on the screen stops it, neither of
@@ -82,7 +86,8 @@ they go through the `speaker_media_player` component directly.
    Install.
 4. In Home Assistant: the new ESPHome device appears, open **Configure** and
    assign an Assist pipeline.
-5. Say "Alexa" (or "OK Nabu"), or just tap the screen.
+5. Say "Alexa" (or "OK Nabu", or "Hey Jarvis"), or press the button under the
+   screen.
 
 After changing anything in the core, run `esphome clean` before the next build -
 otherwise ESPHome reuses the cached copy of the remote package.
@@ -98,8 +103,9 @@ base/
     home.yaml              # optional home screen: clock, date, climate
     face.yaml              # optional animated assistant face (the engine)
   faces/
-    pip, astro, momo,      # characters for the face engine
-    franky, wizard, genie  #   copy any one of them to add your own
+    pip, astro, momo,      # characters; pick one with `assistant:`
+    franky, wizard,        #   each pulls the face engine itself
+    genie, flare, aura     #   aura draws itself, no artwork
   lang/
     en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
   sounds/
@@ -160,33 +166,40 @@ remembered. Set them to the same page to turn the tap off.
 
 ### Characters
 
-The face engine and the character are separate: `base/screens/face.yaml` draws
-and animates, a file in [`base/faces/`](base/faces/README.md) supplies the
-artwork and the measurements. Swapping the assistant is one line:
+Swapping the assistant is one word. Each character in
+[`base/faces/`](base/faces/README.md) pulls whatever it needs by itself, so
+nothing else in the config changes:
 
 ```yaml
-      files:
-        - base/core.yaml
-        - base/screens/face.yaml
-        - base/faces/pip.yaml      # <- after the engine
+substitutions:
+  assistant: pip     # <- the only line that picks a character
+
+packages:
+  core:
+    files:
+      - base/core.yaml
+      - base/faces/${assistant}.yaml
 ```
+
+Whichever one you name, it exposes the same page id, `page_face`, so
+`idle_page_alt: page_face` keeps working across a swap.
 
 ### The cast
 
-Each is one line in `files:`. They are not one face on six bodies - the shape of
-the eyes, whether there are pupils at all, the colours and the range of every
-expression belong to the character, and the artwork decides all of it.
+They are not one face on eight bodies: the shape of the eyes, whether there are
+pupils at all, the colours and the range of every expression belong to the
+character, and the artwork decides all of it.
 
 | | | |
 |---|---|---|
-| ![Aura](base/assets/demo/demo-aura.gif) | **Aura**<br>`base/faces/aura.yaml` | No face, no artwork, nothing to download: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system. The only one that draws itself, so it is listed **without** `base/screens/face.yaml`. |
-| ![Pip](base/assets/demo/demo-pip.gif) | **Pip**<br>`base/faces/pip.yaml` | The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals - the reference every other character was measured against. |
-| ![Astro](base/assets/demo/demo-astro.gif) | **Astro**<br>`base/faces/astro.yaml` | Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits. |
-| ![Momo](base/assets/demo/demo-momo.gif) | **Momo**<br>`base/faces/momo.yaml` | A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan. |
-| ![Franky](base/assets/demo/demo-franky.gif) | **Franky**<br>`base/faces/franky.yaml` | Assembled from spare parts on somebody's day off. The only one here whose face is skin rather than a screen, so it gets white cartoon eyes and a mouth of its own colour. |
-| ![Wizard](base/assets/demo/demo-wizard.gif) | **Wizard**<br>`base/faces/wizard.yaml` | There is nothing under the hat but two burning eyes, and it would rather you did not ask. Almost no mouth, by design. |
-| ![Genie](base/assets/demo/demo-genie.gif) | **Genie**<br>`base/faces/genie.yaml` | Small, moustachioed and faintly smug: grants timers instead of wishes and considers that an upgrade. The most compact face of the set. |
-| ![Flare](base/assets/demo/demo-flare.gif) | **Flare**<br>`base/faces/flare.yaml` | A fireball with a face cut into it, jack-o-lantern style. The inverse of everyone else: dark features on a bright body, pupils lit in the flame's own colour so the eyes read as embers. |
+| ![Aura](base/assets/demo/demo-aura.gif) | **Aura**<br>`assistant: aura` | No face, no artwork, nothing to download: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system. The only one that draws itself, with no image in flash at all. |
+| ![Pip](base/assets/demo/demo-pip.gif) | **Pip**<br>`assistant: pip` | The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals - the reference every other character was measured against. |
+| ![Astro](base/assets/demo/demo-astro.gif) | **Astro**<br>`assistant: astro` | Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits. |
+| ![Momo](base/assets/demo/demo-momo.gif) | **Momo**<br>`assistant: momo` | A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan. |
+| ![Franky](base/assets/demo/demo-franky.gif) | **Franky**<br>`assistant: franky` | Assembled from spare parts on somebody's day off. The only one here whose face is skin rather than a screen, so it gets white cartoon eyes and a mouth of its own colour. |
+| ![Wizard](base/assets/demo/demo-wizard.gif) | **Wizard**<br>`assistant: wizard` | There is nothing under the hat but two burning eyes, and it would rather you did not ask. Almost no mouth, by design. |
+| ![Genie](base/assets/demo/demo-genie.gif) | **Genie**<br>`assistant: genie` | Small, moustachioed and faintly smug: grants timers instead of wishes and considers that an upgrade. The most compact face of the set. |
+| ![Flare](base/assets/demo/demo-flare.gif) | **Flare**<br>`assistant: flare` | A fireball with a face cut into it, jack-o-lantern style. The inverse of everyone else: dark features on a bright body, pupils lit in the flame's own colour so the eyes read as embers. |
 
 Every clip above is idle → thinking → replying, generated by replaying the
 animation engine at its real 120 ms tick against that character's own numbers -
