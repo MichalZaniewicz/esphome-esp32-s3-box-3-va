@@ -6,7 +6,7 @@
 # one you keep. After the core changes, run `esphome clean` before rebuilding —
 # otherwise ESPHome reuses its cached copy of the package.
 #
-# Docs: README.md   Pinout: docs/HARDWARE.md
+# Docs: README.md   Pinout: docs/HARDWARE.md   Characters: base/faces/README.md
 # =============================================================================
 
 substitutions:
@@ -19,25 +19,38 @@ substitutions:
   # https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
   posix_timezone: "CET-1CEST,M3.5.0,M10.5.0/3"
 
-  # Where replies come out. `tts_output_default` is the boot default of the
-  # "TTS output" select; you can change it live in Home Assistant.
+  # Where spoken replies come out. `tts_output_default` is the boot default of
+  # the "TTS output" select; you can change it live in Home Assistant.
   #   This device / External player / Both        (see README.md)
+  # The timer alarm ignores this and always rings on the box.
   external_media_player_id: media_player.living_room
   tts_output_default: "This device"
 
-  # Accented characters your language needs on top of GF_Latin_Core. Anything
-  # missing here renders blank on screen.
-  # extra_glyphs: "°²³ęóąśłżźćńĘĄÓŻĆŹŃŚŁ"
+  # --- Screens ---------------------------------------------------------------
+  # Each phase shows the page named here. The packages below claim most of them;
+  # these two decide what the idle screen is, and what tapping it switches to.
+  idle_page: page_home       # clock, date, climate  (needs screens/home.yaml)
+  idle_page_alt: page_face   # the robot, idling     (needs screens/face.yaml)
 
-  # Swap the artwork without touching the core — any URL or local 320x240 PNG.
-  # idle_illustration_file: https://example.com/idle.png
+  # Home screen entities. Wrong or missing ones are not an error — the label just
+  # stays "--" until something answers.
+  room_temp_entity: sensor.room_temperature
+  room_hum_entity: sensor.room_humidity
+  outdoor_temp_entity: sensor.outdoor_temperature
 
 packages:
   core:
     url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
     ref: main
+    # ORDER MATTERS. Each entry is its own package and later ones win
+    # substitution conflicts, so screens come after the core, the character
+    # after the face engine, and the language last of all.
     files:
       - base/core.yaml
+      - base/screens/home.yaml   # clock + climate; drop it and idle falls back to text
+      - base/screens/face.yaml   # the face engine: draws and animates eyes + mouth
+      - base/faces/robot.yaml    # the character: artwork + measurements
+      - base/lang/en.yaml        # en.yaml, pl.yaml, or your own — see base/lang/
     refresh: 0s
 
 # Optional: encrypt the native API. Add the key to secrets.yaml as well.

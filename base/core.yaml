@@ -175,6 +175,10 @@ substitutions:
   # the active ones. Boot / no-Wi-Fi / no-HA stay fixed: they have to work before
   # any optional screen is up.
   idle_page: page_status
+  # Tapping the idle screen swaps between these two. Point them at a clock and a
+  # character and the tap becomes "show me the robot" / "show me the time".
+  # Leave them equal and tapping does nothing.
+  idle_page_alt: page_status
   listening_page: page_status
   thinking_page: page_status
   replying_page: page_status
@@ -632,6 +636,12 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
+  # false = idle_page, true = idle_page_alt. Survives reboots so the device comes
+  # back showing whichever screen was last chosen.
+  - id: idle_alt
+    type: bool
+    restore_value: true
+    initial_value: "false"
   - id: boot_frame
     type: int
     restore_value: false
@@ -710,6 +720,13 @@ script:
             const uint8_t g = (((PAL[i] >>  8) & 0xFF) * (STEPS - t) + ((PAL[j] >>  8) & 0xFF) * t) / STEPS;
             const uint8_t b = (((PAL[i]      ) & 0xFF) * (STEPS - t) + ((PAL[j]      ) & 0xFF) * t) / STEPS;
             return lv_color_make(r, g, b);
+
+  # Flip the idle screen between its two pages. Anything can call this - the
+  # screen packages wire it to a tap.
+  - id: toggle_idle_screen
+    then:
+      - lambda: id(idle_alt) = !id(idle_alt);
+      - script.execute: draw_display
 
   # Single entry point for "put the right thing on screen". Every state change
   # calls this rather than switching pages itself, so there is one place where
@@ -793,7 +810,13 @@ script:
                   && p != ${voice_assist_not_ready_phase_id}
                   && p != ${voice_assist_timer_finished_phase_id};
           then:
-            - lvgl.page.show: ${idle_page}
+            - if:
+                condition:
+                  lambda: return id(idle_alt);
+                then:
+                  - lvgl.page.show: ${idle_page_alt}
+                else:
+                  - lvgl.page.show: ${idle_page}
 
   # Push what was said / what was answered onto the labels. The text sensors are
   # the source of truth; LVGL labels do not follow them on their own.

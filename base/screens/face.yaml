@@ -34,11 +34,11 @@
 substitutions:
   # Everything below describes a CHARACTER, and every value is overridable by a
   # character package in base/faces/ - see base/faces/README.md. The defaults are
-  # the shipped robot, so this file works on its own.
+  # Pip, the reference character, so this file works on its own.
   #
   # Artwork behind the face: the robot with its painted-on face removed, so the
   # drawn one has somewhere to live.
-  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/robot.png
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/pip.png
 
   face_color: '0x3AFAE6'        # eyes and mouth - sampled from the artwork
   face_alarm_color: '0xFF4D4D'  # timer ringing, and errors
@@ -431,3 +431,27 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             pad_all: 0
+
+        # A tap means different things depending on what the face is doing:
+        # silence a ringing timer, or - when it is merely idling - swap back to
+        # the other idle screen. During a pipeline it does nothing, so a stray
+        # touch while the assistant is listening cannot derail it.
+        - button:
+            id: face_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen

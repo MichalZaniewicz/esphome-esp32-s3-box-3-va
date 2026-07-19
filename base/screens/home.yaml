@@ -214,5 +214,16 @@ lvgl:
             text_font: font_home_small
             text_color: 0xC8C8C8
 
-        # Deliberately no full-screen tap target: the button under the screen
-        # starts the assistant, so this page's taps stay available for widgets.
+        # Tap anywhere to swap to the other idle screen (the character, if one is
+        # installed). This is a UI action, not tap-to-talk - the assistant still
+        # starts from the button under the screen, so nothing here competes with
+        # it. Last in the list, so it sits above the labels.
+        - button:
+            id: home_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - script.execute: toggle_idle_screen

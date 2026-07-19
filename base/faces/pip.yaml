@@ -1,4 +1,7 @@
-# Robot — the reference character.
+# Pip — the reference character.
+#
+# Round head, antenna, soft oval eyes. The friendliest of the three, and the one
+# every other character was measured against.
 #
 # Listing this file changes nothing: these values are the defaults baked into
 # base/screens/face.yaml. It exists to be COPIED as the starting point for a new
@@ -10,7 +13,7 @@
 #   files:
 #     - base/core.yaml
 #     - base/screens/face.yaml
-#     - base/faces/robot.yaml      # <- after the engine
+#     - base/faces/pip.yaml        # <- after the engine
 #
 # See base/faces/README.md.
 
@@ -20,12 +23,12 @@ esphome:
       then:
         - logger.log:
             level: INFO
-            format: "package: faces/robot.yaml"
+            format: "package: faces/pip.yaml"
 
 substitutions:
   # The artwork. Must have NO face painted on it — the eyes and mouth are drawn
   # on top. 320x240; anything else is scaled to fit.
-  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/robot.png
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/pip.png
 
   face_color: '0x3AFAE6'
   face_alarm_color: '0xFF4D4D'

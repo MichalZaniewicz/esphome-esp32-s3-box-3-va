@@ -5,7 +5,17 @@ The assistant on screen is split in two: `base/screens/face.yaml` is the
 file in here is a **character**: one image plus the numbers that say where its
 features go. Swapping the assistant is one line in `files:`.
 
-![Every expression the engine draws](../assets/face-expressions.png)
+![The three characters across five phases](../assets/characters.png)
+
+| Character | Look | Face style |
+|---|---|---|
+| **Pip** | Round head, antenna, blue panel | Soft cyan ovals, small pill mouth. The reference — every other character was measured against it. |
+| **Astro** | Astronaut, sealed visor, waving arm | Cyan capsule slits. The visor is wide and shallow (139x82), so tall eyes do not fit; the glance carries the expression instead. |
+| **Momo** | Cat ears, big black screen | Amber square pixels, barely rounded. The artwork has no colour of its own, so the face sets the tone. |
+
+Every expression the engine draws, for reference:
+
+![Expressions](../assets/face-expressions.png)
 
 ## Using one
 
@@ -16,7 +26,7 @@ packages:
     files:
       - base/core.yaml
       - base/screens/face.yaml
-      - base/faces/robot.yaml      # <- after the engine
+      - base/faces/pip.yaml        # <- after the engine
 ```
 
 Order matters: ESPHome resolves later-listed package files at a higher priority,
@@ -30,12 +40,12 @@ engine's defaults and no error.
    are adapting existing artwork that already has a face, erase it — the blank
    area needs to match whatever is behind it, or the drawn features will sit on
    a patch.
-2. `cp robot.yaml mycharacter.yaml`, point `face_background_file` at your image,
+2. `cp pip.yaml mycharacter.yaml`, point `face_background_file` at your image,
    and adjust the geometry.
 3. Measure rather than guess. Open your original artwork, note the pixel
    coordinates of the eyes and mouth, and convert them to offsets from the
    centre of a 320x240 frame (so centre is `160,120`; `face_eye_y: 36` means 36
-   pixels *below* centre). That is how `robot.yaml` was built, and it landed
+   pixels *below* centre). That is how `pip.yaml` was built, and it landed
    right first time.
 4. Pull requests welcome.
 

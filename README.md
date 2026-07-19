@@ -93,7 +93,7 @@ base/
     home.yaml              # optional home screen: clock, date, climate
     face.yaml              # optional animated assistant face (the engine)
   faces/
-    robot.yaml, robot.png  # characters for the face engine; copy one to add yours
+    pip / astro / momo     # characters for the face engine; copy one to add yours
   lang/
     en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
   sounds/
@@ -153,12 +153,16 @@ artwork and the measurements. Swapping the assistant is one line:
       files:
         - base/core.yaml
         - base/screens/face.yaml
-        - base/faces/robot.yaml    # <- after the engine
+        - base/faces/pip.yaml      # <- after the engine  (or astro, or momo)
 ```
 
-![Expressions](base/assets/face-expressions.png)
+![Three characters](base/assets/characters.png)
 
-Adding a character is `cp robot.yaml yours.yaml`, a faceless 320x240 image, and
+Three ship with the repo: **Pip** (soft ovals), **Astro** (visor slits) and
+**Momo** (square pixels). They differ in more than artwork — the shape of the
+eyes and the range of each expression are the character's own.
+
+Adding a character is `cp pip.yaml yours.yaml`, a faceless 320x240 image, and
 measuring where its eyes and mouth belong. Every expression dimension is a
 substitution, so a bigger or smaller face rescales without touching the engine.
 Details: [`base/faces/README.md`](base/faces/README.md).

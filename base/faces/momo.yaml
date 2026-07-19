@@ -1,0 +1,58 @@
+# Momo — the cat.
+#
+# Ears, a big black screen, no colour of its own. Deadpan; amber-eyed.
+#
+# Usage — the character must come AFTER the face engine, because ESPHome
+# resolves later-listed package files at a higher priority:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/face.yaml
+#     - base/faces/momo.yaml    # <- after the engine
+#
+# See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/momo.yaml"
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/momo.png
+
+  face_color: '0xFFC24D'
+  face_alarm_color: '0xFF5A5A'
+
+  # A big square screen — 161x134 px, centred — and no accent colour anywhere on
+  # the artwork, so the face is free to set the tone. Blocky eyes with barely any
+  # corner rounding read as pixels on a terminal, which is the opposite of Pip's
+  # soft ovals, and amber suits the ears.
+  face_eye_offset: '38'
+  face_eye_y: '-8'
+  face_eye_w: '26'
+  face_eye_h: '26'
+  face_mouth_y: '36'
+  face_mouth_w: '24'
+  face_mouth_h: '8'
+
+  face_eye_h_wide: '32'
+  face_eye_h_think: '16'
+  face_eye_h_narrow: '10'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '22'
+  face_mouth_small_w: '18'
+  face_mouth_think_w: '10'
+  face_mouth_o_w: '18'
+  face_mouth_o_h: '18'
+  face_mouth_alarm_w: '32'
+  face_mouth_alarm_h: '26'
+  face_mouth_error_w: '16'
+  face_glance_dx: '11'
+  face_listen_pulse: '4'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '3'     # square pixels, not ovals
+  face_mouth_radius: '2'
