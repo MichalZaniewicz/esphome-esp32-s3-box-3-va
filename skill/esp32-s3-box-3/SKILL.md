@@ -116,6 +116,23 @@ Diagnosing: the component only logs successful detections and VAD-blocked ones
 nothing at all, so absence of logs tells you nothing about how close it got —
 lower the model's `probability_cutoff` temporarily if you need to see the edge.
 
+## Opacity has two scales
+
+In YAML an opacity is a **percentage or an `LV_OPA_*` constant** (`bg_opa: 27%`,
+`bg_opa: COVER`). In a lambda it is `lv_opa_t`, i.e. **0-255**:
+
+```yaml
+bg_opa: 27%                              # config
+bg_opa: !lambda return on ? 255 : 70;    # runtime, same value
+```
+
+A bare `bg_opa: 90` in YAML fails validation with "Percentage value must use a
+percent sign", which is clear enough once you see it - but the two scales look
+identical while you are writing them, and an animation that sets opacity from a
+lambda makes it easy to carry 0-255 thinking into the static config. Note the
+offline validator cannot catch this: it checks YAML, substitutions and duplicate
+ids, not component schemas.
+
 ## voice_assistant and TTS: the reboot trap
 
 If `voice_assistant:` has a `media_player:`, ESPHome does not merely hand you the
