@@ -62,7 +62,7 @@ they go through the `speaker_media_player` component directly.
 
 ## Quick start
 
-> Requires **ESPHome 2026.4.0+**.
+> Requires **ESPHome 2026.7.0+** — that is where `image:` became a platform component.
 
 1. Copy `secrets.example.yaml` to `secrets.yaml` and fill in your Wi-Fi.
 2. Copy **`esp32-s3-box-3-va.yaml`** next to it and edit the `substitutions:` at

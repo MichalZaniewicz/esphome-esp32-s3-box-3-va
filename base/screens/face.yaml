@@ -376,7 +376,11 @@ interval:
             - script.execute: face_tick_script
 
 image:
-  - id: face_bg
+  # `platform: file` rather than a bare entry: the old top-level form is
+  # deprecated and goes away in ESPHome 2027.1.0. This is why the core requires
+  # 2026.7.0 - the platform syntax landed exactly there.
+  - platform: file
+    id: face_bg
     file: ${face_background_file}
     resize: 320x240
     type: RGB565

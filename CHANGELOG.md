@@ -69,6 +69,12 @@ screen contents, touch, the assistant itself — is not confirmed yet.
   finished or to cut it short. Note this means a muted `speaker_media_player`
   entity silences the alarm.
 
+- **`image:` migrated to the platform syntax** (`platform: file`). The old
+  top-level form is deprecated and removed in ESPHome 2027.1.0. That syntax
+  landed in 2026.7.0, so `min_version` moves there too — a real cost, since it
+  shuts out 2026.4–2026.6, but the alternative is a warning on every build for
+  the next six months and a hard break later.
+
 ### Removed
 
 - **The per-phase illustrations.** Nine full-screen PNGs, every one of them
