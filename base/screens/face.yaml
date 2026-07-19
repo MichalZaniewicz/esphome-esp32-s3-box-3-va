@@ -22,9 +22,9 @@
 # To have the robot idle on screen as well, add `idle_page: page_face`.
 #
 # Expressions
-#   idle       eyes open, mouth a line, blinks every few seconds
+#   idle       blinks twice, then glances right and left, then rests
 #   listening  eyes wide, small round mouth
-#   thinking   eyes glance left and right, mouth a line
+#   thinking   pupils dart side to side, mouth pulled into a dot
 #   replying   mouth opens and closes in time with speech
 #   timer      alarm colour, wide eyes, open mouth, the whole face shakes
 #   muted      eyes shut, mouth a line
@@ -331,7 +331,7 @@ script:
                   return ${face_eye_h_wide} + PULSE[(id(face_frame) / 2) % 4];
                 dx: 0
 
-      # THINKING - the PUPILS look around; the eyes stay put and squint a little.
+      # THINKING - the PUPILS look around; the eyes stay at their resting size.
       # Sliding whole eyes sideways, which is what this used to do, reads as the
       # face being dragged rather than as thought.
       - if:

@@ -16,7 +16,8 @@ one thin config file you actually edit.
 
 ## What it does
 
-- **Voice assistant**: on-device wake word (`alexa`, `okay_nabu`) via
+- **Voice assistant**: on-device wake word (`alexa`, `okay nabu`, `hey jarvis`,
+  pick one in Home Assistant) via
   `micro_wake_word`, the full Home Assistant Assist pipeline (STT / LLM / TTS),
   and a mic that mutes from HA.
 - **LVGL UI**: a page per assistant phase, claimed by whichever screen package
@@ -143,7 +144,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 
 | Screen | What it adds |
 |---|---|
-| `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, as a replacement for the bare idle illustration. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
+| `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
 | `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
 
 Install both and the idle screen has two faces: the clock, and the character
@@ -209,7 +210,7 @@ cp -r skill/esp32-s3-box-3 ~/.claude/skills/
 ## Credits
 
 - **[esphome/wake-word-voice-assistants](https://github.com/esphome/wake-word-voice-assistants)**:
-  the original S3-Box-3 config and the Casita illustrations this is ported from.
+  the S3-Box-3 config this started as a port of.
 - **[espressif/esp-bsp](https://github.com/espressif/esp-bsp)**: the authoritative
   BOX-3 pin map (`bsp/esp-box-3`).
 - **ESPHome**: everything the firmware is built out of.

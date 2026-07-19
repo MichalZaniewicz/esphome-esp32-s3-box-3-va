@@ -9,8 +9,9 @@
 # esphome/wake-word-voice-assistants paints the S3-Box-3 with `display:` +
 # `pages:` + full-screen PNGs, and never touches the touch panel. LVGL and
 # `display: pages:` are mutually exclusive, so this core replaces that layer
-# rather than extending it: same phases, same illustrations, but as LVGL pages
-# with a real touchscreen underneath to build on.
+# rather than extending it: the same phases, but as LVGL pages with a real
+# touchscreen underneath to build on. The full-screen illustrations that came
+# with the port are gone; a character package draws the phases now.
 #
 # WHY TTS IS NOT WIRED INTO voice_assistant
 # `voice_assistant:` deliberately has NO `media_player:`. With one set, ESPHome
@@ -178,7 +179,8 @@ substitutions:
   status_muted: "Microphone muted"
   status_timer: "Timer"
 
-  # Which page each assistant phase shows. Defaults are the phase illustrations;
+  # Which page each assistant phase shows. The default is the plain text status
+  # page, which is the floor rather than the intended look;
   # a screen package claims a phase by pointing its substitution elsewhere -
   # `base/screens/home.yaml` takes the idle one, `base/screens/face.yaml` takes
   # the active ones. Boot / no-Wi-Fi / no-HA stay fixed: they have to work before
@@ -465,8 +467,12 @@ micro_wake_word:
   # gets none of the `auto_gain` / `volume_multiplier` above - those are sent to
   # Home Assistant and applied there, to the speech-to-text stream only. On a
   # quiet mic that splits the two apart: dictation transcribes perfectly while
-  # the wake word never reaches its probability cutoff. `gain_factor` is the fix,
-  # and 4 is what Home Assistant Voice PE ships for exactly this reason.
+  # the wake word never reaches its probability cutoff. `gain_factor` is the knob
+  # for it, and 4 is what Home Assistant Voice PE ships. Note that on this board
+  # it turned out NOT to be the cause: the wake word behaved identically at 1 and
+  # at 4, and what actually fixed it was dropping `vad:` and shortening the
+  # sliding window. Kept because the reference hardware ships it, but do not
+  # assume raising it will help.
   # Raise it (up to 64) if the wake word needs shouting at, lower it if random
   # kitchen noise starts triggering it.
   microphone:
@@ -1377,10 +1383,10 @@ font:
 ###############################################################################
 # LVGL UI
 #
-# One page per assistant phase, mirroring the upstream look, plus a top layer
-# that carries the timer strip so it survives page changes. Every page is a
-# full-screen invisible button, so a tap anywhere is tap-to-talk - that is the
-# hook the touchscreen work builds on.
+# The system pages plus one status page the phases fall back to, and a top layer
+# carrying the timer strip so it survives page changes. Screen taps belong to the
+# UI: the assistant is started from the button under the screen, and the only
+# full-screen tap targets are the ones the screen packages add deliberately.
 ###############################################################################
 
 lvgl:

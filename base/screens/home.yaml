@@ -12,10 +12,10 @@
 #   substitutions:
 #     idle_page: page_home
 #
-# Without those two lines the core falls back to `page_idle`, the full-screen
-# phase illustration. Everything else (listening / thinking / replying / error)
-# keeps using the illustrations either way - this only replaces what you stare
-# at while nothing is happening.
+# Without those two lines the idle phase falls back to `page_status`, the core's
+# plain text screen. This package only changes what you look at while nothing is
+# happening; the active phases belong to whatever else you install, normally
+# base/screens/face.yaml.
 #
 # The clock comes from the core's `ha_time`, so it needs no entity. The climate
 # readings do: set them below or they simply show as "--".
