@@ -67,7 +67,7 @@ engine's defaults and no error.
 | Colour | `face_color`, `face_alarm_color` |
 | Resting shape | `face_eye_offset`, `face_eye_y`, `face_eye_w`, `face_eye_h`, `face_mouth_y`, `face_mouth_w`, `face_mouth_h` |
 | Expressions | `face_eye_h_wide`, `face_eye_h_narrow`, `face_eye_h_shut`, `face_mouth_open_h`, `face_mouth_small_w`, `face_mouth_o_w`, `face_mouth_o_h`, `face_mouth_alarm_w`, `face_mouth_alarm_h`, `face_mouth_error_w` |
-| Motion | `face_glance_dx`, `face_shake_dx`, `face_tick` |
+| Motion | `face_gaze_dx`, `face_shake_dx`, `face_idle_cycle`, `face_tick` |
 | Corners | `face_eye_radius`, `face_mouth_radius` |
 
 Every expression dimension is a substitution precisely so a character with a

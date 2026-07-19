@@ -86,6 +86,10 @@ substitutions:
   face_pupil_dilate: '4'   # added to both dimensions while listening
   face_pupil_shrink: '3'   # taken off while alarmed or in error
   face_gaze_dx: '6'        # how far the pupil travels inside the eye
+  # Idle loop: blink, blink, then glance right and left, then rest. One cycle is
+  # this many ticks - 100 x 120 ms is about twelve seconds, slow enough to read
+  # as a living face rather than a nervous one.
+  face_idle_cycle: '100'
 
   face_eye_h_think: '20'   # squinted while thinking
   face_mouth_think_w: '12' # thinking: the mouth shrinks to a dot
@@ -268,11 +272,32 @@ script:
                       w: ${face_mouth_w}
                       h: ${face_mouth_h}
                       dx: 0
+            # Two blinks close together, a pause, then the eyes wander right and
+            # left and settle. The pupils do the wandering; the blink script
+            # re-centres them when it finishes, so the two never fight.
             - if:
                 condition:
-                  lambda: return id(face_frame) % 33 == 0;
+                  lambda: |-
+                    const int t = id(face_frame) % ${face_idle_cycle};
+                    return t == 0 || t == 5;
                 then:
                   - script.execute: face_blink
+            - if:
+                condition:
+                  lambda: |-
+                    const int t = id(face_frame) % ${face_idle_cycle};
+                    return t == 30 || t == 40 || t == 50 || t == 60;
+                then:
+                  - script.execute:
+                      id: face_pupils
+                      w: ${face_pupil_w}
+                      h: ${face_pupil_h}
+                      gx: !lambda |-
+                        const int t = id(face_frame) % ${face_idle_cycle};
+                        const int g = (${face_gaze_dx} * 2) / 3;
+                        if (t == 30) return g;
+                        if (t == 50) return -g;
+                        return 0;
 
       # LISTENING - eyes wide and breathing, pupils dilated, small round mouth.
       - if:
