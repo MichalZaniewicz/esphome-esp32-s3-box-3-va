@@ -60,74 +60,74 @@ Whichever one you name, it exposes the same page id, `page_face`, so
 
 ### The cast
 
-They are not one face on sixteen bodies: the shape of the eyes, whether there are
-pupils at all, the colours and the range of every expression belong to the
-character. Name any of them in lower case, exactly as the heading reads.
+Sixteen of them, and they are not one face on sixteen bodies: the eyes, the
+colours, the range of every expression and in seven cases the entire way of
+being on screen belong to the character. Name any of them in lower case.
 
 <table>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-aura.gif" width="272" alt="Aura"></td>
-    <td><h3>Aura</h3>No face and no artwork: nine bars on a line, drawn entirely in code. At rest a still line, a swell while listening, a peak sweeping past while thinking, an equaliser while speaking. Borrowed from a certain film about an operating system.</td>
+    <td><h3>Aura</h3>She has no face and never needed one. A line of light that leans in when you speak, thinks in a single travelling pulse, and breaks into an equaliser when she answers. Warm, unhurried, and entirely comfortable being a voice.</td>
   </tr>
   <tr>
-    <td width="290"><img src="base/assets/demo/demo-bit.gif" width="272" alt="Bit"></td>
-    <td><h3>Bit</h3>A face with no body and no artwork, floating in the dark. Everything it has to say it says by blinking, glancing about and working its small mouth. The cheapest character in the set, and the easiest to restyle: every feature is a number.</td>
-  </tr>
-  <tr>
-    <td width="290"><img src="base/assets/demo/demo-pixel.gif" width="272" alt="Pixel"></td>
-    <td><h3>Pixel</h3>Ninety-six dots pretending to be a face, like a departure board that got curious. Its pupils are unlit dots inside lit eyes, and its thinking is a spark running the perimeter. The heaviest of the set, and the only one with brightness rather than plain on and off.</td>
-  </tr>
-  <tr>
-    <td width="290"><img src="base/assets/demo/demo-iris.gif" width="272" alt="Iris"></td>
-    <td><h3>Iris</h3>One enormous eye and nothing else, watching the room over the top of your cooking. Its pupil widens when you speak to it, shrinks to a pinprick while it thinks, and it blinks when it has nothing better to do. Full screen, seven widgets.</td>
-  </tr>
-  <tr>
-    <td width="290"><img src="base/assets/demo/demo-rain.gif" width="272" alt="Rain"></td>
-    <td><h3>Rain</h3>Characters falling down the screen. Each phase changes the weather rather than just the speed: a drizzle on a few columns while idle, the whole wall frozen and shimmering while it listens, a fast downpour while it thinks, and every column falling in step as horizontal bands while it speaks. Nothing on screen actually moves - each column is a label standing still whose text is rewritten every tick.</td>
-  </tr>
-  <tr>
-    <td width="290"><img src="base/assets/demo/demo-crt.gif" width="272" alt="CRT"></td>
-    <td><h3>CRT</h3>A terminal in green phosphor, scanlines and all. The only character that says anything: it prints what it heard, dim, and types the reply underneath it, so it doubles as subtitles when the answer is playing on a speaker in another room. Also the only one that needs translating.</td>
+    <td width="290"><img src="base/assets/demo/demo-kitt.gif" width="272" alt="Kitt"></td>
+    <td><h3>Kitt</h3>A red eye sweeping patiently back and forth, like something that has been on duty a long time and expects to be on duty a while longer. Understated until you ask it for something, then all business.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-jarvis.gif" width="272" alt="Jarvis"></td>
-    <td><h3>Jarvis</h3>A heads-up display in the manner of a certain film franchise's fictional assistant: counter-rotating rings, corner brackets and a core that opens when you speak to it, tightens while it thinks and pulses while it answers. Styled after the genre rather than copied from it.</td>
+    <td><h3>Jarvis</h3>Immaculately composed: rings turning inside rings, corners squared off, everything measured. Opens up when you address him, tightens while he works the problem, and never once looks flustered.</td>
   </tr>
   <tr>
-    <td width="290"><img src="base/assets/demo/demo-lumi.gif" width="272" alt="Lumi"></td>
-    <td><h3>Lumi</h3>Serene, pastel and half hidden under a hood, watching the room through an opening barely fifty pixels across. The smallest face here after Genie, so everything about her is scaled down rather than merely moved.</td>
+    <td width="290"><img src="base/assets/demo/demo-crt.gif" width="272" alt="CRT"></td>
+    <td><h3>CRT</h3>An old terminal that never got switched off. Prints back what it heard and types out its answer a character at a time, in green phosphor, as though someone is still at the keyboard on the other end.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-iris.gif" width="272" alt="Iris"></td>
+    <td><h3>Iris</h3>One enormous eye, watching the room over the top of whatever you are cooking. Her pupil opens when you talk to her and shrinks to a pinprick while she thinks it over. Unnerving for about a day, then oddly companionable.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-rain.gif" width="272" alt="Rain"></td>
+    <td><h3>Rain</h3>Weather rather than a face. Drizzles quietly to herself, freezes mid-fall the instant you say her name, and comes down in sheets while she thinks. The only assistant here you would describe as atmospheric.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-pixel.gif" width="272" alt="Pixel"></td>
+    <td><h3>Pixel</h3>A departure board that got curious about the people reading it. Ninety-six dots that manage a smile, a glance and a blink between them, and are quietly pleased with themselves for it.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-bit.gif" width="272" alt="Bit"></td>
+    <td><h3>Bit</h3>A face and nothing else, floating in the dark. No body, no props, no help: everything Bit has to say is done with two eyes and a small mouth, and it turns out that is plenty.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-rhea.gif" width="272" alt="Rhea"></td>
-    <td><h3>Rhea</h3>Warm, unbothered and dressed for something more heroic than setting kitchen timers. The largest face in the set, and the only one whose artwork came with eyes already drawn - they were kept and now serve as her eyebrows.</td>
+    <td><h3>Rhea</h3>Warm, unhurried and dressed for something considerably more heroic than setting a kitchen timer. Gives the impression she is helping out between assignments and is far too polite to mention it.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>
-    <td><h3>Pip</h3>The house robot: earnest, easily impressed, and quietly certain it is the reason the kitchen runs at all. Soft cyan ovals, the reference every other character was measured against.</td>
+    <td><h3>Pip</h3>The house robot: earnest, easily impressed, and quietly certain he is the reason the kitchen runs at all. Soft cyan eyes, boundless goodwill, no discernible ego problem beyond that one.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-astro.gif" width="272" alt="Astro"></td>
-    <td><h3>Astro</h3>Sealed into a visor and permanently mid-wave, as though it has been waiting all morning for someone to walk in. The visor is wide and shallow, so its eyes are scanner slits.</td>
+    <td><h3>Astro</h3>Sealed into a visor and permanently mid-wave, as though he has been waiting all morning for somebody to walk in. Cheerful in the specific way of someone with nothing else scheduled.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-momo.gif" width="272" alt="Momo"></td>
-    <td><h3>Momo</h3>A cat that woke up as a terminal and has decided not to discuss it. Amber pixels on black, square-cornered, deadpan.</td>
+    <td><h3>Momo</h3>A cat that woke up one morning as a terminal and has decided not to discuss it. Amber, square-cornered, deadpan. Answers everything, explains nothing.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-franky.gif" width="272" alt="Franky"></td>
-    <td><h3>Franky</h3>Assembled from spare parts on somebody's day off. The only one here whose face is skin rather than a screen, so it gets white cartoon eyes and a mouth of its own colour.</td>
+    <td><h3>Franky</h3>Assembled from spare parts on somebody's day off and delighted about it. The stitches are structural, the enthusiasm is genuine, and he would like you to know he is very good at timers.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-wizard.gif" width="272" alt="Wizard"></td>
-    <td><h3>Wizard</h3>There is nothing under the hat but two burning eyes, and it would rather you did not ask. Almost no mouth, by design.</td>
+    <td><h3>Wizard</h3>There is nothing under the hat but two burning eyes, and he would rather you did not ask. Speaks as little as possible and makes each word feel like it cost him something.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-genie.gif" width="272" alt="Genie"></td>
-    <td><h3>Genie</h3>Small, moustachioed and faintly smug: grants timers instead of wishes and considers that an upgrade. The most compact face of the set.</td>
+    <td><h3>Genie</h3>Small, moustachioed and faintly smug. Grants timers instead of wishes and considers this a promotion. Do not get him started on lamps.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-flare.gif" width="272" alt="Flare"></td>
-    <td><h3>Flare</h3>A fireball with a face cut into it, jack-o-lantern style. The inverse of everyone else: dark features on a bright body, pupils lit in the flame's own colour so the eyes read as embers.</td>
+    <td><h3>Flare</h3>A fireball with a face cut into it, lit from the inside like a lantern. Burns bright, burns constantly, and has never in its life been described as restful.</td>
   </tr>
 </table>
 

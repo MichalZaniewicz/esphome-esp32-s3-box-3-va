@@ -1,0 +1,400 @@
+###############################################################################
+# Kitt - a scanner bar, in the manner of a certain talking car from the 1980s.
+# Styled after the genre, not copied from it, and not affiliated with anyone.
+#
+# No artwork: a dark housing and 9 segments whose brightness sweeps side to
+# side. Like the other drawn characters it does NOT nest base/screens/face.yaml.
+#
+# NOTHING MOVES AND NOTHING CHANGES SIZE. The sweep is brightness alone: every
+# tick computes a level 0..255 per segment and writes it as a colour. That makes
+# this the cheapest animation in the repository - 9 colour writes per tick and
+# not one geometry change.
+#
+# The idle sweep is the whole point of this character, so unlike every other
+# assistant here it is at its most recognisable when nothing is happening.
+###############################################################################
+
+substitutions:
+  kitt_color: '0xFF2A18'
+  kitt_dim_color: '0x2A0806'      # an unlit segment, not a black one: the bar
+                                  # should still read as hardware when dark
+  kitt_alarm_color: '0xFFB030'
+  kitt_muted_color: '0x3A2A28'
+  kitt_housing_color: '0x16161A'
+  kitt_bg_color: '0x08080A'
+
+  kitt_housing_w: '300'
+  kitt_housing_h: '78'
+  kitt_seg_w: '26'
+  kitt_seg_h: '46'
+  kitt_seg_radius: '4'
+
+  # Sweep speed, in hundredths of a segment per tick. Idle is deliberately
+  # unhurried; thinking is the same motion driven hard.
+  kitt_speed_idle: '28'
+  kitt_speed_think: '90'
+  # How far the glow bleeds into neighbouring segments, hundredths per segment.
+  # Higher is a tighter point of light.
+  kitt_spread_idle: '55'
+  kitt_spread_think: '85'
+
+  kitt_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: kitt_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: kitt_lv
+    type: int[9]
+    restore_value: false
+  # Which colour the bar is wearing, so the draw lambdas do not each have to
+  # work out the phase again.
+  - id: kitt_lit
+    type: int
+    restore_value: false
+    initial_value: "1"
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/kitt.yaml (scanner bar, no artwork)"
+
+script:
+  - id: kitt_compute
+    then:
+      - lambda: |-
+          const int f = id(kitt_frame);
+          const int phase = id(voice_assistant_phase);
+          const float SPAN = 9 - 1;
+
+          int lit = 1;
+          if (phase == ${voice_assist_timer_finished_phase_id} ||
+              phase == ${voice_assist_error_phase_id}) lit = 2;
+          if (phase == ${voice_assist_muted_phase_id}) lit = 3;
+          id(kitt_lit) = lit;
+
+          for (int i = 0; i < 9; i++) {
+            int v;
+
+            if (phase == ${voice_assist_listening_phase_id}) {
+              // Opens outwards from the middle: a bar reacting to a voice
+              // rather than patrolling.
+              const float w = fmodf(f * 0.30f, SPAN / 2.0f + 1.0f);
+              const float d = fabsf(i - SPAN / 2.0f);
+              v = (int) (255.0f * (1.0f - fabsf(d - w) * 0.75f));
+              if (v < 30) v = 30;
+            } else if (phase == ${voice_assist_thinking_phase_id}) {
+              const float p = fmodf(f * ${kitt_speed_think} / 100.0f, SPAN * 2.0f);
+              const float pos = (p < SPAN) ? p : (SPAN * 2.0f - p);
+              v = (int) (255.0f * (1.0f - fabsf(i - pos) * ${kitt_spread_think} / 100.0f));
+              if (v < 20) v = 20;
+            } else if (phase == ${voice_assist_replying_phase_id}) {
+              // Deterministic noise, the same trick the other drawn characters
+              // use: busy without flickering.
+              uint32_t n = (uint32_t) (f * 73 + i * 151);
+              n = (n ^ (n >> 5)) * 2654435761u;
+              v = 38 + (int) (((n >> 16) & 0xFF) * 217 / 255);
+            } else if (lit == 2) {
+              v = ((f / 2) % 2) ? 255 : 30;
+            } else if (lit == 3) {
+              v = 26;
+            } else {
+              // Idle: the slow patrol this character exists for.
+              const float p = fmodf(f * ${kitt_speed_idle} / 100.0f, SPAN * 2.0f);
+              const float pos = (p < SPAN) ? p : (SPAN * 2.0f - p);
+              v = (int) (255.0f * (1.0f - fabsf(i - pos) * ${kitt_spread_idle} / 100.0f));
+              if (v < 15) v = 15;
+            }
+
+            id(kitt_lv)[i] = v > 255 ? 255 : (v < 0 ? 0 : v);
+          }
+
+  - id: kitt_draw
+    then:
+      - lvgl.widget.update:
+          id: kitt_seg_0
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[0];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+      - lvgl.widget.update:
+          id: kitt_seg_1
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[1];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+      - lvgl.widget.update:
+          id: kitt_seg_2
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[2];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+      - lvgl.widget.update:
+          id: kitt_seg_3
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[3];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+      - lvgl.widget.update:
+          id: kitt_seg_4
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[4];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+      - lvgl.widget.update:
+          id: kitt_seg_5
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[5];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+      - lvgl.widget.update:
+          id: kitt_seg_6
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[6];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+      - lvgl.widget.update:
+          id: kitt_seg_7
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[7];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+      - lvgl.widget.update:
+          id: kitt_seg_8
+          bg_color: !lambda |-
+            const int v = id(kitt_lv)[8];
+            uint32_t lit = ${kitt_color};
+            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+            const uint32_t off = ${kitt_dim_color};
+            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
+            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
+            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+
+  - id: kitt_tick_script
+    mode: single
+    then:
+      - lambda: id(kitt_frame)++;
+      - script.execute: kitt_compute
+      - script.execute: kitt_draw
+
+interval:
+  - interval: ${kitt_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: kitt_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: ${kitt_bg_color}
+      widgets:
+        - obj:
+            id: kitt_housing
+            align: CENTER
+            x: 0
+            y: 0
+            width: ${kitt_housing_w}
+            height: ${kitt_housing_h}
+            radius: 14
+            bg_color: ${kitt_housing_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_0
+            align: CENTER
+            x: -128
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_1
+            align: CENTER
+            x: -96
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_2
+            align: CENTER
+            x: -64
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_3
+            align: CENTER
+            x: -32
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_4
+            align: CENTER
+            x: 0
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_5
+            align: CENTER
+            x: 32
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_6
+            align: CENTER
+            x: 64
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_7
+            align: CENTER
+            x: 96
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_seg_8
+            align: CENTER
+            x: 128
+            y: 0
+            width: ${kitt_seg_w}
+            height: ${kitt_seg_h}
+            radius: ${kitt_seg_radius}
+            bg_color: ${kitt_dim_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: kitt_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen
