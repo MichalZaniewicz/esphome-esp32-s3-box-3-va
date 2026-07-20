@@ -38,11 +38,12 @@ substitutions:
   face_alarm_color: '0xFF5A5A'
 
   # Measured, not guessed. The mirror axis lands on x 160 exactly, so no centre
-  # correction. The mask runs y 60..94 in the eye columns, giving 31 px of
-  # height to work in; the eyes sit at y 78, mid-mask. The mouth is at y 108,
-  # on the white muzzle and clear of the nose above it.
+  # correction. At this spacing the mask runs y 60..94 in the eye columns, 34 px
+  # of height to work in, and the eyes sit at y 78, mid-mask. Bringing them much
+  # closer than this reads as cross-eyed - 24 was already too far. The mouth is
+  # at y 108, on the white muzzle and clear of the nose above it.
   face_center_x: '0'
-  face_eye_offset: '30'
+  face_eye_offset: '27'
   face_eye_y: '-42'
   face_eye_w: '28'
   face_eye_h: '18'

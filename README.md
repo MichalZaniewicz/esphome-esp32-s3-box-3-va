@@ -60,7 +60,7 @@ Whichever one you name, it exposes the same page id, `page_face`, so
 
 ### The cast
 
-Nineteen of them, and they are not one face on nineteen bodies: the eyes, the
+Twenty of them, and they are not one face on twenty bodies: the eyes, the
 colours, the range of every expression and in ten cases the entire way of
 being on screen belong to the character. Name any of them in lower case.
 
@@ -112,6 +112,10 @@ being on screen belong to the character. Name any of them in lower case.
   <tr>
     <td width="290"><img src="base/assets/demo/demo-vu.gif" width="272" alt="VU"></td>
     <td><h3>VU</h3>A pair of needles behind glass, the warmest hardware in the set. They rest just off zero with a faint tremble, swing up together when you talk, and jump into the red when the reply gets loud. Nothing else here looks like it belongs to a hi-fi.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-rufus.gif" width="272" alt="Rufus"></td>
+    <td><h3>Rufus</h3>A fox who has clearly been waiting for someone to need saving and will settle for a kitchen timer. Stands in a hero pose at all times, mask on, entirely sincere about it.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>
