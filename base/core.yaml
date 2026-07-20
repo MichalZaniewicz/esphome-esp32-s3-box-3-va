@@ -1271,7 +1271,32 @@ script:
   # Starts whichever wake word engine is selected. mWW runs on the device;
   # "In Home Assistant" streams audio continuously instead.
   - id: start_wake_word
+    # RESTART, not the default single. A pending call below can be waiting out a
+    # pipeline that is still finishing; if a new interaction begins meanwhile,
+    # `single` would DROP the fresh call and let the stale one proceed against
+    # the wrong state. Restart supersedes it.
+    mode: restart
     then:
+      # WAIT for a pipeline to finish rather than giving up on it. The guards
+      # below refuse to start the wake word into a running pipeline, which is
+      # right - two consumers on one microphone floods the ring buffer. But
+      # refusing SILENTLY and never trying again is what made the device go deaf
+      # after every reply, and the log of 2026-07-20 shows the margin: on_end
+      # holds the replying phase while the voice assistant is still in
+      # STREAMING_RESPONSE, so it reached this script at 15:12:50.6 and the
+      # pipeline went idle at 15:12:52.8. Two and a bit seconds, and the wake
+      # word stayed off until the watchdog noticed 37 seconds later.
+      #
+      # The speaker matters too: starting the microphone while the box is still
+      # playing puts two claims on the single I2S bus.
+      - wait_until:
+          condition:
+            and:
+              - not:
+                  - voice_assistant.is_running:
+              - not:
+                  - speaker.is_playing:
+          timeout: 30s
       - if:
           condition:
             and:
