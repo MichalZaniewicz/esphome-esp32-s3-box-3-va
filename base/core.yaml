@@ -641,8 +641,23 @@ voice_assistant:
         condition:
           lambda: return id(tts_output).current_option() == "External player";
         then:
-          - media_player.stop:
-              announcement: true
+          # RETRY, because one stop is not enough. On 2026-07-20 a reply took
+          # seven seconds to fetch: the announcement went to ANNOUNCING
+          # immediately, our stop landed while it was still resolving the URL and
+          # was simply lost, and the box then played the whole 50 second answer
+          # out loud - LVGL stalling for 735 ms at a time while it decoded FLAC.
+          # Stopping too EARLY turns out to be as bad as stopping too late, so
+          # keep asking until it actually lets go.
+          - repeat:
+              count: 12
+              then:
+                - if:
+                    condition:
+                      media_player.is_announcing:
+                    then:
+                      - media_player.stop:
+                          announcement: true
+                      - delay: 250ms
     - if:
         condition:
           lambda: return id(tts_output).current_option() != "This device";
@@ -698,13 +713,28 @@ voice_assistant:
                   const std::string &st = id(external_player_state).state;
                   return !st.empty() && st != "unknown" && st != "unavailable";
               then:
+                # The estimate is not thrown away - it becomes the DEADLINE. If
+                # the speaker's state is honest we stop exactly when it does; if
+                # it lies, or stays "playing" long after the sound ended, we fall
+                # back to roughly the old behaviour instead of standing deaf for
+                # the full timeout. A flat 30 s cap here would mean half a minute
+                # of not listening after every single reply.
+                - lambda: |-
+                    uint32_t ms = ${tts_hold_lead_ms} + ${tts_hold_base_ms}
+                                + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
+                    if (ms > ${tts_hold_max_ms}) ms = ${tts_hold_max_ms};
+                    id(hold_deadline) = millis() + ms;
                 - wait_until:
                     condition:
-                      lambda: return id(external_player_state).state == "playing";
+                      lambda: |-
+                        return id(external_player_state).state == "playing"
+                            || millis() > id(hold_deadline);
                     timeout: ${tts_wait_start_ms}ms
                 - wait_until:
                     condition:
-                      lambda: return id(external_player_state).state != "playing";
+                      lambda: |-
+                        return id(external_player_state).state != "playing"
+                            || millis() > id(hold_deadline);
                     timeout: ${tts_hold_max_ms}ms
               else:
                 - delay: !lambda |-
@@ -825,6 +855,12 @@ globals:
   # the whole conversation, alongside the audio streaming, for nothing.
   # Consecutive 10 s checks during which the assistant was idle and the wake word
   # was not running. Four in a row and the watchdog restarts it.
+  # When the replying phase must end at the latest, in millis(). The external
+  # speaker's own state ends it sooner when that state can be trusted.
+  - id: hold_deadline
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
   - id: deaf_ticks
     type: int
     restore_value: false
