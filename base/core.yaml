@@ -154,7 +154,17 @@ substitutions:
   tts_hold_lead_ms: '1200'
   tts_hold_base_ms: '700'
   tts_hold_ms_per_char: '70'
-  tts_hold_max_ms: '30000'
+  # THE CAP, NOT THE RATE, IS WHAT CUTS A LONG REPLY SHORT. At 70 ms per
+  # character a 450-character Polish answer is about 31 seconds of speech, so a
+  # 30 second cap expired mid-sentence: the face stopped talking and the idle
+  # clock came up while the speaker was still going. That is the whole of the
+  # "it switched to the clock and kept answering" report of 2026-07-20.
+  # Raising the cap costs listening time, because the wake word is deliberately
+  # held off until the hold ends - with the reply coming out of a speaker in the
+  # same room, letting the microphone open early invites the box to hear itself.
+  # So this is a ceiling for genuinely long answers, not a schedule: ordinary
+  # ones finish on the per-character estimate long before it.
+  tts_hold_max_ms: '60000'
 
 
   # Bare-core screen text. Overridable by a language package like everything
@@ -1289,6 +1299,17 @@ script:
       #
       # The speaker matters too: starting the microphone while the box is still
       # playing puts two claims on the single I2S bus.
+      #
+      # wake_start_pending IS NOT OPTIONAL HERE, and leaving it out is what
+      # flooded the log with "Not enough free bytes in ring buffer" on
+      # 2026-07-20. Between micro_wake_word.stop and voice_assistant.start in
+      # on_wake_word_detected there is a window - the beep - where the pipeline
+      # has NOT started yet, so "is the assistant running" answers no, and the
+      # speaker falls silent the moment the beep ends. A call that was sitting in
+      # this wait sailed straight through that gap, started the wake word, and
+      # the pipeline then opened the microphone underneath it: two consumers on
+      # one stream. The flag marks exactly that window, which is why the sibling
+      # handler on the media player consults it too.
       - wait_until:
           condition:
             and:
@@ -1296,12 +1317,14 @@ script:
                   - voice_assistant.is_running:
               - not:
                   - speaker.is_playing:
+              - lambda: return !id(wake_start_pending);
           timeout: 30s
       - if:
           condition:
             and:
               - not:
                   - voice_assistant.is_running:
+              - lambda: return !id(wake_start_pending);
               - lambda: return id(wake_word_engine_location).current_option() == "On device";
           then:
             - lambda: id(va).set_use_wake_word(false);
@@ -1311,6 +1334,7 @@ script:
             and:
               - not:
                   - voice_assistant.is_running:
+              - lambda: return !id(wake_start_pending);
               - lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
           then:
             - lambda: id(va).set_use_wake_word(true);
