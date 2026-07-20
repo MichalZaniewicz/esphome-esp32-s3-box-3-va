@@ -665,12 +665,14 @@ voice_assistant:
                           + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
               return ms > ${tts_hold_max_ms} ? ${tts_hold_max_ms} : ms;
     - lambda: id(tts_reply_active) = false;
-    - if:
-        condition:
-          - lambda: return id(wake_word_engine_location).current_option() == "On device";
-        then:
-          - lambda: id(va).set_use_wake_word(false);
-          - micro_wake_word.start:
+    # Was an inline copy of start_wake_word's "On device" branch - MINUS its
+    # `not voice_assistant.is_running` guard. That mattered: this handler waits
+    # for the announcement and then holds for the length of the reply, so it
+    # finishes late. If a new interaction had begun in the meantime, the copy
+    # started the wake word INTO a running pipeline, leaving two consumers on one
+    # microphone. That is what floods the log with "Not enough free bytes in ring
+    # buffer" and "Wake word detection is already running".
+    - script.execute: start_wake_word
     - script.execute: set_idle_or_mute_phase
     # Cleared BEFORE the redraw, not after. The other way round, draw_display
     # read the sensors while they still held the last exchange, so the status
