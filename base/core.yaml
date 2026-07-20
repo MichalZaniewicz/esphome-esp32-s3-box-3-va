@@ -440,8 +440,10 @@ media_player:
                   - lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
                 then:
                   - wait_until:
-                      - not:
-                          voice_assistant.is_running:
+                      condition:
+                        - not:
+                            voice_assistant.is_running:
+                      timeout: 30s
       # No pipeline running means this is user- or HA-initiated playback, not a
       # reply: show the muted (blank) page while it plays. A ringing timer is the
       # exception - it is an announcement too, and without this guard it would
@@ -659,12 +661,20 @@ voice_assistant:
         condition:
           - media_player.is_announcing:
         timeout: 0.5s
+    # TIMEOUT, and it is not decorative. This wait had none, and on 2026-07-20 it
+    # hung: a local reply ended with "ISR event queue overflow, restarting
+    # speaker task", after which speaker.is_playing never went false. on_end
+    # therefore never reached the line that clears tts_reply_active, and that
+    # flag gates the media-player idle handler that would otherwise restart the
+    # wake word. The device went permanently deaf and only a reboot fixed it.
     - wait_until:
-        - and:
-            - not:
-                media_player.is_announcing:
-            - not:
-                speaker.is_playing:
+        condition:
+          - and:
+              - not:
+                  media_player.is_announcing:
+              - not:
+                  speaker.is_playing:
+        timeout: 20s
     # Nothing above waits for an EXTERNAL speaker - the box cannot see it. Hold
     # the replying phase for as long as the reply plausibly takes, so the face
     # keeps talking and the wake word stays off until the speaker is done.
@@ -813,6 +823,12 @@ globals:
   # and that trigger restarts the wake word - a fraction of a second before the
   # assistant opens the microphone. The result was TFLite inference running for
   # the whole conversation, alongside the audio streaming, for nothing.
+  # Consecutive 10 s checks during which the assistant was idle and the wake word
+  # was not running. Four in a row and the watchdog restarts it.
+  - id: deaf_ticks
+    type: int
+    restore_value: false
+    initial_value: "0"
   - id: wake_start_pending
     type: bool
     restore_value: false
@@ -1259,6 +1275,45 @@ script:
             - delay: 100ms
             - voice_assistant.start:
 
+# A DEAF DEVICE IS THE ONE FAILURE THAT MATTERS HERE, so this is the backstop.
+#
+# Everything that starts the wake word hangs off a trigger - a pipeline ending,
+# an announcement finishing, a mute being lifted. Any one of those paths getting
+# stuck leaves the box listening for nothing, and it stays that way until it is
+# rebooted. That is exactly what happened on 2026-07-20, when a wait without a
+# timeout in on_end never returned.
+#
+# The timeouts above fix that particular path. This fixes the class: if the
+# assistant is idle and the wake word simply is not running, after 40 seconds
+# start it, whatever the reason. It deliberately does NOT consult tts_reply_active
+# or any of our own flags - those are precisely what get stuck.
+interval:
+  - interval: 10s
+    then:
+      - if:
+          condition:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - not:
+                  micro_wake_word.is_running:
+              - switch.is_off: mute
+              - lambda: return !id(wake_start_pending);
+              - lambda: return id(wake_word_engine_location).current_option() == "On device";
+          then:
+            - lambda: id(deaf_ticks)++;
+          else:
+            - lambda: id(deaf_ticks) = 0;
+      - if:
+          condition:
+            lambda: return id(deaf_ticks) >= 4;
+          then:
+            - logger.log:
+                level: WARN
+                format: "Wake word has been off for 40s with the assistant idle - restarting it"
+            - lambda: id(deaf_ticks) = 0;
+            - script.execute: start_wake_word
+
 # Runs only while the boot page is on screen, which is a few seconds per reboot.
 interval:
   - interval: ${boot_tick}
@@ -1494,7 +1549,9 @@ select:
           then:
             # Never switch engines mid-pipeline.
             - wait_until:
-                lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id} || id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                condition:
+                  lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id} || id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                timeout: 30s
             - if:
                 condition:
                   lambda: return x == "In Home Assistant";
