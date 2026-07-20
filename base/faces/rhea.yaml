@@ -1,0 +1,72 @@
+# Rhea - the one with the waves.
+#
+# The largest face in the set, and the only one whose artwork already had
+# eyes drawn on it. They were left alone rather than erased: those two dark
+# arcs sit right under the fringe, and once real eyes appear below them they
+# read as eyebrows. Erasing them would have meant repainting hair, which is
+# how you end up with a patch that does not match.
+#
+# Usage: `assistant: rhea` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/rhea.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/rhea.png
+
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0xB5514A'
+  face_pupil_color: '0x4D352B'
+  face_alarm_color: '0xFF5A5A'
+
+  # Clean face area: x 112..204, y 84..152, mirror axis x 158. The drawn arcs
+  # above it are at y 72..84 and are treated as eyebrows.
+  face_center_x: '-2'
+  face_eye_offset: '22'
+  face_eye_y: '-18'
+  face_eye_w: '24'
+  face_eye_h: '20'
+  face_mouth_y: '14'
+  face_mouth_w: '30'
+  face_mouth_h: '6'
+
+  face_pupil_w: '10'
+  face_pupil_h: '12'
+  face_pupil_radius: '5'
+  face_pupil_dilate: '3'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '6'
+
+  face_eye_h_wide: '26'
+  face_eye_h_think: '20'
+  face_eye_h_narrow: '7'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '18'
+  face_mouth_small_w: '20'
+  face_mouth_think_w: '14'
+  face_mouth_o_w: '18'
+  face_mouth_o_h: '18'
+  face_mouth_alarm_w: '34'
+  face_mouth_alarm_h: '22'
+  face_mouth_error_w: '18'
+  face_listen_pulse: '4'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '10'
+  face_mouth_radius: '3'

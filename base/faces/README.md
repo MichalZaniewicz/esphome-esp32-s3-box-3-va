@@ -10,7 +10,7 @@ config can point a phase at it without knowing which one is in use.
 
 ![The seven characters across five phases](../assets/characters.png)
 
-Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [iris](../assets/demo/demo-iris.gif) · [rain](../assets/demo/demo-rain.gif) · [crt](../assets/demo/demo-crt.gif) · [jarvis](../assets/demo/demo-jarvis.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif)
+Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [iris](../assets/demo/demo-iris.gif) · [rain](../assets/demo/demo-rain.gif) · [crt](../assets/demo/demo-crt.gif) · [jarvis](../assets/demo/demo-jarvis.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif) · [lumi](../assets/demo/demo-lumi.gif) · [rhea](../assets/demo/demo-rhea.gif)
 
 The preview image above shows only the characters that use artwork; `aura`, `bit`, `pixel`,
 `iris`, `rain`, `crt` and `jarvis` draw themselves and are in the clips.
@@ -23,6 +23,8 @@ The preview image above shows only the characters that use artwork; `aura`, `bit
 | **Franky** | Green monster, bolts, stitches | White cartoon eyes with black pupils - the only face here that is skin rather than a display, so it gets a separate mouth colour. |
 | **Wizard** | Void under a purple hat | Glowing gold eyes and almost no mouth. The void sits below the hat brim, not at the frame's centre. |
 | **Genie** | Small head, big moustache | The most compact face of the set; the mouth is a hint under the moustache. |
+| **Lumi** | Hooded, pastel, pink fringe | White eyes with plum pupils. The hood leaves an opening only 50 px wide, so every dimension is scaled down; the mirror axis sits on x 159, hence `face_center_x: -1`. |
+| **Rhea** | Wavy brown hair, gold and blue | White cartoon eyes with brown pupils. The artwork arrived with closed-eye arcs already drawn near the fringe; they were kept as eyebrows and the real eyes placed in the clean area below, rather than repainting hair to erase them. |
 | **Aura** | No artwork at all | Nine bars on a line: flat at rest, an equaliser while speaking. No eyes and no mouth, so it skips the engine entirely and draws itself. |
 | **Bit** | No artwork at all | Two eyes with pupils and a small mouth on black. Draws itself. Started out as eyes only; the mouth was added because eyes alone cannot show speech, which left `replying` and `listening` looking identical. |
 | **Iris** | No artwork at all | One eye filling the screen. Draws itself. Everything it does is a size change on the iris and pupil plus a height change on two eyelid rectangles, which is why it is the cheapest full-screen character here. |

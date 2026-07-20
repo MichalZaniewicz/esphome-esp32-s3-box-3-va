@@ -60,7 +60,7 @@ Whichever one you name, it exposes the same page id, `page_face`, so
 
 ### The cast
 
-They are not one face on fourteen bodies: the shape of the eyes, whether there are
+They are not one face on sixteen bodies: the shape of the eyes, whether there are
 pupils at all, the colours and the range of every expression belong to the
 character. Name any of them in lower case, exactly as the heading reads.
 
@@ -92,6 +92,14 @@ character. Name any of them in lower case, exactly as the heading reads.
   <tr>
     <td width="290"><img src="base/assets/demo/demo-jarvis.gif" width="272" alt="Jarvis"></td>
     <td><h3>Jarvis</h3>A heads-up display in the manner of a certain film franchise's fictional assistant: counter-rotating rings, corner brackets and a core that opens when you speak to it, tightens while it thinks and pulses while it answers. Styled after the genre rather than copied from it.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-lumi.gif" width="272" alt="Lumi"></td>
+    <td><h3>Lumi</h3>Serene, pastel and half hidden under a hood, watching the room through an opening barely fifty pixels across. The smallest face here after Genie, so everything about her is scaled down rather than merely moved.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-rhea.gif" width="272" alt="Rhea"></td>
+    <td><h3>Rhea</h3>Warm, unbothered and dressed for something more heroic than setting kitchen timers. The largest face in the set, and the only one whose artwork came with eyes already drawn - they were kept and now serve as her eyebrows.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>

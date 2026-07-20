@@ -1,0 +1,72 @@
+# Lumi - the one in the hood.
+#
+# Pastel and unhurried, with a face the size of a postage stamp: the hood
+# leaves an opening only 50 px across, so every feature here is scaled down
+# rather than merely moved. Measured, not guessed - the visible face runs
+# from y 64 to 104 and its mirror axis lands on x 159, one pixel left of
+# centre, which is what `face_center_x` below is correcting.
+#
+# Usage: `assistant: lumi` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/lumi.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/lumi.png
+
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0xA6226B'
+  face_pupil_color: '0x4A2340'
+  face_alarm_color: '0xFF5A5A'
+
+  # Face opening: x 135..185, y 64..104. Eyes a third of the way down it,
+  # mouth three quarters.
+  face_center_x: '-1'
+  face_eye_offset: '13'
+  face_eye_y: '-43'
+  face_eye_w: '16'
+  face_eye_h: '18'
+  face_mouth_y: '-26'
+  face_mouth_w: '16'
+  face_mouth_h: '5'
+
+  face_pupil_w: '7'
+  face_pupil_h: '9'
+  face_pupil_radius: '3'
+  face_pupil_dilate: '2'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '4'
+
+  face_eye_h_wide: '22'
+  face_eye_h_think: '18'
+  face_eye_h_narrow: '6'
+  face_eye_h_shut: '3'
+  face_mouth_open_h: '11'
+  face_mouth_small_w: '12'
+  face_mouth_think_w: '9'
+  face_mouth_o_w: '11'
+  face_mouth_o_h: '11'
+  face_mouth_alarm_w: '20'
+  face_mouth_alarm_h: '13'
+  face_mouth_error_w: '11'
+  face_listen_pulse: '3'
+  face_shake_dx: '3'
+  face_tick: 120ms
+  face_eye_radius: '7'
+  face_mouth_radius: '2'
