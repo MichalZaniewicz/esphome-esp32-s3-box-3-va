@@ -639,27 +639,6 @@ voice_assistant:
     # a few milliseconds later.
     - if:
         condition:
-          lambda: return id(tts_output).current_option() == "External player";
-        then:
-          # RETRY, because one stop is not enough. On 2026-07-20 a reply took
-          # seven seconds to fetch: the announcement went to ANNOUNCING
-          # immediately, our stop landed while it was still resolving the URL and
-          # was simply lost, and the box then played the whole 50 second answer
-          # out loud - LVGL stalling for 735 ms at a time while it decoded FLAC.
-          # Stopping too EARLY turns out to be as bad as stopping too late, so
-          # keep asking until it actually lets go.
-          - repeat:
-              count: 12
-              then:
-                - if:
-                    condition:
-                      media_player.is_announcing:
-                    then:
-                      - media_player.stop:
-                          announcement: true
-                      - delay: 250ms
-    - if:
-        condition:
           lambda: return id(tts_output).current_option() != "This device";
         then:
           - homeassistant.service:
@@ -669,6 +648,27 @@ voice_assistant:
                 media_content_id: !lambda 'return x;'
                 media_content_type: music
                 announce: "true"
+    - if:
+        condition:
+          lambda: return id(tts_output).current_option() == "External player";
+        then:
+          # KEEP ASKING UNTIL IT LETS GO. A single stop is useless here and a
+          # three second retry was not enough either: the announcement enters
+          # ANNOUNCING the moment the URL arrives, but the fetch itself has been
+          # measured at SIXTEEN seconds, and a stop issued while it is still
+          # downloading is simply discarded. The box then played the whole answer
+          # out loud, stalling LVGL for up to 460 ms at a time decoding FLAC it
+          # was never meant to touch.
+          - lambda: id(cancel_deadline) = millis() + 45000;
+          - while:
+              condition:
+                and:
+                  - media_player.is_announcing:
+                  - lambda: return millis() < id(cancel_deadline);
+              then:
+                - media_player.stop:
+                    announcement: true
+                - delay: 250ms
   on_end:
     # Give a local announcement a moment to start, then let it finish before
     # taking the I2S bus back for the wake word.
@@ -730,12 +730,27 @@ voice_assistant:
                         return id(external_player_state).state == "playing"
                             || millis() > id(hold_deadline);
                     timeout: ${tts_wait_start_ms}ms
-                - wait_until:
+                # IF IT NEVER SAID "playing", DO NOT TRUST IT. Your kitchen
+                # speaker reports `off` - so the "has it stopped yet" test below
+                # was instantly true and the hold collapsed to about four
+                # seconds, letting the wake word back in while the speaker was
+                # still talking. When the state never shows playback, fall back
+                # to the estimate and simply wait out the deadline.
+                - if:
                     condition:
-                      lambda: |-
-                        return id(external_player_state).state != "playing"
-                            || millis() > id(hold_deadline);
-                    timeout: ${tts_hold_max_ms}ms
+                      lambda: return id(external_player_state).state == "playing";
+                    then:
+                      - wait_until:
+                          condition:
+                            lambda: |-
+                              return id(external_player_state).state != "playing"
+                                  || millis() > id(hold_deadline);
+                          timeout: ${tts_hold_max_ms}ms
+                    else:
+                      - wait_until:
+                          condition:
+                            lambda: return millis() > id(hold_deadline);
+                          timeout: ${tts_hold_max_ms}ms
               else:
                 - delay: !lambda |-
                     uint32_t ms = ${tts_hold_lead_ms} + ${tts_hold_base_ms}
@@ -857,6 +872,11 @@ globals:
   # was not running. Four in a row and the watchdog restarts it.
   # When the replying phase must end at the latest, in millis(). The external
   # speaker's own state ends it sooner when that state can be trusted.
+  # How long to keep telling the local player to stop, in millis().
+  - id: cancel_deadline
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
   - id: hold_deadline
     type: uint32_t
     restore_value: false
@@ -1350,8 +1370,7 @@ interval:
             - lambda: id(deaf_ticks) = 0;
             - script.execute: start_wake_word
 
-# Runs only while the boot page is on screen, which is a few seconds per reboot.
-interval:
+  # Runs only while the boot page is on screen, which is a few seconds per reboot.
   - interval: ${boot_tick}
     then:
       - if:

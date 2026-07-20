@@ -40,6 +40,39 @@ BUILTIN_SUBS = {"name", "friendly_name", "device_name", "esphome_version"}
 SUB_REF = re.compile(r"\$\{(\w+)\}|\$(\w+)")
 
 
+# A YAML document with the SAME top-level key twice keeps only the last one, in
+# silence. That is how a whole `interval:` block - a watchdog, as it happens -
+# disappeared from core.yaml on 2026-07-20: it was added above an existing
+# `interval:` and simply ceased to exist at parse time. Nothing downstream can
+# notice, because by then the duplicate is already gone.
+class DuplicateKeyLoader(yaml.SafeLoader):
+    pass
+
+
+def _no_duplicates(loader, node, deep=False):
+    seen, mapping = set(), {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        if key in seen:
+            raise yaml.YAMLError(
+                f"klucz '{key}' wystepuje dwa razy na tym samym poziomie "
+                f"(linia {key_node.start_mark.line + 1}) - YAML zachowa TYLKO "
+                f"ostatni, wczesniejszy zniknie bez sladu"
+            )
+        seen.add(key)
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+DuplicateKeyLoader.add_constructor(
+    yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _no_duplicates
+)
+for _tag in ("!secret", "!lambda", "!include", "!extend", "!remove", "!force"):
+    DuplicateKeyLoader.add_constructor(
+        _tag, (lambda t: lambda loader, node: f"<{t[1:]}>")(_tag)
+    )
+
+
 # Control-flow actions take a FIXED set of keys. An extra one means a line was
 # indented one level too far and became a sibling of `condition:`/`then:`
 # instead of a field inside the action underneath. That is still valid YAML, so
@@ -130,7 +163,7 @@ def _check_merged(args) -> int:
         path = Path(arg)
         text = path.read_text(encoding="utf-8")
         try:
-            doc = yaml.safe_load(text)
+            doc = yaml.load(text, Loader=DuplicateKeyLoader)
         except yaml.YAMLError as exc:
             print(f"  FAIL  {path}: YAML nie parsuje sie:\n{exc}")
             return 1
@@ -180,7 +213,7 @@ def _check(args) -> int:
 
         # 1. Does it parse?
         try:
-            doc = yaml.safe_load(text)
+            doc = yaml.load(text, Loader=DuplicateKeyLoader)
         except yaml.YAMLError as exc:
             print(f"  FAIL  YAML does not parse:\n{exc}")
             problems += 1
