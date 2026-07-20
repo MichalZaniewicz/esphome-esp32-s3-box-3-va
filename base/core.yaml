@@ -981,10 +981,12 @@ script:
                   const uint32_t minutes = (left % 3600) / 60;
                   const uint32_t seconds = left % 60;
                   char buf[16];
+                  // Cast for the format: uint32_t is `long unsigned` on this
+                  // toolchain, so %u warned on every build.
                   if (hours > 0) {
-                    snprintf(buf, sizeof(buf), "%02u:%02u", hours, minutes);
+                    snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned) hours, (unsigned) minutes);
                   } else {
-                    snprintf(buf, sizeof(buf), "%02u:%02u", minutes, seconds);
+                    snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned) minutes, (unsigned) seconds);
                   }
                   return std::string(buf);
             - lvgl.widget.show: timer_label

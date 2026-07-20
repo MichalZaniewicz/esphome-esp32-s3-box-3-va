@@ -8,7 +8,9 @@
 # A needle has to pivot, and LVGL cannot rotate a rectangle. So a needle is a
 # LINE of two points, and the lambda writes those points itself with
 # lv_line_set_points() - `lvgl.line.update` only takes points fixed at build
-# time. The array is static because LVGL keeps the pointer rather than copying.
+# time. Two things that are easy to get wrong: a line id is an LvLineType, not
+# an lv_obj_t*, so the pointer is `id(vu_needle_l)->obj`; and LVGL keeps the
+# points array rather than copying it, so it has to be `static`.
 #
 # Everything else is nailed down: the faces, the scale marks and the red zone are
 # built once and never touched, so a tick costs exactly two needle writes.
@@ -103,8 +105,8 @@ script:
             pts[s][1].x = (lv_value_precise_t) (PIVOT_X[s] + LEN * sinf(a));
             pts[s][1].y = (lv_value_precise_t) (PIVOT_Y - LEN * cosf(a));
           }
-          lv_line_set_points(id(vu_needle_l), left, 2);
-          lv_line_set_points(id(vu_needle_r), right, 2);
+          lv_line_set_points(id(vu_needle_l)->obj, left, 2);
+          lv_line_set_points(id(vu_needle_r)->obj, right, 2);
 
 interval:
   - interval: ${vu_tick}

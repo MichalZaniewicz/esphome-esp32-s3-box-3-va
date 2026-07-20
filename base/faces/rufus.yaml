@@ -1,0 +1,78 @@
+# Rufus - the fox in the mask.
+#
+# A hero pose and a red domino mask. His eyes go ON the mask, which is what
+# makes him work: the mask is a flat, unbroken red, so nothing had to be erased
+# from the artwork to make room for them.
+#
+# Careful with the two white slits above the mask. They look exactly like narrow
+# eyes and are not - they are shading on the brow. Reading them as eyes puts the
+# whole face a good twenty pixels too high.
+#
+# Usage: `assistant: rufus` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/rufus.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/rufus.png
+
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0x4A1F14'
+  face_pupil_color: '0x2A1008'
+  face_alarm_color: '0xFF5A5A'
+
+  # Measured, not guessed. The mirror axis lands on x 160 exactly, so no centre
+  # correction. The mask runs y 60..94 in the eye columns, giving 31 px of
+  # height to work in; the eyes sit at y 78, mid-mask. The mouth is at y 108,
+  # on the white muzzle and clear of the nose above it.
+  face_center_x: '0'
+  face_eye_offset: '30'
+  face_eye_y: '-42'
+  face_eye_w: '28'
+  face_eye_h: '18'
+  face_mouth_y: '-12'
+  face_mouth_w: '30'
+  face_mouth_h: '6'
+
+  face_pupil_w: '10'
+  face_pupil_h: '14'
+  face_pupil_radius: '4'
+  face_pupil_dilate: '3'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '6'
+
+  # The widest expression still has to sit inside the mask: 24 px tall centred
+  # on y 78 spans 66..90, which the mask covers at both eye columns.
+  face_eye_h_wide: '24'
+  face_eye_h_think: '18'
+  face_eye_h_narrow: '7'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '16'
+  face_mouth_small_w: '18'
+  face_mouth_think_w: '14'
+  face_mouth_o_w: '16'
+  face_mouth_o_h: '16'
+  face_mouth_alarm_w: '34'
+  face_mouth_alarm_h: '20'
+  face_mouth_error_w: '16'
+  face_listen_pulse: '4'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '8'
+  face_mouth_radius: '3'

@@ -9,10 +9,17 @@
 # blocks. That is also why it needs a mechanism nothing else uses:
 #
 #   `lvgl.line.update` takes its points as CONFIG values, validated at build
-#   time, so it cannot compute a waveform per tick. But a line widget is a plain
-#   lv_obj_t*, so the lambda calls lv_line_set_points() itself. LVGL does not
-#   copy the array, so it must be `static` and outlive the call - a local one
-#   would leave the widget pointing at freed stack.
+#   time, so it cannot compute a waveform per tick. The lambda therefore calls
+#   lv_line_set_points() itself. Two traps in doing that:
+#
+#   A LINE ID IS NOT AN lv_obj_t*. Plain `obj` widgets are, which is what pixel
+#   and nixie rely on, but `line` is declared LvLineType and inherits LvCompound,
+#   so the real pointer is `id(scope_trace)->obj`. Passing the id straight in
+#   fails to compile - it cost one build to find out.
+#
+#   LVGL DOES NOT COPY THE POINTS. It keeps the pointer, so the array must be
+#   `static` and outlive the call; a local one leaves the widget reading freed
+#   stack.
 #
 # Each phase differs in SHAPE, not brightness, which is what keeps the phases
 # apart: a flat line, a swelling wave, a rotating loop, a ragged voice print.
@@ -124,7 +131,7 @@ script:
               pts[k].y = (lv_value_precise_t) y;
             }
           }
-          lv_line_set_points(id(scope_trace), pts, N);
+          lv_line_set_points(id(scope_trace)->obj, pts, N);
 
   - id: scope_tint
     then:
