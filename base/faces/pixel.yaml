@@ -91,7 +91,9 @@ script:
           // Perimeter walk, for the spinner that circles while thinking.
           static const uint8_t ring[36] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 23, 35, 47, 59, 71, 83, 95, 94, 93, 92, 91, 90, 89, 88, 87, 86, 85, 84, 72, 60, 48, 36, 24, 12};
 
-          const int f = id(pixel_frame)++;
+          // Wrapped: a free-running counter eventually costs sinf() its precision.
+          const int f = id(pixel_frame);
+          id(pixel_frame) = (f + 1) % 36000;
           const int phase = id(voice_assistant_phase);
 
           uint8_t want[96];
@@ -177,7 +179,10 @@ script:
           } else if (phase == ${voice_assist_timer_finished_phase_id} ||
                      phase == ${voice_assist_error_phase_id}) {
             for (int rr = 0; rr < 8; rr++)
-              for (int cc = 0; cc < 12; cc++) PUT(rr, cc, ((rr + cc + f) % 2) ? 255 : 51);
+              // f/2, not f: keyed on `f` all 96 dots flip every tick, which is
+              // the most expensive state in this file - roughly three band passes
+              // over the whole screen, for as long as a timer rings.
+              for (int cc = 0; cc < 12; cc++) PUT(rr, cc, ((rr + cc + f / 2) % 2) ? 255 : 51);
           } else if (phase == ${voice_assist_muted_phase_id}) {
             for (int cc = 3; cc <= 8; cc++) PUT(6, cc, 255);
           } else {

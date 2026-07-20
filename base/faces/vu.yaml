@@ -73,7 +73,9 @@ script:
           static const int PIVOT_X[2] = {82, 238};
           const int PIVOT_Y = 150, LEN = 60;
 
-          const int f = id(vu_frame)++;
+          // Wrapped: a free-running counter eventually costs sinf() its precision.
+          const int f = id(vu_frame);
+          id(vu_frame) = (f + 1) % 36000;
           const int phase = id(voice_assistant_phase);
 
           auto rnd = [](int a, int b) {
@@ -105,8 +107,18 @@ script:
             pts[s][1].x = (lv_value_precise_t) (PIVOT_X[s] + LEN * sinf(a));
             pts[s][1].y = (lv_value_precise_t) (PIVOT_Y - LEN * cosf(a));
           }
-          lv_line_set_points(id(vu_needle_l)->obj, left, 2);
-          lv_line_set_points(id(vu_needle_r)->obj, right, 2);
+          // Only re-set a needle whose tip actually moved. In muted the angle
+          // is a constant, so both needles were being re-set and re-invalidated
+          // ten times a second at a fixed position, and idle's small tremble
+          // repeats the same integer tip across several ticks.
+          static lv_value_precise_t seen_x[2] = {-1, -1}, seen_y[2] = {-1, -1};
+          for (int s = 0; s < 2; s++) {
+            if (pts[s][1].x == seen_x[s] && pts[s][1].y == seen_y[s]) continue;
+            seen_x[s] = pts[s][1].x;
+            seen_y[s] = pts[s][1].y;
+            lv_line_set_points(s == 0 ? id(vu_needle_l)->obj : id(vu_needle_r)->obj,
+                               s == 0 ? left : right, 2);
+          }
 
 interval:
   - interval: ${vu_tick}

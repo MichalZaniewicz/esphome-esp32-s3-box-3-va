@@ -150,7 +150,8 @@ script:
     then:
       - lambda: |-
           const int phase = id(voice_assistant_phase);
-          const int f = id(jarvis_frame);
+          // Wrapped: a free-running counter degrades sinf() precision over days.
+          const int f = id(jarvis_frame) % 36000;
 
           float so = ${jarvis_spin_idle}, si = ${jarvis_spin_idle_in};
           int span = ${jarvis_span_idle};
@@ -197,29 +198,42 @@ script:
           static bool primed = false;
 
           const int span = id(jarvis_span);
+          // The span is phase-dependent but was NOT part of the skip key, and
+          // muted freezes the rotation (spin 0), so the angle stops changing
+          // too. Entering muted from thinking left all seven arcs stuck at the
+          // 22 degree thinking span for the whole phase.
+          static int seen_span = -1;
+          const bool respan = (seen_span != span);
+          seen_span = span;
           for (int k = 0; k < 3; k++) {
             const int a = ((int) id(jarvis_rot_out) + k * 120) % 360;
             // Kat jest calkowity, wiec przy powolnym obrocie wiekszosc tickow
             // nie zmienia nic - wtedy nie ruszamy widgetu w ogole.
-            if (primed && seen_o[k] == a) continue;
+            if (primed && !respan && seen_o[k] == a) continue;
             seen_o[k] = a;
             lv_arc_set_bg_angles(out[k], a, (a + span) % 360);
           }
           for (int k = 0; k < 4; k++) {
             const int a = ((int) id(jarvis_rot_in) + k * 90) % 360;
-            if (primed && seen_i[k] == a) continue;
+            if (primed && !respan && seen_i[k] == a) continue;
             seen_i[k] = a;
             lv_arc_set_bg_angles(inn[k], a, (a + span * 3 / 5) % 360);
           }
           primed = true;
-      - lvgl.widget.update:
-          id: jarvis_core_outer
-          width: !lambda return id(jarvis_core) * 2;
-          height: !lambda return id(jarvis_core) * 2;
-      - lvgl.widget.update:
-          id: jarvis_core_inner
-          width: !lambda return (id(jarvis_core) - ${jarvis_core_ring}) * 2;
-          height: !lambda return (id(jarvis_core) - ${jarvis_core_ring}) * 2;
+      # The core, the same way as the arcs. It was still going through
+      # lvgl.widget.update - the exact thing this file's header argues against -
+      # and in thinking and muted its size is a constant, so those were four
+      # property writes per tick that could never change anything.
+      - lambda: |-
+          static int seen_core = -1;
+          const int c = id(jarvis_core);
+          if (seen_core == c) return;
+          seen_core = c;
+          lv_obj_set_width((lv_obj_t *) id(jarvis_core_outer), c * 2);
+          lv_obj_set_height((lv_obj_t *) id(jarvis_core_outer), c * 2);
+          const int inner = (c - ${jarvis_core_ring}) * 2;
+          lv_obj_set_width((lv_obj_t *) id(jarvis_core_inner), inner);
+          lv_obj_set_height((lv_obj_t *) id(jarvis_core_inner), inner);
 
   - id: jarvis_tint_normal
     then:

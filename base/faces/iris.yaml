@@ -140,7 +140,10 @@ script:
             const int t = f % ${iris_idle_cycle};
             if (t == 0 || t == 1 || t == 6 || t == 7) lid = ${iris_lid_shut};
             else if (t == 2 || t == 5) lid = ${iris_lid_shut} / 2;
-            dx = (int) (${iris_drift} * sinf(f * 0.06f));
+            // Quantised to 3 px steps: a smooth drift changed dx on nearly
+            // every tick to move the eye by one pixel, which defeats the
+            // skip-if-unchanged above for no visible gain.
+            dx = ((int) (${iris_drift} * sinf(f * 0.06f)) / 3) * 3;
           }
 
           // The pupil must never reach the rim, or it stops reading as an eye.
@@ -155,32 +158,49 @@ script:
 
   - id: iris_draw
     then:
-      - lvgl.widget.update:
-          id: iris_outer
-          width: !lambda return id(iris_ir) * 2;
-          height: !lambda return id(iris_ir) * 2;
-          x: !lambda return id(iris_dx);
-      - lvgl.widget.update:
-          id: iris_inner
-          width: !lambda return (id(iris_ir) - ${iris_ring_w}) * 2;
-          height: !lambda return (id(iris_ir) - ${iris_ring_w}) * 2;
-          x: !lambda return id(iris_dx);
-      - lvgl.widget.update:
-          id: iris_pupil
-          width: !lambda return id(iris_pr) * 2;
-          height: !lambda return id(iris_pr) * 2;
-          x: !lambda return id(iris_dx);
-      # The glint rides on the iris rather than on the screen, so it stays put
-      # on the eye's surface as it looks around.
-      - lvgl.widget.update:
-          id: iris_glint
-          x: !lambda return id(iris_dx) - id(iris_ir) / 2;
-      - lvgl.widget.update:
-          id: iris_lid_top
-          height: !lambda return ${iris_lid_base} + id(iris_lid);
-      - lvgl.widget.update:
-          id: iris_lid_bot
-          height: !lambda return ${iris_lid_base} + id(iris_lid);
+      # One lambda, writing through LVGL and only when a value moved.
+      #
+      # The lids are why this matters. Both are `width: 100%`, so at the resting
+      # height each is 320x46 = 14720 px, and rewriting both dirtied ~29000 px -
+      # more than the entire 19200 px draw buffer - every single tick. Yet the
+      # lid height is zero for every tick of listening, replying and the alarm,
+      # constant through muted, and non-zero on just 4 ticks in 100 of idle. Over
+      # 95% of the most expensive write in this file was writing what was already
+      # there.
+      #
+      # The iris discs are the same story at 140x140: their radius is a per-phase
+      # constant everywhere except replying.
+      - lambda: |-
+          static int p_ir = -1, p_pr = -1, p_dx = 0x7FFFFFFF, p_lid = -1;
+          static bool primed = false;
+
+          const int ir = id(iris_ir), pr = id(iris_pr);
+          const int dx = id(iris_dx), lid = id(iris_lid);
+
+          if (!primed || ir != p_ir) {
+            lv_obj_set_width((lv_obj_t *) id(iris_outer), ir * 2);
+            lv_obj_set_height((lv_obj_t *) id(iris_outer), ir * 2);
+            const int inner = (ir - ${iris_ring_w}) * 2;
+            lv_obj_set_width((lv_obj_t *) id(iris_inner), inner);
+            lv_obj_set_height((lv_obj_t *) id(iris_inner), inner);
+          }
+          if (!primed || pr != p_pr) {
+            lv_obj_set_width((lv_obj_t *) id(iris_pupil), pr * 2);
+            lv_obj_set_height((lv_obj_t *) id(iris_pupil), pr * 2);
+          }
+          // The glint rides on the iris, so it moves when either does.
+          if (!primed || dx != p_dx || ir != p_ir) {
+            lv_obj_set_x((lv_obj_t *) id(iris_outer), dx);
+            lv_obj_set_x((lv_obj_t *) id(iris_inner), dx);
+            lv_obj_set_x((lv_obj_t *) id(iris_pupil), dx);
+            lv_obj_set_x((lv_obj_t *) id(iris_glint), dx - ir / 2);
+          }
+          if (!primed || lid != p_lid) {
+            lv_obj_set_height((lv_obj_t *) id(iris_lid_top), ${iris_lid_base} + lid);
+            lv_obj_set_height((lv_obj_t *) id(iris_lid_bot), ${iris_lid_base} + lid);
+          }
+          p_ir = ir; p_pr = pr; p_dx = dx; p_lid = lid;
+          primed = true;
 
   - id: iris_tint_normal
     then:
@@ -212,7 +232,8 @@ script:
   - id: iris_tick_script
     mode: single
     then:
-      - lambda: id(iris_frame)++;
+      # Wrapped: a free-running counter eventually costs sinf() its precision.
+      - lambda: id(iris_frame) = (id(iris_frame) + 1) % 36000;
       - if:
           condition:
             lambda: |-

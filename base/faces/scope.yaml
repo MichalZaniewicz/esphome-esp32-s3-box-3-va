@@ -54,14 +54,6 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
-  - id: scope_alarm
-    type: bool
-    restore_value: false
-    initial_value: "false"
-  - id: scope_recolour
-    type: bool
-    restore_value: false
-    initial_value: "true"
 
 font:
   - id: font_scope
@@ -141,22 +133,15 @@ script:
           }
           lv_line_set_points(id(scope_trace)->obj, pts, N);
 
-          // Repaint the trace colour only when the alarm state flips.
-          const bool alarm = (phase == ${voice_assist_timer_finished_phase_id} ||
-                              phase == ${voice_assist_error_phase_id});
-          id(scope_recolour) = (alarm != id(scope_alarm));
-          id(scope_alarm) = alarm;
-
   - id: scope_tint
     then:
-      # Was running every tick, rewriting a colour that changes only when the
-      # phase group does. Now it is called from the tick script, and only when
-      # the alarm state has actually flipped.
       - lvgl.widget.update:
           id: scope_trace
           line_color: !lambda |-
-            return id(scope_alarm) ? lv_color_hex(${scope_alarm_color})
-                                   : lv_color_hex(${scope_trace_color});
+            const int p = id(voice_assistant_phase);
+            if (p == ${voice_assist_timer_finished_phase_id} ||
+                p == ${voice_assist_error_phase_id}) return lv_color_hex(${scope_alarm_color});
+            return lv_color_hex(${scope_trace_color});
 
 interval:
   - interval: ${scope_tick}
@@ -166,11 +151,7 @@ interval:
             lvgl.page.is_showing: page_face
           then:
             - script.execute: scope_tick_script
-            - if:
-                condition:
-                  lambda: return id(scope_recolour);
-                then:
-                  - script.execute: scope_tint
+            - script.execute: scope_tint
 
 lvgl:
   pages:

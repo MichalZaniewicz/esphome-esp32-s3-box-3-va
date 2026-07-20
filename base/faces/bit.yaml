@@ -161,7 +161,8 @@ script:
           if (pw > ew - 14) pw = ew - 14;
           if (ph > eh - 10) ph = eh - 10;
           if (pw < 4 || ph < 4) pup = false;
-          const int lim = (ew - pw) / 2 - 2;
+          int lim = (ew - pw) / 2 - 2;
+          if (lim < 0) lim = 0;   // a negative limit would FORCE a centred pupil off-centre
           if (gx > lim) gx = lim;
           if (gx < -lim) gx = -lim;
 
@@ -176,37 +177,52 @@ script:
 
   - id: bit_draw
     then:
-      - lvgl.widget.update:
-          id: bit_eye_l
-          width: !lambda return id(bit_ew);
-          height: !lambda return id(bit_eh);
-      - lvgl.widget.update:
-          id: bit_eye_r
-          width: !lambda return id(bit_ew);
-          height: !lambda return id(bit_eh);
-      - lvgl.widget.update:
-          id: bit_mouth
-          width: !lambda return id(bit_mw);
-          height: !lambda return id(bit_mh);
-      - if:
-          condition:
-            lambda: return id(bit_pupils_on);
-          then:
-            - lvgl.widget.show: bit_pupil_l
-            - lvgl.widget.show: bit_pupil_r
-            - lvgl.widget.update:
-                id: bit_pupil_l
-                width: !lambda return id(bit_pw);
-                height: !lambda return id(bit_ph);
-                x: !lambda return id(bit_gx) - ${bit_eye_offset};
-            - lvgl.widget.update:
-                id: bit_pupil_r
-                width: !lambda return id(bit_pw);
-                height: !lambda return id(bit_ph);
-                x: !lambda return id(bit_gx) + ${bit_eye_offset};
-          else:
-            - lvgl.widget.hide: bit_pupil_l
-            - lvgl.widget.hide: bit_pupil_r
+      # One lambda, writing only what moved. Previously three unconditional
+      # widget updates plus two more for the pupils plus a show/hide pair EVERY
+      # tick - and lv_obj_clear_flag(HIDDEN) invalidates whether or not the flag
+      # actually changed. Almost none of it carried information: the mouth is a
+      # per-phase constant everywhere except replying, the eyes change on 4 ticks
+      # in 100 of idle, and the pupils move only during the two gaze windows.
+      - lambda: |-
+          static int p_ew = -1, p_eh = -1, p_pw = -1, p_ph = -1;
+          static int p_gx = 0x7FFFFFFF, p_mw = -1, p_mh = -1, p_pup = -1;
+          static bool primed = false;
+
+          const int ew = id(bit_ew), eh = id(bit_eh);
+          const int pw = id(bit_pw), ph = id(bit_ph), gx = id(bit_gx);
+          const int mw = id(bit_mw), mh = id(bit_mh);
+          const int pup = id(bit_pupils_on) ? 1 : 0;
+
+          if (!primed || ew != p_ew || eh != p_eh) {
+            lv_obj_set_width((lv_obj_t *) id(bit_eye_l), ew);
+            lv_obj_set_height((lv_obj_t *) id(bit_eye_l), eh);
+            lv_obj_set_width((lv_obj_t *) id(bit_eye_r), ew);
+            lv_obj_set_height((lv_obj_t *) id(bit_eye_r), eh);
+          }
+          if (!primed || mw != p_mw || mh != p_mh) {
+            lv_obj_set_width((lv_obj_t *) id(bit_mouth), mw);
+            lv_obj_set_height((lv_obj_t *) id(bit_mouth), mh);
+          }
+          if (!primed || pup != p_pup) {
+            if (pup) {
+              lv_obj_clear_flag((lv_obj_t *) id(bit_pupil_l), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag((lv_obj_t *) id(bit_pupil_r), LV_OBJ_FLAG_HIDDEN);
+            } else {
+              lv_obj_add_flag((lv_obj_t *) id(bit_pupil_l), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag((lv_obj_t *) id(bit_pupil_r), LV_OBJ_FLAG_HIDDEN);
+            }
+          }
+          if (pup && (!primed || pw != p_pw || ph != p_ph || gx != p_gx)) {
+            lv_obj_set_width((lv_obj_t *) id(bit_pupil_l), pw);
+            lv_obj_set_height((lv_obj_t *) id(bit_pupil_l), ph);
+            lv_obj_set_x((lv_obj_t *) id(bit_pupil_l), gx - ${bit_eye_offset});
+            lv_obj_set_width((lv_obj_t *) id(bit_pupil_r), pw);
+            lv_obj_set_height((lv_obj_t *) id(bit_pupil_r), ph);
+            lv_obj_set_x((lv_obj_t *) id(bit_pupil_r), gx + ${bit_eye_offset});
+          }
+          p_ew = ew; p_eh = eh; p_pw = pw; p_ph = ph;
+          p_gx = gx; p_mw = mw; p_mh = mh; p_pup = pup;
+          primed = true;
 
   # Colours are repainted only when the phase group changes, so they cost
   # nothing per tick.
@@ -249,7 +265,8 @@ script:
   - id: bit_tick_script
     mode: single
     then:
-      - lambda: id(bit_frame)++;
+      # Wrapped: a free-running counter eventually costs sinf() its precision.
+      - lambda: id(bit_frame) = (id(bit_frame) + 1) % 36000;
       - if:
           condition:
             lambda: |-

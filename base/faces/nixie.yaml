@@ -52,14 +52,6 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
-  # Digit shown per tube, and how hard each tube is driven (0..255 where 255 is
-  # the resting glow; above that the crest brightens towards nixie_hot_color).
-  - id: nixie_digit
-    type: int[4]
-    restore_value: false
-  - id: nixie_glow
-    type: int[4]
-    restore_value: false
 
 esphome:
   on_boot:
@@ -90,7 +82,11 @@ script:
           static uint8_t seen[34];
           static bool primed = false;
 
-          const int f = id(nixie_frame)++;
+          // Wrapped, not free-running: at ~10^7 the float product in sinf() loses
+          // enough precision that the breath turns into a stepped wobble. The
+          // period is a multiple of every cycle this file uses.
+          const int f = id(nixie_frame);
+          id(nixie_frame) = (f + 1) % 36000;
           const int phase = id(voice_assistant_phase);
 
           // --- what the tubes should read -----------------------------------
@@ -135,8 +131,6 @@ script:
             colon_on = (f % 10) < 5;      // only the idle clock ticks
           }
 
-          for (int i = 0; i < 4; i++) { id(nixie_digit)[i] = d[i]; id(nixie_glow)[i] = glow[i]; }
-
           // --- paint ---------------------------------------------------------
           uint32_t lit = ${nixie_on_color};
           const uint32_t hot = ${nixie_hot_color};
@@ -144,6 +138,15 @@ script:
           if (phase == ${voice_assist_timer_finished_phase_id} ||
               phase == ${voice_assist_error_phase_id}) lit = ${nixie_alarm_color};
           else if (phase == ${voice_assist_muted_phase_id}) lit = ${nixie_muted_color};
+
+          // The skip-if-unchanged cache is keyed on BRIGHTNESS, which does not
+          // capture a change of colour. Going idle -> muted on a tick where the
+          // colon happened to be lit left it full orange next to four correctly
+          // dimmed tubes, for the whole muted phase. Force a repaint whenever
+          // the lit colour itself moves.
+          static uint32_t painted = 0;
+          const bool recolour = (painted != lit);
+          painted = lit;
 
           // Blends PACKED COLOURS and returns one, so the calls can nest:
           // the crest is a blend applied on top of a blend. Returning
@@ -163,20 +166,20 @@ script:
               const bool on = (MAP[d[i]] >> (6 - s)) & 1;
               const uint8_t want = on ? (uint8_t) (base / 2 + over / 2 + 1) : 0;
               const int idx = i * 7 + s;
-              if (primed && seen[idx] == want) continue;
+              if (primed && !recolour && seen[idx] == want) continue;
               seen[idx] = want;
               lv_obj_set_style_bg_color(seg[idx],
                   lv_color_hex(on ? blend(blend(off, lit, base), hot, over) : off), 0);
             }
             const uint8_t pw = (uint8_t) (base / 2 + 1);
-            if (!primed || seen[28 + i] != pw) {
+            if (!primed || recolour || seen[28 + i] != pw) {
               seen[28 + i] = pw;
               lv_obj_set_style_bg_color(pool[i],
                   lv_color_hex(blend(${nixie_glass_color}, ${nixie_pool_color}, base)), 0);
             }
           }
           const uint8_t cw = colon_on ? 1 : 0;
-          if (!primed || seen[32] != cw) {
+          if (!primed || recolour || seen[32] != cw) {
             seen[32] = cw;
             for (int k = 0; k < 2; k++)
               lv_obj_set_style_bg_color(colon[k],

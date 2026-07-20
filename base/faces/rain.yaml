@@ -168,10 +168,17 @@ script:
             for (int r = 0; r < 12; r++) {
               if (r) s += "\n";
               const int dist = lead - r;
-              if (dist < 0 || dist > tail) continue;      // empty line, keeps rows aligned
+              // The band has to be tested BEFORE the trail check. It used to sit
+              // after the `continue`, so it could only recolour rows that already
+              // had a glyph - and since every column shares one `lead` while
+              // replying, the band was either exactly under the trail or nowhere
+              // at all. The documented bright row walking down the screen simply
+              // never appeared.
+              const bool on_band = (r == band);
+              if (!on_band && (dist < 0 || dist > tail)) continue;
 
-              const char *col = (dist == 0) ? head : (dist <= 2 ? mid : dim);
-              if (r == band) col = head;
+              const char *col = on_band ? head
+                                        : ((dist == 0) ? head : (dist <= 2 ? mid : dim));
 
               // The glyph changes every few ticks, not every tick: faster and
               // the trail stops reading as a trail and turns into static.
@@ -190,46 +197,31 @@ script:
 
   - id: rain_draw
     then:
-      - lvgl.label.update:
-          id: rain_col_0
-          text: !lambda return id(rain_text)[0];
-      - lvgl.label.update:
-          id: rain_col_1
-          text: !lambda return id(rain_text)[1];
-      - lvgl.label.update:
-          id: rain_col_2
-          text: !lambda return id(rain_text)[2];
-      - lvgl.label.update:
-          id: rain_col_3
-          text: !lambda return id(rain_text)[3];
-      - lvgl.label.update:
-          id: rain_col_4
-          text: !lambda return id(rain_text)[4];
-      - lvgl.label.update:
-          id: rain_col_5
-          text: !lambda return id(rain_text)[5];
-      - lvgl.label.update:
-          id: rain_col_6
-          text: !lambda return id(rain_text)[6];
-      - lvgl.label.update:
-          id: rain_col_7
-          text: !lambda return id(rain_text)[7];
-      - lvgl.label.update:
-          id: rain_col_8
-          text: !lambda return id(rain_text)[8];
-      - lvgl.label.update:
-          id: rain_col_9
-          text: !lambda return id(rain_text)[9];
-      - lvgl.label.update:
-          id: rain_col_10
-          text: !lambda return id(rain_text)[10];
-      - lvgl.label.update:
-          id: rain_col_11
-          text: !lambda return id(rain_text)[11];
+      # One lambda, and a write only when the string actually changed. This used
+      # to be twelve lvgl.label.update actions every tick. The twelve labels are
+      # adjacent and cover the whole screen, so LVGL merged them into one
+      # 320x240 dirty area - four draw-buffer passes - and re-parsed the recolor
+      # markup for every glyph. Most of it was waste: in idle seven columns are
+      # permanently empty and were still rewritten, and the glyphs only churn on
+      # every third tick, so roughly two ticks in three produced a byte-identical
+      # string.
+      - lambda: |-
+          static lv_obj_t *col[12] = {id(rain_col_0), id(rain_col_1), id(rain_col_2), id(rain_col_3), id(rain_col_4), id(rain_col_5), id(rain_col_6), id(rain_col_7), id(rain_col_8), id(rain_col_9), id(rain_col_10), id(rain_col_11)};
+          static std::string prev[12];
+          static bool primed = false;
+          for (int c = 0; c < 12; c++) {
+            const std::string &s = id(rain_text)[c];
+            if (primed && prev[c] == s) continue;
+            prev[c] = s;
+            lv_label_set_text(col[c], s.c_str());
+          }
+          primed = true;
+
   - id: rain_tick_script
     mode: single
     then:
-      - lambda: id(rain_frame)++;
+      # Wrapped: a free-running counter eventually costs sinf() its precision.
+      - lambda: id(rain_frame) = (id(rain_frame) + 1) % 36000;
       - script.execute: rain_compute
       - script.execute: rain_draw
 

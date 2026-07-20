@@ -41,7 +41,7 @@ substitutions:
   crt_rows: '6'
 
   # Every string the terminal prints. Override in base/lang/*.yaml.
-  crt_header: "AGENT CONSOLE"
+  crt_header: "VOICE TERMINAL"
   crt_idle_hint: "awaiting wake word"
   crt_listen_label: "input level"
   crt_muted_text: "microphone off"
@@ -123,10 +123,14 @@ script:
           // Hard-ish wrap at COLS, breaking on spaces where one is near enough.
           // A terminal tolerates a blunt wrap; a word split mid-syllable looks
           // like a bug rather than a style.
+          // `limit` caps how many rows one call may take. Without it the
+          // request could fill all six rows and the reply - the entire point of
+          // this character - was never printed at all.
           auto wrap = [&](const std::string &src, const char *colour,
-                          std::vector<std::string> &out) {
+                          std::vector<std::string> &out, int limit) {
+            const int cap = (int) out.size() + limit;
             size_t i = 0;
-            while (i < src.size() && (int) out.size() < ROWS) {
+            while (i < src.size() && (int) out.size() < ROWS && (int) out.size() < cap) {
               size_t take = (size_t) COLS;
               if (i + take < src.size()) {
                 const size_t sp = src.rfind(' ', i + take);
@@ -144,26 +148,30 @@ script:
           const char *DIM = "${crt_dim_color}";
 
           if (phase == ${voice_assist_listening_phase_id}) {
+            // NOT '#' for the bar. In LVGL recolor markup a '#' CLOSES the
+            // coloured run - it is not neutralised by being inside one - so a
+            // bar of hashes ended the colour at the first character and left
+            // LVGL parsing the rest as colour commands. The meter rendered as
+            // junk. '=' carries no meaning to the parser.
             std::string bar = "> ";
-            const int n = 1 + (pf * 3 / 5) % (COLS - 4);
-            for (int i = 0; i < n; i++) bar += "#";
-            // A '#' opens recolor markup, so the bar has to be built as one
-            // coloured run rather than pasted in raw.
+            const int span = COLS > 4 ? COLS - 4 : 1;   // never modulo by zero
+            const int n = 1 + (pf * 3 / 5) % span;
+            for (int i = 0; i < n; i++) bar += "=";
             lines.push_back(std::string("#") + BRIGHT + " " + bar + "#");
             lines.push_back(std::string("#") + DIM + "   ${crt_listen_label}#");
           } else if (phase == ${voice_assist_thinking_phase_id}) {
             if (!id(text_request).state.empty())
-              wrap("> " + id(text_request).state, DIM, lines);
+              wrap("> " + id(text_request).state, DIM, lines, 2);
             std::string dots = "${crt_think_text}";
             for (int i = 0; i < 1 + (pf / 3) % 4; i++) dots += ".";
             lines.push_back(std::string("#") + BRIGHT + " " + dots + "#");
           } else if (phase == ${voice_assist_replying_phase_id}) {
             if (!id(text_request).state.empty())
-              wrap("> " + id(text_request).state, DIM, lines);
+              wrap("> " + id(text_request).state, DIM, lines, 2);
             const std::string &full = id(text_response).state;
             const size_t shown = (size_t) (pf * ${crt_type_speed});
             std::string part = shown >= full.size() ? full : full.substr(0, shown);
-            if (!part.empty()) wrap(part, BRIGHT, lines);
+            if (!part.empty()) wrap(part, BRIGHT, lines, ROWS);
           } else if (phase == ${voice_assist_timer_finished_phase_id}) {
             if (f % 6 < 3)
               lines.push_back(std::string("#") + "${crt_alarm_color}" + " ${crt_timer_text}#");
@@ -190,11 +198,23 @@ script:
   - id: crt_tick_script
     mode: single
     then:
-      - lambda: id(crt_frame)++;
+      - lambda: id(crt_frame) = (id(crt_frame) + 1) % 36000;
       - script.execute: crt_compute
-      - lvgl.label.update:
-          id: crt_body
-          text: !lambda return id(crt_body_text);
+      # Only when the text actually changed. lv_label_set_text never compares:
+      # it reallocs, copies and re-lays-out every time. In error and muted the
+      # string is a constant and this was rewriting it ten times a second; in
+      # idle only two ticks in ten carry a new cursor state.
+      - if:
+          condition:
+            lambda: |-
+              static std::string prev;
+              if (prev == id(crt_body_text)) return false;
+              prev = id(crt_body_text);
+              return true;
+          then:
+            - lvgl.label.update:
+                id: crt_body
+                text: !lambda return id(crt_body_text);
 
 interval:
   - interval: ${crt_tick}
@@ -236,6 +256,9 @@ lvgl:
             align: TOP_LEFT
             x: 14
             y: 44
+            # Explicit width: without one the label auto-sizes, so every text
+            # change re-runs a full layout pass instead of just redrawing.
+            width: 292
             text: ""
             recolor: true
             text_font: font_crt

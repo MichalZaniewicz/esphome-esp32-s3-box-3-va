@@ -230,16 +230,28 @@ script:
           h: ${face_eye_h_shut}
           dx: 0
       - delay: 120ms
-      - script.execute:
-          id: face_eyes
-          w: ${face_eye_w}
-          h: ${face_eye_h}
-          dx: 0
-      - script.execute:
-          id: face_pupils
-          w: ${face_pupil_w}
-          h: ${face_pupil_h}
-          gx: 0
+      # ONLY re-open if we are still idle. `mode: single` stops this script
+      # overlapping itself, but nothing stopped its tail landing after the phase
+      # had changed. That was harmless in the animated phases, which overwrite
+      # the eyes on the next tick - but muted and error apply their shape exactly
+      # once, on entry. A blink that began in idle and finished after the mic was
+      # muted re-opened the eyes and put the pupils back, and since the muted
+      # branch had already run, nothing ever corrected it: the face sat there
+      # wide awake, supposedly muted, until the phase changed again.
+      - if:
+          condition:
+            lambda: return id(face_expr) == 1;
+          then:
+            - script.execute:
+                id: face_eyes
+                w: ${face_eye_w}
+                h: ${face_eye_h}
+                dx: 0
+            - script.execute:
+                id: face_pupils
+                w: ${face_pupil_w}
+                h: ${face_pupil_h}
+                gx: 0
 
   # --- the driver ----------------------------------------------------------
   # One tick: work out which expression the current phase wants, apply its
@@ -312,6 +324,7 @@ script:
                   lambda: return id(face_expr) != 2;
                 then:
                   - lambda: id(face_expr) = 2;
+                  - script.stop: face_blink
                   - script.execute: face_tint_normal
                   - script.execute:
                       id: face_pupils
@@ -343,6 +356,7 @@ script:
                   lambda: return id(face_expr) != 3;
                 then:
                   - lambda: id(face_expr) = 3;
+                  - script.stop: face_blink
                   - script.execute: face_tint_normal
                   - script.execute:
                       id: face_eyes
@@ -371,6 +385,7 @@ script:
                   lambda: return id(face_expr) != 4;
                 then:
                   - lambda: id(face_expr) = 4;
+                  - script.stop: face_blink
                   - script.execute: face_tint_normal
                   - script.execute:
                       id: face_eyes
@@ -399,6 +414,7 @@ script:
                   lambda: return id(face_expr) != 5;
                 then:
                   - lambda: id(face_expr) = 5;
+                  - script.stop: face_blink
                   - script.execute: face_tint_alarm
                   - script.execute:
                       id: face_mouth
@@ -428,6 +444,7 @@ script:
                   lambda: return id(face_expr) != 6;
                 then:
                   - lambda: id(face_expr) = 6;
+                  - script.stop: face_blink
                   - script.execute: face_tint_normal
                   - script.execute: face_pupils_hide
                   - script.execute:
@@ -451,6 +468,7 @@ script:
                   lambda: return id(face_expr) != 7;
                 then:
                   - lambda: id(face_expr) = 7;
+                  - script.stop: face_blink
                   - script.execute: face_tint_alarm
                   - script.execute:
                       id: face_eyes
@@ -488,7 +506,12 @@ image:
     file: ${face_background_file}
     resize: 320x240
     type: RGB565
-    transparency: alpha_channel
+    # NO `transparency:` on purpose. Every character PNG in this repo is fully
+    # opaque - checked, alpha is 255 everywhere - and this image covers the whole
+    # screen anyway. Declaring an alpha channel costs on every single redraw:
+    # LVGL loses the straight blit and blends the background per pixel inside
+    # each dirty rect, which here means each eye, pupil and mouth, every tick.
+    # It also carries the alpha plane in flash for nothing.
 
 lvgl:
   pages:
