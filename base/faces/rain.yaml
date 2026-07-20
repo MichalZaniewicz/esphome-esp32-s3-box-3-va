@@ -37,6 +37,16 @@ substitutions:
   rain_tail_think: '11'
   rain_tail_reply: '8'
 
+  # Colour shifts with the phase too. Speed alone was not enough to tell the
+  # phases apart: everything just looked like green rain going faster.
+  rain_listen_head: 'D8FFE8'     # near-white: it is paying attention
+  rain_reply_head: 'A8F0FF'      # cool, so speech does not read as thinking
+  rain_reply_mid: '2E8AA8'
+
+  # In idle only some columns run at all, which is what makes it read as
+  # drizzle rather than as a slower downpour.
+  rain_idle_cols: '5'
+
   rain_speed_idle: '1'
   rain_speed_listen: '2'
   rain_speed_think: '3'
@@ -100,12 +110,23 @@ script:
           const char *mid = "${rain_mid_color}";
           const char *dim = "${rain_tail_color}";
 
+          // Each phase changes the WEATHER, not just the speed:
+          //   idle       only a few columns run, short trails
+          //   listening  the rain freezes in place and shimmers
+          //   thinking   every column, full-length trails, fast
+          //   replying   all columns fall in step, as horizontal bands
+          bool frozen = false, sync = false;
+
           if (phase == ${voice_assist_listening_phase_id}) {
             tail = ${rain_tail_listen}; speed = ${rain_speed_listen};
+            frozen = true;
+            head = "${rain_listen_head}";
           } else if (phase == ${voice_assist_thinking_phase_id}) {
             tail = ${rain_tail_think}; speed = ${rain_speed_think};
           } else if (phase == ${voice_assist_replying_phase_id}) {
             tail = ${rain_tail_reply}; speed = ${rain_speed_reply};
+            sync = true;
+            head = "${rain_reply_head}"; mid = "${rain_reply_mid}";
           } else if (phase == ${voice_assist_timer_finished_phase_id} ||
                      phase == ${voice_assist_error_phase_id}) {
             tail = ${rain_tail_think}; speed = ${rain_speed_think};
@@ -119,12 +140,28 @@ script:
           const int band = (phase == ${voice_assist_replying_phase_id})
                          ? (int) ((f * 3 / 2) % 12) : -1;
 
+          const bool idle = (phase == ${voice_assist_idle_phase_id});
+
           for (int c = 0; c < 12; c++) {
             // Each column gets its own offset, otherwise the rain falls as one
             // flat wall and reads like a table rather than weather.
             uint32_t o = (uint32_t) (c * 151);
             o = (o ^ (o >> 5)) * 2654435761u;
-            const int lead = ((f * speed + (int) ((o >> 16) & 0x3F)) / 2) % (12 + tail);
+
+            // Spread by stride, not by hash: a hash happened to pick five
+            // neighbouring columns, so the drizzle fell on one half of the
+            // screen and looked like a fault rather than like weather.
+            if (idle && ((c * 5) % 12) >= ${rain_idle_cols}) {
+              id(rain_text)[c] = "";      // this column is not raining at all
+              continue;
+            }
+
+            // Frozen: the trail stops descending and only the glyphs churn.
+            // Synced: every column shares one lead, so the rain arrives in
+            // horizontal bands instead of as independent streaks.
+            const int drift = frozen ? 0 : f * speed;
+            const int offset = sync ? 0 : (int) ((o >> 16) & 0x3F);
+            const int lead = ((drift + offset) / 2) % (12 + tail);
 
             std::string s;
             s.reserve(12 * 12);
@@ -138,7 +175,8 @@ script:
 
               // The glyph changes every few ticks, not every tick: faster and
               // the trail stops reading as a trail and turns into static.
-              uint32_t g = (uint32_t) ((f / 3) * 31 + r * 7 + c * 101);
+              const int churn = frozen ? f : (f / 3);
+              uint32_t g = (uint32_t) (churn * 31 + r * 7 + c * 101);
               g = (g ^ (g >> 5)) * 2654435761u;
 
               s += "#";
