@@ -89,6 +89,12 @@ substitutions:
   # Idle loop: blink, blink, then glance right and left, then rest. One cycle is
   # this many ticks - 100 x 120 ms is about twelve seconds, slow enough to read
   # as a living face rather than a nervous one.
+  #
+  # MUST BE GREATER THAN ZERO. A character package may override it, and this is
+  # the only divisor in the file that is not a literal: the idle tick takes
+  # face_frame modulo this value, so a zero divides by zero on the device rather
+  # than failing the build. The glance timings inside assume roughly this scale
+  # too - much below about 70 and the blinks collide with the gaze.
   face_idle_cycle: '100'
 
   # Equal to face_eye_h by default: thinking is carried by the pupils and the
@@ -358,12 +364,20 @@ script:
                     return t == 0 || t == 5;
                 then:
                   - script.execute: face_blink
-            # Gaze from a RANGE, not from equality on one frame. An interval tick
-            # that lands on a busy loop is skipped, not deferred, so `t == 40`
-            # could simply never happen - and 40 and 60 are the frames that
-            # RECENTRE the pupils, so a single missed tick left them parked off
-            # to one side for the rest of the twelve second cycle. With ranges
-            # the value is recomputed every tick and a missed tick costs nothing.
+            # Gaze from a RANGE, not from equality on one frame, so that the gaze
+            # is a STATE the tick keeps restoring rather than an event that has to
+            # land. Anything else that moves the pupils - the blink recentring
+            # them on its way out - is corrected on the next tick instead of
+            # leaving them parked off to one side for the rest of the cycle.
+            #
+            # The original note here claimed equality was unsafe because a missed
+            # interval tick is skipped rather than deferred, so `t == 40` might
+            # never happen. That reasoning is WRONG and worth correcting before it
+            # spreads: face_frame is incremented in exactly one place, inside this
+            # script, so a tick that never runs does not advance it and no value
+            # of t can be stepped over. The blink just above still keys off
+            # equality and is perfectly correct.
+            #
             # Calling this every tick is free now that face_pupils only writes on
             # a change; the guard is just to keep out of the blink's way.
             - if:
