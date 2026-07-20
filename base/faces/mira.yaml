@@ -1,0 +1,79 @@
+# Mira - the one with the ponytail.
+#
+# IMPORTANT, because it is easy to get backwards: the dark curves on her face
+# are EYEBROWS and EYELASHES, not eyes. The artwork arrived with the eyes and
+# mouth already taken out, and the lash line left behind is the upper lid. So
+# the eyes belong directly UNDER the lashes, not in place of them - and the
+# lashes must not be erased, or she loses her lids.
+#
+# The nose stays too. Only the eyes and the mouth are drawn at runtime.
+#
+# Usage: `assistant: mira` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/mira.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/mira.png
+
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0xB23E3E'
+  face_pupil_color: '0x2E1A14'
+  face_alarm_color: '0xFF5A5A'
+
+  # Measured, not guessed. Mirror axis on x 160, so no centre correction. Below
+  # the lash line each eye column has clear skin from y 64 to 99, so the eyes sit
+  # at y 71 and even the widest expression stays clear of the nose. The mouth
+  # goes at y 97, below the nose, where the original one was.
+  face_center_x: '0'
+  face_eye_offset: '16'
+  face_eye_y: '-49'
+  face_eye_w: '16'
+  face_eye_h: '12'
+  face_mouth_y: '-23'
+  face_mouth_w: '10'
+  face_mouth_h: '6'
+
+  face_pupil_w: '7'
+  face_pupil_h: '9'
+  face_pupil_radius: '3'
+  face_pupil_dilate: '2'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '4'
+
+  # 14 tall centred on y 71 spans 64..78: it just touches the lashes, which is
+  # what makes them read as a lid rather than as a separate mark.
+  face_eye_h_wide: '14'
+  face_eye_h_think: '12'
+  face_eye_h_narrow: '4'
+  face_eye_h_shut: '3'
+  face_mouth_open_h: '14'
+  face_mouth_small_w: '8'
+  face_mouth_think_w: '10'   # same as face_mouth_w: at rest
+                             # she keeps the thinking mouth, by request
+  face_mouth_o_w: '10'
+  face_mouth_o_h: '12'
+  face_mouth_alarm_w: '18'
+  face_mouth_alarm_h: '14'
+  face_mouth_error_w: '10'
+  face_listen_pulse: '3'
+  face_shake_dx: '3'
+  face_tick: 120ms
+  face_eye_radius: '7'
+  face_mouth_radius: '3'
