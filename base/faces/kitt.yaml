@@ -2,8 +2,8 @@
 # Kitt - a scanner bar, in the manner of a certain talking car from the 1980s.
 # Styled after the genre, not copied from it, and not affiliated with anyone.
 #
-# No artwork: a dark housing and 9 segments whose brightness sweeps side to
-# side. Like the other drawn characters it does NOT nest base/screens/face.yaml.
+# No artwork: two rails and 9 segments whose brightness sweeps side to side.
+# Like the other drawn characters it does NOT nest base/screens/face.yaml.
 #
 # NOTHING MOVES AND NOTHING CHANGES SIZE. The sweep is brightness alone: every
 # tick computes a level 0..255 per segment and writes it as a colour. That makes
@@ -20,11 +20,13 @@ substitutions:
                                   # should still read as hardware when dark
   kitt_alarm_color: '0xFFB030'
   kitt_muted_color: '0x3A2A28'
-  kitt_housing_color: '0x16161A'
+  # Two thin rails above and below the segments instead of a box behind them.
+  # A filled housing read as a grey slab with lights sitting on top; a pair of
+  # rails reads as a slot the light is set into, and costs two objects.
+  kitt_rail_color: '0x7A808C'
+  kitt_rail_shadow: '0x3A3E46'
+  kitt_rail_offset: '40'          # from centre, up and down
   kitt_bg_color: '0x08080A'
-
-  kitt_housing_w: '300'
-  kitt_housing_h: '78'
   kitt_seg_w: '26'
   kitt_seg_h: '46'
   kitt_seg_radius: '4'
@@ -257,14 +259,26 @@ lvgl:
       bg_color: ${kitt_bg_color}
       widgets:
         - obj:
-            id: kitt_housing
+            id: kitt_rail_top
             align: CENTER
             x: 0
-            y: 0
-            width: ${kitt_housing_w}
-            height: ${kitt_housing_h}
-            radius: 14
-            bg_color: ${kitt_housing_color}
+            y: -${kitt_rail_offset}
+            width: 100%
+            height: 4
+            radius: 0
+            bg_color: ${kitt_rail_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: kitt_rail_bottom
+            align: CENTER
+            x: 0
+            y: ${kitt_rail_offset}
+            width: 100%
+            height: 4
+            radius: 0
+            bg_color: ${kitt_rail_shadow}
             bg_opa: COVER
             border_width: 0
             pad_all: 0

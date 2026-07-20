@@ -1,6 +1,6 @@
 # Genie - the wish granter.
 #
-# Small head, big moustache, floating tail. The most compact face of the set.
+# Small head, big beard, floating tail. The most compact face of the set.
 #
 # Usage - the character must come AFTER the face engine, because ESPHome
 # resolves later-listed package files at a higher priority:
@@ -37,8 +37,8 @@ substitutions:
   face_pupil_color: '0x10283A'
   face_alarm_color: '0xFF5A5A'
 
-# A full-body character: the head occupies rows -74..-10 and is centred. Eyes go
-  # above the moustache, and the mouth is only a hint below it.
+# A full-body character: the head occupies rows -74..-10 and is centred. Eyes and
+  # mouth both sit on the face, above the beard, which starts around row 0.
   face_center_x: '0'
   face_eye_offset: '16'
   face_eye_y: '-38'

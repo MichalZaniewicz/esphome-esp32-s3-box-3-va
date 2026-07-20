@@ -123,7 +123,7 @@ being on screen belong to the character. Name any of them in lower case.
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-genie.gif" width="272" alt="Genie"></td>
-    <td><h3>Genie</h3>Small, moustachioed and faintly smug. Grants timers instead of wishes and considers this a promotion. Do not get him started on lamps.</td>
+    <td><h3>Genie</h3>Small, bearded and faintly smug. Grants timers instead of wishes and considers this a promotion. Do not get him started on lamps.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-flare.gif" width="272" alt="Flare"></td>
