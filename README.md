@@ -33,138 +33,12 @@ one thin config file you actually edit.
   layer that stays visible across page changes (green while running, blue while
   paused).
 - **TTS routing you choose at runtime**: the reply can come out of the box, out
-  of an external Home Assistant media player, or both - see below.
+  of a Home Assistant media player elsewhere in the house, or both. Details:
+  [TTS routing](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/wiki/TTS-routing).
 - **Swappable assistant**: the on-screen character is a package - artwork plus
   the measurements of where its face goes - so changing assistants is one line.
 
-## The TTS routing, and why it exists
-
-A reply can come out of the box, out of a Home Assistant media player elsewhere
-in the house, or both, chosen at runtime in the `TTS output` select:
-
-| Option | What happens |
-|---|---|
-| `This device` | The box speaks. Upstream behaviour, local decode included. |
-| `External player` | Only `${external_media_player_id}` speaks. The box starts the local playback and immediately stops it. |
-| `Both` | Both, at the cost of the local decode. |
-
-The awkward bit in that middle row is deliberate, and worth knowing before you
-"simplify" it. With a `media_player:` attached, ESPHome does not just hand you
-the TTS URL at `TTS_END` - it *also* calls the media player with it
-(`voice_assistant.cpp`: `media_player_->make_call().set_media_url(url)`), so the
-box downloads and decodes the audio locally whatever `on_tts_end` does. On long
-replies that local download-and-decode is the suspected cause of mid-answer
-reboots, so detaching the media player looks like the clean fix.
-
-It is not, because the attachment does more than audio: `get_feature_flags()`
-only advertises `ANNOUNCE` when a media player is present, and Home Assistant
-only asks a satellite for its wake word list *inside* `if feature_flags &
-ANNOUNCE`. No media player therefore means **no wake word picker in HA** and a
-satellite that never leaves `responding`. So the player stays attached and
-`on_tts_end` cancels the local playback instead.
-
-This routes **spoken replies only**. The timer alarm always rings on the box:
-there it repeats until silenced and a tap on the screen stops it, neither of
-which a remote speaker can offer, since the box cannot tell when one finishes.
-Home Assistant announcements and Music Assistant are unaffected either way -
-they go through the `speaker_media_player` component directly.
-
-## Quick start
-
-> Requires **ESPHome 2026.7.0+** - that is where `image:` became a platform component.
-
-1. Copy `secrets.example.yaml` to `secrets.yaml` and fill in your Wi-Fi.
-2. Copy **`esp32-s3-box-3-va.yaml`** next to it and edit the `substitutions:` at
-   the top (device name, timezone, external media player, artwork). That thin
-   file is the only firmware file you keep; the core is pulled from GitHub at
-   compile time, see its `packages:` block.
-3. **First flash over USB**, then updates go wireless:
-   ```
-   esphome run esp32-s3-box-3-va.yaml
-   ```
-   Or drop both files into the ESPHome dashboard's `/config/esphome/` and hit
-   Install.
-4. In Home Assistant: the new ESPHome device appears, open **Configure** and
-   assign an Assist pipeline.
-5. Say "Alexa" (or "OK Nabu", or "Hey Jarvis"), or press the button under the
-   screen.
-
-After changing anything in the core, run `esphome clean` before the next build -
-otherwise ESPHome reuses the cached copy of the remote package.
-
-## Repository layout
-
-```
-esp32-s3-box-3-va.yaml     # YOUR config: copy + edit this (pulls the rest from GitHub)
-secrets.example.yaml       # copy to secrets.yaml
-base/
-  core.yaml                # the always-on core, pulled as a remote package
-  screens/
-    home.yaml              # optional home screen: clock, date, climate
-    face.yaml              # optional animated assistant face (the engine)
-  faces/
-    pip, astro, momo,      # characters; pick one with `assistant:`
-    franky, wizard,        #   each pulls the face engine itself
-    genie, flare, aura     #   aura draws itself, no artwork
-  lang/
-    en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
-  sounds/
-    timer_finished.flac    # the timer alarm, compiled into the firmware
-docs/
-  HARDWARE.md              # pinout, I2C map, gotchas
-scripts/
-  validate.py              # offline YAML check (syntax, substitutions, duplicate ids)
-  esplog.py                # stream device logs over the native API
-skill/
-  esp32-s3-box-3/          # Claude Code skill: pinout + hard-won gotchas
-```
-
-## Configuration
-
-Day-to-day settings are Home Assistant entities, not config edits: microphone
-mute, wake sound, screen brightness, TTS output, wake word engine location, the
-wake word itself and the timer switch.
-
-Four substitutions are worth deciding before the first flash:
-
-| Substitution | Default | What it does |
-|---|---|---|
-| `name` / `friendly_name` | `esp32-s3-box-3-va` / `S3 Box 3 Voice` | Device name. Changing `name` re-creates every entity in Home Assistant. |
-| `posix_timezone` | `UTC0` | Clock zone in POSIX form, since the device has no IANA database. Only a fallback until Home Assistant syncs the clock. |
-| `external_media_player_id` | `media_player.living_room` | Where the reply goes when `TTS output` is `External player` or `Both`. |
-| `tts_output_default` | `This device` | Boot default of that select. |
-
-Everything else has a working default: wake word tuning, sounds, fonts, screen
-pages, the boot animation, pins. All of it is in the
-[Configuration reference](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/wiki/Configuration)
-on the wiki.
-
-Three wake words are compiled in - **alexa**, **okay nabu** and **hey jarvis** -
-and Home Assistant picks between them, one at a time.
-
-## Screens
-
-The core ships one page per assistant phase. Extra screens are optional packages
-under `base/screens/` - add the file to your `files:` list to compile it in, drop
-the line to leave it out. ESPHome merges each package's `lvgl:` block into one UI.
-
-| Screen | What it adds |
-|---|---|
-| `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
-| `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
-
-Install both and the idle screen has two faces: the clock, and the character
-idling. **Tap the screen to swap between them** - `idle_page` is what you see
-after a reboot, `idle_page_alt` is what a tap switches to, and the last choice is
-remembered. Set them to the same page to turn the tap off.
-
-```yaml
-  idle_page: page_home      # clock, date, temperatures
-  idle_page_alt: page_face  # the character, blinking and looking around
-```
-
-
-### Characters
+## Characters
 
 Swapping the assistant is one word. Each character in
 [`base/faces/`](base/faces/README.md) pulls whatever it needs by itself, so
@@ -260,6 +134,100 @@ one is `cp pip.yaml yours.yaml`, a faceless 320x240 image, and measuring where i
 eyes and mouth belong. Every expression dimension is a substitution, so a bigger
 or smaller face rescales without touching the engine. Details:
 [`base/faces/README.md`](base/faces/README.md).
+
+## Quick start
+
+> Requires **ESPHome 2026.7.0+** - that is where `image:` became a platform component.
+
+1. Copy `secrets.example.yaml` to `secrets.yaml` and fill in your Wi-Fi.
+2. Copy **`esp32-s3-box-3-va.yaml`** next to it and edit the `substitutions:` at
+   the top (device name, timezone, external media player, artwork). That thin
+   file is the only firmware file you keep; the core is pulled from GitHub at
+   compile time, see its `packages:` block.
+3. **First flash over USB**, then updates go wireless:
+   ```
+   esphome run esp32-s3-box-3-va.yaml
+   ```
+   Or drop both files into the ESPHome dashboard's `/config/esphome/` and hit
+   Install.
+4. In Home Assistant: the new ESPHome device appears, open **Configure** and
+   assign an Assist pipeline.
+5. Say "Alexa" (or "OK Nabu", or "Hey Jarvis"), or press the button under the
+   screen.
+
+After changing anything in the core, run `esphome clean` before the next build -
+otherwise ESPHome reuses the cached copy of the remote package.
+
+## Repository layout
+
+```
+esp32-s3-box-3-va.yaml     # YOUR config: copy + edit this (pulls the rest from GitHub)
+secrets.example.yaml       # copy to secrets.yaml
+base/
+  core.yaml                # the always-on core, pulled as a remote package
+  screens/
+    home.yaml              # optional home screen: clock, date, climate
+    face.yaml              # optional animated assistant face (the engine)
+  faces/
+    pip, astro, momo,      # characters; pick one with `assistant:`
+    franky, wizard,        #   each pulls the face engine itself
+    genie, flare, aura     #   aura draws itself, no artwork
+  lang/
+    en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
+  sounds/
+    timer_finished.flac    # the timer alarm, compiled into the firmware
+docs/
+  HARDWARE.md              # pinout, I2C map, gotchas
+scripts/
+  validate.py              # offline YAML check (syntax, substitutions, duplicate ids)
+  esplog.py                # stream device logs over the native API
+skill/
+  esp32-s3-box-3/          # Claude Code skill: pinout + hard-won gotchas
+```
+
+## Configuration
+
+Day-to-day settings are Home Assistant entities, not config edits: microphone
+mute, wake sound, screen brightness, TTS output, wake word engine location, the
+wake word itself and the timer switch.
+
+Four substitutions are worth deciding before the first flash:
+
+| Substitution | Default | What it does |
+|---|---|---|
+| `name` / `friendly_name` | `esp32-s3-box-3-va` / `S3 Box 3 Voice` | Device name. Changing `name` re-creates every entity in Home Assistant. |
+| `posix_timezone` | `UTC0` | Clock zone in POSIX form, since the device has no IANA database. Only a fallback until Home Assistant syncs the clock. |
+| `external_media_player_id` | `media_player.living_room` | Where the reply goes when `TTS output` is `External player` or `Both`. |
+| `tts_output_default` | `This device` | Boot default of that select. |
+
+Everything else has a working default: wake word tuning, sounds, fonts, screen
+pages, the boot animation, pins. All of it is in the
+[Configuration reference](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/wiki/Configuration)
+on the wiki.
+
+Three wake words are compiled in - **alexa**, **okay nabu** and **hey jarvis** -
+and Home Assistant picks between them, one at a time.
+
+## Screens
+
+The core ships one page per assistant phase. Extra screens are optional packages
+under `base/screens/` - add the file to your `files:` list to compile it in, drop
+the line to leave it out. ESPHome merges each package's `lvgl:` block into one UI.
+
+| Screen | What it adds |
+|---|---|
+| `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
+| `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
+
+Install both and the idle screen has two faces: the clock, and the character
+idling. **Tap the screen to swap between them** - `idle_page` is what you see
+after a reboot, `idle_page_alt` is what a tap switches to, and the last choice is
+remembered. Set them to the same page to turn the tap off.
+
+```yaml
+  idle_page: page_home      # clock, date, temperatures
+  idle_page_alt: page_face  # the character, blinking and looking around
+```
 
 ## Claude Code skill
 
