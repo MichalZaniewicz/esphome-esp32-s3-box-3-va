@@ -1,4 +1,4 @@
-# Mira - the one with the ponytail.
+# Agnes - the one with the ponytail.
 #
 # IMPORTANT, because it is easy to get backwards: the dark curves on her face
 # are EYEBROWS and EYELASHES, not eyes. The artwork arrived with the eyes and
@@ -8,7 +8,7 @@
 #
 # The nose stays too. Only the eyes and the mouth are drawn at runtime.
 #
-# Usage: `assistant: mira` in your thin config. See base/faces/README.md.
+# Usage: `assistant: agnes` in your thin config. See base/faces/README.md.
 
 esphome:
   on_boot:
@@ -16,7 +16,7 @@ esphome:
       then:
         - logger.log:
             level: INFO
-            format: "package: faces/mira.yaml"
+            format: "package: faces/agnes.yaml"
 
 # This character is artwork plus measurements; the drawing and animating is done
 # by base/screens/face.yaml, which it pulls in itself. That is what lets a config
@@ -30,7 +30,7 @@ packages:
     refresh: 0s
 
 substitutions:
-  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/mira.png
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/agnes.png
 
   face_color: '0xFFFFFF'
   face_mouth_color: '0xB23E3E'

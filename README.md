@@ -118,8 +118,8 @@ being on screen belong to the character. Name any of them in lower case.
     <td><h3>Rufus</h3>A fox who has clearly been waiting for someone to need saving and will settle for a kitchen timer. Stands in a hero pose at all times, mask on, entirely sincere about it.</td>
   </tr>
   <tr>
-    <td width="290"><img src="base/assets/demo/demo-mira.gif" width="272" alt="Mira"></td>
-    <td><h3>Mira</h3>Cheerful, unhurried and always halfway through her day, hair tied back like she has somewhere to be in ten minutes. Talks to you the way you would talk to someone leaning in your kitchen doorway.</td>
+    <td width="290"><img src="base/assets/demo/demo-agnes.gif" width="272" alt="Agnes"></td>
+    <td><h3>Agnes</h3>Cheerful, unhurried and always halfway through her day, hair tied back like she has somewhere to be in ten minutes. Talks to you the way you would talk to someone leaning in your kitchen doorway.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>
