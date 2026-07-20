@@ -7,11 +7,22 @@
 # brackets and a ring of tick marks. Like the other drawn characters it does NOT
 # nest base/screens/face.yaml.
 #
-# The rotation is the whole trick. An LVGL arc's `start_angle` and `end_angle`
-# set how far the arc runs, and they can both be written at runtime, so a
-# segment is spun simply by advancing both angles together every tick. Seven
-# arcs at two radii, turning at different speeds in opposite directions, is what
-# makes it look mechanical rather than merely animated.
+# The rotation is the whole trick: seven arcs at two radii, turning at different
+# speeds in opposite directions, which is what makes it look mechanical rather
+# than merely animated.
+#
+# HOW THE ARCS ARE TURNED, AND WHY NOT THE OBVIOUS WAY. `lvgl.arc.update` can
+# set start_angle and end_angle, and that is how this was written first - but it
+# routes each property through ESPHome's style machinery, so fourteen style
+# recalculations and invalidations per tick, on the largest shapes on the screen.
+# On the device it crawled. The lambda now calls lv_arc_set_bg_angles() once per
+# arc instead, and skips any arc whose whole-degree angle has not moved since the
+# last tick, which at idle speed is most of them.
+#
+# An arc id is an `lv_arc_t *`. That is neither a bare lv_obj_t* (what plain
+# `obj` widgets are) nor an LvCompound (what `line` widgets are, reached through
+# ->obj). Its first member is an lv_obj_t, so the cast below is the one LVGL
+# itself relies on.
 #
 # WHAT DELIBERATELY DOES NOT MOVE, and why:
 #
@@ -50,16 +61,16 @@ substitutions:
 
   # Degrees per tick, outer ring then inner. Negative inner means the two rings
   # counter-rotate, which is what stops it reading as one spinning wheel.
-  jarvis_spin_idle: '0.8'
-  jarvis_spin_idle_in: '-0.5'
-  jarvis_spin_listen: '1.6'
-  jarvis_spin_listen_in: '-1.1'
-  jarvis_spin_think: '7.0'
-  jarvis_spin_think_in: '-5.0'
-  jarvis_spin_reply: '2.2'
-  jarvis_spin_reply_in: '-1.6'
-  jarvis_spin_alarm: '4.0'
-  jarvis_spin_alarm_in: '-4.0'
+  jarvis_spin_idle: '1.2'
+  jarvis_spin_idle_in: '-0.75'
+  jarvis_spin_listen: '2.4'
+  jarvis_spin_listen_in: '-1.65'
+  jarvis_spin_think: '10.5'
+  jarvis_spin_think_in: '-7.5'
+  jarvis_spin_reply: '3.3'
+  jarvis_spin_reply_in: '-2.4'
+  jarvis_spin_alarm: '6.0'
+  jarvis_spin_alarm_in: '-6.0'
 
   # How long each segment is, in degrees. Short segments read as fast and busy.
   jarvis_span_idle: '38'
@@ -68,7 +79,10 @@ substitutions:
   jarvis_span_reply: '40'
   jarvis_span_alarm: '30'
 
-  jarvis_tick: 100ms
+  # 150 ms, not 100: seven arcs redrawing a 200 px circle is the heaviest
+  # thing on this screen, and at 100 ms the device could not keep up. The
+  # spin figures below are scaled to match, so it turns at the same speed.
+  jarvis_tick: 150ms
 
   # Claim every phase. `page_face` is the id every character exposes, so a
   # config can point a phase at the character without knowing which is installed.
@@ -162,34 +176,28 @@ script:
 
   - id: jarvis_draw
     then:
-      - lvgl.arc.update:
-          id: jarvis_arc_out_0
-          start_angle: !lambda return (int) (id(jarvis_rot_out) + 0) % 360;
-          end_angle: !lambda return (int) (id(jarvis_rot_out) + 0 + id(jarvis_span)) % 360;
-      - lvgl.arc.update:
-          id: jarvis_arc_out_1
-          start_angle: !lambda return (int) (id(jarvis_rot_out) + 120) % 360;
-          end_angle: !lambda return (int) (id(jarvis_rot_out) + 120 + id(jarvis_span)) % 360;
-      - lvgl.arc.update:
-          id: jarvis_arc_out_2
-          start_angle: !lambda return (int) (id(jarvis_rot_out) + 240) % 360;
-          end_angle: !lambda return (int) (id(jarvis_rot_out) + 240 + id(jarvis_span)) % 360;
-      - lvgl.arc.update:
-          id: jarvis_arc_in_0
-          start_angle: !lambda return (int) (id(jarvis_rot_in) + 0) % 360;
-          end_angle: !lambda return (int) (id(jarvis_rot_in) + 0 + id(jarvis_span) * 3 / 5) % 360;
-      - lvgl.arc.update:
-          id: jarvis_arc_in_1
-          start_angle: !lambda return (int) (id(jarvis_rot_in) + 90) % 360;
-          end_angle: !lambda return (int) (id(jarvis_rot_in) + 90 + id(jarvis_span) * 3 / 5) % 360;
-      - lvgl.arc.update:
-          id: jarvis_arc_in_2
-          start_angle: !lambda return (int) (id(jarvis_rot_in) + 180) % 360;
-          end_angle: !lambda return (int) (id(jarvis_rot_in) + 180 + id(jarvis_span) * 3 / 5) % 360;
-      - lvgl.arc.update:
-          id: jarvis_arc_in_3
-          start_angle: !lambda return (int) (id(jarvis_rot_in) + 270) % 360;
-          end_angle: !lambda return (int) (id(jarvis_rot_in) + 270 + id(jarvis_span) * 3 / 5) % 360;
+      - lambda: |-
+          static lv_obj_t *out[3] = {(lv_obj_t *) id(jarvis_arc_out_0), (lv_obj_t *) id(jarvis_arc_out_1), (lv_obj_t *) id(jarvis_arc_out_2)};
+          static lv_obj_t *inn[4] = {(lv_obj_t *) id(jarvis_arc_in_0), (lv_obj_t *) id(jarvis_arc_in_1), (lv_obj_t *) id(jarvis_arc_in_2), (lv_obj_t *) id(jarvis_arc_in_3)};
+          static int seen_o[3], seen_i[4];
+          static bool primed = false;
+
+          const int span = id(jarvis_span);
+          for (int k = 0; k < 3; k++) {
+            const int a = ((int) id(jarvis_rot_out) + k * 120) % 360;
+            // Kat jest calkowity, wiec przy powolnym obrocie wiekszosc tickow
+            // nie zmienia nic - wtedy nie ruszamy widgetu w ogole.
+            if (primed && seen_o[k] == a) continue;
+            seen_o[k] = a;
+            lv_arc_set_bg_angles(out[k], a, (a + span) % 360);
+          }
+          for (int k = 0; k < 4; k++) {
+            const int a = ((int) id(jarvis_rot_in) + k * 90) % 360;
+            if (primed && seen_i[k] == a) continue;
+            seen_i[k] = a;
+            lv_arc_set_bg_angles(inn[k], a, (a + span * 3 / 5) % 360);
+          }
+          primed = true;
       - lvgl.widget.update:
           id: jarvis_core_outer
           width: !lambda return id(jarvis_core) * 2;
