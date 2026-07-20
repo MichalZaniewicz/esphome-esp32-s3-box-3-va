@@ -614,6 +614,21 @@ voice_assistant:
     # ESPHome has already started playing `x` on speaker_media_player by the time
     # this runs. So local playback needs no action here - only the external hop,
     # and cancelling the local one when the reply is not meant for this speaker.
+    #
+    # THE CANCEL GOES FIRST, BEFORE THE HANDOFF TO HOME ASSISTANT. It used to be
+    # the other way round, and the Home Assistant call is a network round trip:
+    # by the time the stop landed, the local pipeline had opened the file, filled
+    # its ring buffers and started the I2S driver, and cancelling in the middle
+    # of that left the speaker task thrashing - "ISR event queue overflow" in the
+    # log, roughly 700 ms after the announcement began. Stopping first cuts that
+    # window to almost nothing. The external speaker loses nothing by being told
+    # a few milliseconds later.
+    - if:
+        condition:
+          lambda: return id(tts_output).current_option() == "External player";
+        then:
+          - media_player.stop:
+              announcement: true
     - if:
         condition:
           lambda: return id(tts_output).current_option() != "This device";
@@ -625,14 +640,6 @@ voice_assistant:
                 media_content_id: !lambda 'return x;'
                 media_content_type: music
                 announce: "true"
-    - if:
-        condition:
-          lambda: return id(tts_output).current_option() == "External player";
-        then:
-          # Stop the download ESPHome just began. This is what keeps the box off
-          # the hook for a long reply while still advertising ANNOUNCE.
-          - media_player.stop:
-              announcement: true
   on_end:
     # Give a local announcement a moment to start, then let it finish before
     # taking the I2S bus back for the wake word.
