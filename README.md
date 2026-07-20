@@ -186,7 +186,7 @@ Whichever one you name, it exposes the same page id, `page_face`, so
 
 ### The cast
 
-They are not one face on thirteen bodies: the shape of the eyes, whether there are
+They are not one face on fourteen bodies: the shape of the eyes, whether there are
 pupils at all, the colours and the range of every expression belong to the
 character. Name any of them in lower case, exactly as the heading reads.
 
@@ -214,6 +214,10 @@ character. Name any of them in lower case, exactly as the heading reads.
   <tr>
     <td width="290"><img src="base/assets/demo/demo-crt.gif" width="272" alt="CRT"></td>
     <td><h3>CRT</h3>A terminal in green phosphor, scanlines and all. The only character that says anything: it prints what it heard, dim, and types the reply underneath it, so it doubles as subtitles when the answer is playing on a speaker in another room. Also the only one that needs translating.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-jarvis.gif" width="272" alt="Jarvis"></td>
+    <td><h3>Jarvis</h3>A heads-up display in the manner of a certain film franchise's fictional assistant: counter-rotating rings, corner brackets and a core that opens when you speak to it, tightens while it thinks and pulses while it answers. Styled after the genre rather than copied from it.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>
@@ -251,7 +255,7 @@ animation at its real tick against that character's own numbers, read out of its
 YAML - so a change to a character shows up in its clip. The only edit is a couple
 of seconds trimmed from the idle pause, which on the device is longer and stiller.
 
-The first six need no artwork at all and draw themselves. For the rest, adding
+The first seven need no artwork at all and draw themselves. For the rest, adding
 one is `cp pip.yaml yours.yaml`, a faceless 320x240 image, and measuring where its
 eyes and mouth belong. Every expression dimension is a substitution, so a bigger
 or smaller face rescales without touching the engine. Details:

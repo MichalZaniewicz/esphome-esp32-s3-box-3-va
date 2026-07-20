@@ -11,7 +11,7 @@
 
 substitutions:
   # Pick an assistant and a language by name. Characters:
-  #   aura, bit, pixel, iris, rain, crt (no artwork, they draw themselves)
+  #   aura, bit, pixel, iris, rain, crt, jarvis (no artwork, self-drawing)
   #   pip, astro, momo, franky, wizard, genie, flare
   # Languages: en, pl - or add your own, see base/lang/README.md
   assistant: pip
