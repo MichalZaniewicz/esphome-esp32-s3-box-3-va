@@ -145,11 +145,14 @@ script:
               phase == ${voice_assist_error_phase_id}) lit = ${nixie_alarm_color};
           else if (phase == ${voice_assist_muted_phase_id}) lit = ${nixie_muted_color};
 
-          auto blend = [](uint32_t a, uint32_t b, int t) {
+          // Blends PACKED COLOURS and returns one, so the calls can nest:
+          // the crest is a blend applied on top of a blend. Returning
+          // lv_color_t here instead makes the nested call a type error.
+          auto blend = [](uint32_t a, uint32_t b, int t) -> uint32_t {
             const int r = (int) ((a >> 16) & 0xFF) + (((int) ((b >> 16) & 0xFF) - (int) ((a >> 16) & 0xFF)) * t) / 255;
             const int g = (int) ((a >> 8) & 0xFF) + (((int) ((b >> 8) & 0xFF) - (int) ((a >> 8) & 0xFF)) * t) / 255;
             const int bl = (int) (a & 0xFF) + (((int) (b & 0xFF) - (int) (a & 0xFF)) * t) / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) bl);
+            return ((uint32_t) r << 16) | ((uint32_t) g << 8) | (uint32_t) bl;
           };
 
           for (int i = 0; i < 4; i++) {
@@ -163,13 +166,13 @@ script:
               if (primed && seen[idx] == want) continue;
               seen[idx] = want;
               lv_obj_set_style_bg_color(seg[idx],
-                  on ? blend(blend(off, lit, base), hot, over) : lv_color_hex(off), 0);
+                  lv_color_hex(on ? blend(blend(off, lit, base), hot, over) : off), 0);
             }
             const uint8_t pw = (uint8_t) (base / 2 + 1);
             if (!primed || seen[28 + i] != pw) {
               seen[28 + i] = pw;
               lv_obj_set_style_bg_color(pool[i],
-                  blend(${nixie_glass_color}, ${nixie_pool_color}, base), 0);
+                  lv_color_hex(blend(${nixie_glass_color}, ${nixie_pool_color}, base)), 0);
             }
           }
           const uint8_t cw = colon_on ? 1 : 0;
