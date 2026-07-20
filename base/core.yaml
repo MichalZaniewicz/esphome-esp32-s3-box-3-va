@@ -96,10 +96,6 @@ substitutions:
   # and the assistant hearing anything.
   wake_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/wake.wav
 
-  # Always plays on the box, independently of `TTS output` - see the
-  # `timer_ringing` switch for why. A local path works fine, since the file is
-  # compiled in and never handed to Home Assistant.
-
   # Input gain for the wake word only (1-64). See the micro_wake_word block for
   # why this exists and why it is not 1.
   mww_gain_factor: '4'
@@ -885,6 +881,13 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
+  # The percentage actually written to the bar, so the tick can skip writing the
+  # same one again. -1 means "nothing written yet", which is also what the
+  # visibility transition resets it to when the other bar takes over.
+  - id: timer_percent_drawn
+    type: int
+    restore_value: false
+    initial_value: "-1"
   # false = idle_page, true = idle_page_alt. Survives reboots so the device comes
   # back showing whichever screen was last chosen.
   - id: idle_alt
@@ -1271,17 +1274,30 @@ script:
                     snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned) minutes, (unsigned) seconds);
                   }
                   return std::string(buf);
+            # ONLY WHEN THE PERCENTAGE ACTUALLY MOVED. The label really does
+            # change every second, but the bar is a whole number out of a
+            # hundred: a thirty minute timer advances it once every eighteen
+            # seconds, so seventeen writes in eighteen invalidated a 320 px bar
+            # to redraw exactly the same pixels. Same reasoning as the
+            # visibility block just below.
             - if:
                 condition:
-                  lambda: return id(has_active_timer);
+                  lambda: |-
+                    if (id(timer_percent) == id(timer_percent_drawn)) return false;
+                    id(timer_percent_drawn) = id(timer_percent);
+                    return true;
                 then:
-                  - lvgl.bar.update:
-                      id: timer_bar_active
-                      value: !lambda return id(timer_percent);
-                else:
-                  - lvgl.bar.update:
-                      id: timer_bar_paused
-                      value: !lambda return id(timer_percent);
+                  - if:
+                      condition:
+                        lambda: return id(has_active_timer);
+                      then:
+                        - lvgl.bar.update:
+                            id: timer_bar_active
+                            value: !lambda return id(timer_percent);
+                      else:
+                        - lvgl.bar.update:
+                            id: timer_bar_paused
+                            value: !lambda return id(timer_percent);
       # Visibility changes ONLY on a transition. draw_display runs this on every
       # phase change, and with no timer - the normal state - it used to issue
       # three hides on three already-hidden widgets every single time.
@@ -1291,6 +1307,10 @@ script:
               const int want = !id(has_timer) ? 0 : (id(has_active_timer) ? 1 : 2);
               if (want == id(timer_ui_state)) return false;
               id(timer_ui_state) = want;
+              // The OTHER bar is about to become the visible one and it still
+              // holds whatever it was left at. Forcing the next tick to write
+              // is what stops it appearing at zero.
+              id(timer_percent_drawn) = -1;
               return true;
           then:
             - if:
@@ -1442,10 +1462,18 @@ script:
 # rebooted. That is exactly what happened on 2026-07-20, when a wait without a
 # timeout in on_end never returned.
 #
-# The timeouts above fix that particular path. This fixes the class: if the
-# assistant is idle and the wake word simply is not running, after 40 seconds
+# The timeouts above fix that particular path. This covers the rest of them: if
+# the assistant is idle and the wake word simply is not running, after 40 seconds
 # start it, whatever the reason. It deliberately does NOT consult tts_reply_active
 # or any of our own flags - those are precisely what get stuck.
+#
+# SCOPE, because the last condition is easy to read past: this watches the "On
+# device" engine ONLY. With the engine set to "In Home Assistant" the listener is
+# voice_assistant.start_continuous, micro_wake_word never runs, and nothing here
+# ever counts - so that mode has no backstop. Covering it needs a different test,
+# since "is the assistant running" means something else entirely while streaming
+# continuously, and getting it wrong would restart the stream every 40 seconds
+# forever. Left deliberately uncovered rather than covered by guesswork.
 interval:
   - interval: 10s
     then:
@@ -1608,7 +1636,11 @@ switch:
       - script.execute: draw_display
     on_turn_off:
       - microphone.unmute:
-      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
+      # The script, not an inline copy of what it does. The result is the same
+      # here - mute has just gone off, so the script picks the idle phase - but
+      # every other caller in this file goes through it, and the last inline
+      # copy in this file drifted from its original and cost us a bug.
+      - script.execute: set_idle_or_mute_phase
       - script.execute: draw_display
 
   # Exposed (not `internal:`) so an HA automation can silence a timer that is
