@@ -1,0 +1,352 @@
+###############################################################################
+# Scope - an oscilloscope trace on a measurement grid.
+#
+# No artwork. The grid is static objects; the only thing that moves is one line
+# widget whose points are recomputed every tick.
+#
+# THIS IS THE ONLY CHARACTER THAT DRAWS A CONTINUOUS CURVE. Everything else in
+# the set is built from rectangles, so shapes here are limited to bars and
+# blocks. That is also why it needs a mechanism nothing else uses:
+#
+#   `lvgl.line.update` takes its points as CONFIG values, validated at build
+#   time, so it cannot compute a waveform per tick. But a line widget is a plain
+#   lv_obj_t*, so the lambda calls lv_line_set_points() itself. LVGL does not
+#   copy the array, so it must be `static` and outlive the call - a local one
+#   would leave the widget pointing at freed stack.
+#
+# Each phase differs in SHAPE, not brightness, which is what keeps the phases
+# apart: a flat line, a swelling wave, a rotating loop, a ragged voice print.
+###############################################################################
+
+substitutions:
+  scope_trace_color: '0x5CFF8A'
+  scope_grid_color: '0x10331C'
+  scope_frame_color: '0x1E5A30'
+  scope_alarm_color: '0xFF6A4A'
+  scope_bg_color: '0x030C06'
+  scope_label_color: '0x2E8A4A'
+
+  scope_label: "CH1  20ms/div"
+  scope_trace_width: '2'
+
+  scope_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: scope_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+
+font:
+  - id: font_scope
+    file:
+      type: gfonts
+      family: Roboto Mono
+      weight: 400
+    size: 12
+    glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz /:.-"
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/scope.yaml (oscilloscope, no artwork)"
+
+script:
+  - id: scope_tick_script
+    mode: single
+    then:
+      - lambda: |-
+          // LVGL keeps the pointer, not the data, so this array has to outlive
+          // the call. Static, not local.
+          static lv_point_precise_t pts[33];
+
+          const int f = id(scope_frame)++;
+          const int phase = id(voice_assistant_phase);
+          const float X0 = 18, X1 = 302;
+          const float MID = (34 + 206) / 2.0f;
+          const float AMP = (206 - 34) / 2.0f - 8.0f;
+          const int N = 33;
+
+          auto rnd = [](int a, int b) {
+            uint32_t n = (uint32_t) (a * 73 + b * 151);
+            n = (n ^ (n >> 5)) * 2654435761u;
+            return (int) ((n >> 16) & 0xFF);
+          };
+
+          if (phase == ${voice_assist_thinking_phase_id}) {
+            // A Lissajous loop, turning. A closed figure reads as "working on
+            // it" in a way no left-to-right trace does.
+            for (int k = 0; k < N; k++) {
+              const float t = (float) k / (N - 1) * 6.2831853f;
+              pts[k].x = (lv_value_precise_t) (160.0f + (X1 - X0) / 2.6f * sinf(3.0f * t + f * 0.09f));
+              pts[k].y = (lv_value_precise_t) (MID + AMP * 0.8f * sinf(2.0f * t));
+            }
+          } else {
+            for (int k = 0; k < N; k++) {
+              const float u = (float) k / (N - 1) * 6.2831853f;
+              const float x = X0 + (X1 - X0) * k / (N - 1);
+              float y;
+              if (phase == ${voice_assist_listening_phase_id}) {
+                // Deliberately not a textbook sine: the amplitude swells and
+                // falls, a second harmonic spoils the perfect shape, and an
+                // envelope fades the edges, so it reads as a signal coming in
+                // rather than as a test pattern standing still.
+                const float swell = 0.38f + 0.62f * (0.5f + 0.5f * sinf(f * 0.24f));
+                const float env = powf(sinf(3.14159f * k / (N - 1)), 0.6f);
+                const float wave = (sinf(u * 3.0f - f * 0.55f)
+                                  + 0.38f * sinf(u * 7.0f - f * 0.95f)) / 1.38f;
+                y = MID - AMP * 0.92f * swell * env * wave;
+              } else if (phase == ${voice_assist_replying_phase_id}) {
+                y = MID - AMP * ((rnd(f, k) / 255.0f) - 0.5f) * 1.7f;
+              } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                         phase == ${voice_assist_error_phase_id}) {
+                y = MID - AMP * (((k / 4 + f) % 2) ? 0.9f : -0.9f);
+              } else if (phase == ${voice_assist_muted_phase_id}) {
+                y = MID;
+              } else {
+                y = MID - AMP * 0.06f * sinf(u * 3.0f - f * 0.12f);
+              }
+              pts[k].x = (lv_value_precise_t) x;
+              pts[k].y = (lv_value_precise_t) y;
+            }
+          }
+          lv_line_set_points(id(scope_trace), pts, N);
+
+  - id: scope_tint
+    then:
+      - lvgl.widget.update:
+          id: scope_trace
+          line_color: !lambda |-
+            const int p = id(voice_assistant_phase);
+            if (p == ${voice_assist_timer_finished_phase_id} ||
+                p == ${voice_assist_error_phase_id}) return lv_color_hex(${scope_alarm_color});
+            return lv_color_hex(${scope_trace_color});
+
+interval:
+  - interval: ${scope_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: scope_tick_script
+            - script.execute: scope_tint
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: ${scope_bg_color}
+      widgets:
+        - obj:
+            id: scope_v0
+            align: TOP_LEFT
+            x: 18
+            y: 34
+            width: 1
+            height: 172
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_v1
+            align: TOP_LEFT
+            x: 65
+            y: 34
+            width: 1
+            height: 172
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_v2
+            align: TOP_LEFT
+            x: 112
+            y: 34
+            width: 1
+            height: 172
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_v3
+            align: TOP_LEFT
+            x: 160
+            y: 34
+            width: 1
+            height: 172
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_v4
+            align: TOP_LEFT
+            x: 207
+            y: 34
+            width: 1
+            height: 172
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_v5
+            align: TOP_LEFT
+            x: 254
+            y: 34
+            width: 1
+            height: 172
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_v6
+            align: TOP_LEFT
+            x: 302
+            y: 34
+            width: 1
+            height: 172
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_h0
+            align: TOP_LEFT
+            x: 18
+            y: 34
+            width: 284
+            height: 1
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_h1
+            align: TOP_LEFT
+            x: 18
+            y: 77
+            width: 284
+            height: 1
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_h2
+            align: TOP_LEFT
+            x: 18
+            y: 120
+            width: 284
+            height: 1
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_h3
+            align: TOP_LEFT
+            x: 18
+            y: 163
+            width: 284
+            height: 1
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_h4
+            align: TOP_LEFT
+            x: 18
+            y: 206
+            width: 284
+            height: 1
+            radius: 0
+            bg_color: ${scope_grid_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: scope_frame_box
+            align: TOP_LEFT
+            x: 18
+            y: 34
+            width: 284
+            height: 172
+            radius: 0
+            bg_opa: TRANSP
+            border_width: 2
+            border_color: ${scope_frame_color}
+            pad_all: 0
+        - label:
+            id: scope_label
+            align: TOP_LEFT
+            x: 20
+            y: 12
+            text: "${scope_label}"
+            text_font: font_scope
+            text_color: ${scope_label_color}
+            pad_all: 0
+        # The trace goes last so it draws over the grid. Its points are set from
+        # the lambda above; the two here are only a placeholder for the schema.
+        - line:
+            id: scope_trace
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 18, 120
+              - 302, 120
+            line_width: ${scope_trace_width}
+            line_color: ${scope_trace_color}
+
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: scope_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen

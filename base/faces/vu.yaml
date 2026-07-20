@@ -1,0 +1,516 @@
+###############################################################################
+# VU - two analogue meters with swinging needles.
+#
+# No artwork: two housings, two faces, the scale marks, a red zone and two
+# needles. Like the other drawn characters it does NOT nest
+# base/screens/face.yaml.
+#
+# A needle has to pivot, and LVGL cannot rotate a rectangle. So a needle is a
+# LINE of two points, and the lambda writes those points itself with
+# lv_line_set_points() - `lvgl.line.update` only takes points fixed at build
+# time. The array is static because LVGL keeps the pointer rather than copying.
+#
+# Everything else is nailed down: the faces, the scale marks and the red zone are
+# built once and never touched, so a tick costs exactly two needle writes.
+###############################################################################
+
+substitutions:
+  vu_face_color: '0xE8DCC0'       # warm paper, not white
+  vu_ink_color: '0x2A2218'
+  vu_red_color: '0xC43628'
+  vu_needle_color: '0x1A1410'
+  vu_case_color: '0x221C14'
+  vu_bg_color: '0x14100A'
+
+  vu_swing: '50'                  # degrees either side of centre
+
+  vu_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: vu_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+
+font:
+  - id: font_vu
+    file:
+      type: gfonts
+      family: Roboto Mono
+      weight: 500
+    size: 12
+    glyphs: "VU"
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/vu.yaml (analogue meters, no artwork)"
+
+script:
+  - id: vu_tick_script
+    mode: single
+    then:
+      - lambda: |-
+          // One static pair of points per needle: LVGL keeps the pointer.
+          static lv_point_precise_t left[2], right[2];
+          lv_point_precise_t *pts[2] = {left, right};
+          static const int PIVOT_X[2] = {82, 238};
+          const int PIVOT_Y = 150, LEN = 60;
+
+          const int f = id(vu_frame)++;
+          const int phase = id(voice_assistant_phase);
+
+          auto rnd = [](int a, int b) {
+            uint32_t n = (uint32_t) (a * 73 + b * 151);
+            n = (n ^ (n >> 5)) * 2654435761u;
+            return (int) ((n >> 16) & 0xFF);
+          };
+
+          for (int s = 0; s < 2; s++) {
+            float deg;
+            if (phase == ${voice_assist_listening_phase_id}) {
+              deg = -${vu_swing} + 78.0f * (0.5f + 0.5f * sinf(f * 0.28f - s * 0.3f));
+            } else if (phase == ${voice_assist_thinking_phase_id}) {
+              deg = -44.0f + 12.0f * sinf(f * 0.8f + s);
+            } else if (phase == ${voice_assist_replying_phase_id}) {
+              deg = -${vu_swing} + 100.0f * (rnd(f, s * 5) / 255.0f);
+            } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                       phase == ${voice_assist_error_phase_id}) {
+              deg = ((f + s) % 2) ? 45.0f : -45.0f;
+            } else if (phase == ${voice_assist_muted_phase_id}) {
+              deg = -${vu_swing};
+            } else {
+              // Idle: resting near zero, with just enough tremble to look live.
+              deg = -48.0f + 3.0f * sinf(f * 0.18f + s * 2.0f);
+            }
+            const float a = deg * 3.14159265f / 180.0f;
+            pts[s][0].x = (lv_value_precise_t) PIVOT_X[s];
+            pts[s][0].y = (lv_value_precise_t) PIVOT_Y;
+            pts[s][1].x = (lv_value_precise_t) (PIVOT_X[s] + LEN * sinf(a));
+            pts[s][1].y = (lv_value_precise_t) (PIVOT_Y - LEN * cosf(a));
+          }
+          lv_line_set_points(id(vu_needle_l), left, 2);
+          lv_line_set_points(id(vu_needle_r), right, 2);
+
+interval:
+  - interval: ${vu_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: vu_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: ${vu_bg_color}
+      widgets:
+        - obj:
+            id: vu_case_l
+            align: TOP_LEFT
+            x: 10
+            y: 42
+            width: 144
+            height: 154
+            radius: 8
+            bg_color: ${vu_case_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: vu_face_l
+            align: TOP_LEFT
+            x: 18
+            y: 50
+            width: 128
+            height: 122
+            radius: 6
+            bg_color: ${vu_face_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - line:
+            id: vu_tl0
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 31, 108
+              - 39, 114
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tl1
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 40, 99
+              - 43, 103
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tl2
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 49, 93
+              - 52, 97
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tl3
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 59, 88
+              - 61, 93
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tl4
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 71, 85
+              - 71, 90
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tl5
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 82, 84
+              - 82, 94
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tl6
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 93, 85
+              - 93, 90
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tl7
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 105, 88
+              - 103, 93
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tl8
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 115, 93
+              - 112, 97
+            line_width: 2
+            line_color: ${vu_red_color}
+        - line:
+            id: vu_tl9
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 124, 99
+              - 121, 103
+            line_width: 2
+            line_color: ${vu_red_color}
+        - line:
+            id: vu_tl10
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 133, 108
+              - 125, 114
+            line_width: 2
+            line_color: ${vu_red_color}
+        - label:
+            id: vu_cap_l
+            align: TOP_LEFT
+            x: 71
+            y: 118
+            text: "VU"
+            text_font: font_vu
+            text_color: ${vu_ink_color}
+            pad_all: 0
+        - arc:
+            id: vu_red_l
+            align: TOP_LEFT
+            x: 18
+            y: 86
+            width: 128
+            height: 128
+            start_angle: 300
+            end_angle: 322
+            min_value: 0
+            max_value: 100
+            value: 100
+            adjustable: false
+            arc_opa: TRANSP
+            arc_width: 4
+            indicator:
+              arc_color: ${vu_red_color}
+              arc_width: 4
+            knob:
+              bg_opa: TRANSP
+            pad_all: 0
+        - obj:
+            id: vu_case_r
+            align: TOP_LEFT
+            x: 166
+            y: 42
+            width: 144
+            height: 154
+            radius: 8
+            bg_color: ${vu_case_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: vu_face_r
+            align: TOP_LEFT
+            x: 174
+            y: 50
+            width: 128
+            height: 122
+            radius: 6
+            bg_color: ${vu_face_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - line:
+            id: vu_tr0
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 187, 108
+              - 195, 114
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tr1
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 196, 99
+              - 199, 103
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tr2
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 205, 93
+              - 208, 97
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tr3
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 215, 88
+              - 217, 93
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tr4
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 227, 85
+              - 227, 90
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tr5
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 238, 84
+              - 238, 94
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tr6
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 249, 85
+              - 249, 90
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tr7
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 261, 88
+              - 259, 93
+            line_width: 2
+            line_color: ${vu_ink_color}
+        - line:
+            id: vu_tr8
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 271, 93
+              - 268, 97
+            line_width: 2
+            line_color: ${vu_red_color}
+        - line:
+            id: vu_tr9
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 280, 99
+              - 277, 103
+            line_width: 2
+            line_color: ${vu_red_color}
+        - line:
+            id: vu_tr10
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 289, 108
+              - 281, 114
+            line_width: 2
+            line_color: ${vu_red_color}
+        - label:
+            id: vu_cap_r
+            align: TOP_LEFT
+            x: 227
+            y: 118
+            text: "VU"
+            text_font: font_vu
+            text_color: ${vu_ink_color}
+            pad_all: 0
+        - arc:
+            id: vu_red_r
+            align: TOP_LEFT
+            x: 174
+            y: 86
+            width: 128
+            height: 128
+            start_angle: 300
+            end_angle: 322
+            min_value: 0
+            max_value: 100
+            value: 100
+            adjustable: false
+            arc_opa: TRANSP
+            arc_width: 4
+            indicator:
+              arc_color: ${vu_red_color}
+              arc_width: 4
+            knob:
+              bg_opa: TRANSP
+            pad_all: 0
+        - line:
+            id: vu_needle_l
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 82, 150
+              - 82, 90
+            line_width: 3
+            line_color: ${vu_needle_color}
+        - obj:
+            id: vu_pivot_l
+            align: TOP_LEFT
+            x: 76
+            y: 144
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${vu_needle_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - line:
+            id: vu_needle_r
+            align: TOP_LEFT
+            x: 0
+            y: 0
+            points:
+              - 238, 150
+              - 238, 90
+            line_width: 3
+            line_color: ${vu_needle_color}
+        - obj:
+            id: vu_pivot_r
+            align: TOP_LEFT
+            x: 232
+            y: 144
+            width: 12
+            height: 12
+            radius: 6
+            bg_color: ${vu_needle_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: vu_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen

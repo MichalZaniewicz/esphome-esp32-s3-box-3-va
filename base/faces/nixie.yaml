@@ -1,0 +1,677 @@
+###############################################################################
+# Nixie - four glass tubes with glowing digits.
+#
+# No artwork: four tube bodies, four glow pools and twenty eight segments, all
+# LVGL objects. Like the other drawn characters it does NOT nest
+# base/screens/face.yaml.
+#
+# THE ONLY CHARACTER THAT IS USEFUL WHILE IDLE. Every other assistant here looks
+# good doing nothing; this one shows the clock, read from the core's `ha_time`.
+# That is worth knowing when choosing: on a kitchen shelf it earns its screen.
+#
+# While replying the glow TRAVELS across the tubes rather than pulsing in all
+# four at once. That was a deliberate second attempt: an even pulse gave the eye
+# nothing to follow and read as flicker, and when the wave was allowed to run
+# past the end tubes they all went dark together, which read as a fault. The
+# wave now circles, and the tubes never go out - it adds glow on top of a floor.
+#
+# Colours are written straight through the LVGL C API from one lambda, and only
+# for the objects whose value actually changed. Thirty four YAML actions per
+# tick would repaint the whole panel whether or not anything moved.
+###############################################################################
+
+substitutions:
+  nixie_on_color: '0xFF8A1E'      # the glow at rest
+  nixie_hot_color: '0xFFC87A'     # the crest of the travelling wave
+  nixie_off_color: '0x2E1C10'     # an unlit segment still shows: it is a filament
+  nixie_glass_color: '0x1C1612'
+  nixie_pool_color: '0x3A1E0C'    # the haze inside the glass behind a lit digit
+  nixie_alarm_color: '0xFF5A3C'
+  nixie_muted_color: '0x3A2A20'
+  nixie_bg_color: '0x0A0705'
+
+  nixie_wave_speed: '55'          # hundredths of a tube per tick, while replying
+  nixie_wave_floor: '85'          # glow every tube keeps, hundredths
+  nixie_wave_peak: '85'           # what the crest adds on top, hundredths
+
+  nixie_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: nixie_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # Digit shown per tube, and how hard each tube is driven (0..255 where 255 is
+  # the resting glow; above that the crest brightens towards nixie_hot_color).
+  - id: nixie_digit
+    type: int[4]
+    restore_value: false
+  - id: nixie_glow
+    type: int[4]
+    restore_value: false
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/nixie.yaml (nixie tubes, no artwork)"
+
+script:
+  - id: nixie_tick_script
+    mode: single
+    then:
+      - lambda: |-
+          static lv_obj_t *seg[28] = {
+            id(nx_seg_0_a), id(nx_seg_0_b), id(nx_seg_0_c), id(nx_seg_0_d), id(nx_seg_0_e), id(nx_seg_0_f), id(nx_seg_0_g),
+            id(nx_seg_1_a), id(nx_seg_1_b), id(nx_seg_1_c), id(nx_seg_1_d), id(nx_seg_1_e), id(nx_seg_1_f), id(nx_seg_1_g),
+            id(nx_seg_2_a), id(nx_seg_2_b), id(nx_seg_2_c), id(nx_seg_2_d), id(nx_seg_2_e), id(nx_seg_2_f), id(nx_seg_2_g),
+            id(nx_seg_3_a), id(nx_seg_3_b), id(nx_seg_3_c), id(nx_seg_3_d), id(nx_seg_3_e), id(nx_seg_3_f), id(nx_seg_3_g),
+          };
+          static lv_obj_t *pool[4] = {id(nx_pool_0), id(nx_pool_1), id(nx_pool_2), id(nx_pool_3)};
+          static lv_obj_t *colon[2] = {id(nx_colon_top), id(nx_colon_bot)};
+          // Which digit lights which segments, in order a b c d e f g.
+          static const uint8_t MAP[10] = {
+            0b1111110, 0b0110000, 0b1101101, 0b1111001, 0b0110011,
+            0b1011011, 0b1011111, 0b1110000, 0b1111111, 0b1111011
+          };
+          static uint8_t seen[34];
+          static bool primed = false;
+
+          const int f = id(nixie_frame)++;
+          const int phase = id(voice_assistant_phase);
+
+          // --- what the tubes should read -----------------------------------
+          int d[4];
+          auto now = id(ha_time).now();
+          const int hh = now.is_valid() ? now.hour : 0;
+          const int mm = now.is_valid() ? now.minute : 0;
+          d[0] = hh / 10; d[1] = hh % 10; d[2] = mm / 10; d[3] = mm % 10;
+
+          int glow[4] = {255, 255, 255, 255};
+          bool colon_on = true;
+
+          auto rnd = [](int a, int b) {
+            uint32_t n = (uint32_t) (a * 73 + b * 151);
+            n = (n ^ (n >> 5)) * 2654435761u;
+            return (int) ((n >> 16) & 0xFF);
+          };
+
+          if (phase == ${voice_assist_listening_phase_id}) {
+            for (int i = 0; i < 4; i++) { d[i] = rnd(f, i) % 10; glow[i] = 255; }
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            for (int i = 0; i < 4; i++) { d[i] = rnd(f / 2, i * 7) % 10; glow[i] = 190; }
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            // The crest circles the four tubes; distance is measured the short
+            // way round so it never leaves the panel dark.
+            const float head = fmodf(f * ${nixie_wave_speed} / 100.0f, 4.0f);
+            for (int i = 0; i < 4; i++) {
+              float dist = fabsf(i - head);
+              if (dist > 2.0f) dist = 4.0f - dist;
+              const float crest = dist < 1.25f ? (1.0f - dist * 0.8f) : 0.0f;
+              glow[i] = (int) (${nixie_wave_floor} * 2.55f + ${nixie_wave_peak} * 2.55f * crest);
+              if (dist < 0.6f) d[i] = rnd(f, i * 3) % 10;
+            }
+          } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                     phase == ${voice_assist_error_phase_id}) {
+            for (int i = 0; i < 4; i++) { d[i] = 0; glow[i] = (f % 2) ? 255 : 60; }
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            for (int i = 0; i < 4; i++) glow[i] = 70;
+          } else {
+            const int breath = 235 + (int) (20.0f * sinf(f * 0.09f));
+            for (int i = 0; i < 4; i++) glow[i] = breath;
+            colon_on = (f % 10) < 5;      // only the idle clock ticks
+          }
+
+          for (int i = 0; i < 4; i++) { id(nixie_digit)[i] = d[i]; id(nixie_glow)[i] = glow[i]; }
+
+          // --- paint ---------------------------------------------------------
+          uint32_t lit = ${nixie_on_color};
+          const uint32_t hot = ${nixie_hot_color};
+          const uint32_t off = ${nixie_off_color};
+          if (phase == ${voice_assist_timer_finished_phase_id} ||
+              phase == ${voice_assist_error_phase_id}) lit = ${nixie_alarm_color};
+          else if (phase == ${voice_assist_muted_phase_id}) lit = ${nixie_muted_color};
+
+          auto blend = [](uint32_t a, uint32_t b, int t) {
+            const int r = (int) ((a >> 16) & 0xFF) + (((int) ((b >> 16) & 0xFF) - (int) ((a >> 16) & 0xFF)) * t) / 255;
+            const int g = (int) ((a >> 8) & 0xFF) + (((int) ((b >> 8) & 0xFF) - (int) ((a >> 8) & 0xFF)) * t) / 255;
+            const int bl = (int) (a & 0xFF) + (((int) (b & 0xFF) - (int) (a & 0xFF)) * t) / 255;
+            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) bl);
+          };
+
+          for (int i = 0; i < 4; i++) {
+            const int g = glow[i];
+            const int base = g > 255 ? 255 : g;
+            const int over = g > 255 ? (g - 255 > 255 ? 255 : g - 255) : 0;
+            for (int s = 0; s < 7; s++) {
+              const bool on = (MAP[d[i]] >> (6 - s)) & 1;
+              const uint8_t want = on ? (uint8_t) (base / 2 + over / 2 + 1) : 0;
+              const int idx = i * 7 + s;
+              if (primed && seen[idx] == want) continue;
+              seen[idx] = want;
+              lv_obj_set_style_bg_color(seg[idx],
+                  on ? blend(blend(off, lit, base), hot, over) : lv_color_hex(off), 0);
+            }
+            const uint8_t pw = (uint8_t) (base / 2 + 1);
+            if (!primed || seen[28 + i] != pw) {
+              seen[28 + i] = pw;
+              lv_obj_set_style_bg_color(pool[i],
+                  blend(${nixie_glass_color}, ${nixie_pool_color}, base), 0);
+            }
+          }
+          const uint8_t cw = colon_on ? 1 : 0;
+          if (!primed || seen[32] != cw) {
+            seen[32] = cw;
+            for (int k = 0; k < 2; k++)
+              lv_obj_set_style_bg_color(colon[k],
+                  colon_on ? lv_color_hex(lit) : lv_color_hex(off), 0);
+          }
+          primed = true;
+
+interval:
+  - interval: ${nixie_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: nixie_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: ${nixie_bg_color}
+      widgets:
+        - obj:
+            # the tube body
+            id: nx_glass_0
+            align: CENTER
+            x: -104
+            y: 0
+            width: 52
+            height: 92
+            radius: 24
+            bg_color: ${nixie_glass_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            # haze behind the digit; brightens with the glow
+            id: nx_pool_0
+            align: CENTER
+            x: -104
+            y: 0
+            width: 40
+            height: 80
+            radius: 20
+            bg_color: ${nixie_glass_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_glass_1
+            align: CENTER
+            x: -44
+            y: 0
+            width: 52
+            height: 92
+            radius: 24
+            bg_color: ${nixie_glass_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_pool_1
+            align: CENTER
+            x: -44
+            y: 0
+            width: 40
+            height: 80
+            radius: 20
+            bg_color: ${nixie_glass_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_glass_2
+            align: CENTER
+            x: 44
+            y: 0
+            width: 52
+            height: 92
+            radius: 24
+            bg_color: ${nixie_glass_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_pool_2
+            align: CENTER
+            x: 44
+            y: 0
+            width: 40
+            height: 80
+            radius: 20
+            bg_color: ${nixie_glass_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_glass_3
+            align: CENTER
+            x: 104
+            y: 0
+            width: 52
+            height: 92
+            radius: 24
+            bg_color: ${nixie_glass_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_pool_3
+            align: CENTER
+            x: 104
+            y: 0
+            width: 40
+            height: 80
+            radius: 20
+            bg_color: ${nixie_glass_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_0_a
+            align: CENTER
+            x: -104
+            y: -20
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_0_b
+            align: CENTER
+            x: -94
+            y: -11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_0_c
+            align: CENTER
+            x: -94
+            y: 11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_0_d
+            align: CENTER
+            x: -104
+            y: 19
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_0_e
+            align: CENTER
+            x: -115
+            y: 11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_0_f
+            align: CENTER
+            x: -115
+            y: -11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_0_g
+            align: CENTER
+            x: -104
+            y: -1
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_1_a
+            align: CENTER
+            x: -44
+            y: -20
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_1_b
+            align: CENTER
+            x: -34
+            y: -11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_1_c
+            align: CENTER
+            x: -34
+            y: 11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_1_d
+            align: CENTER
+            x: -44
+            y: 19
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_1_e
+            align: CENTER
+            x: -55
+            y: 11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_1_f
+            align: CENTER
+            x: -55
+            y: -11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_1_g
+            align: CENTER
+            x: -44
+            y: -1
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_2_a
+            align: CENTER
+            x: 44
+            y: -20
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_2_b
+            align: CENTER
+            x: 54
+            y: -11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_2_c
+            align: CENTER
+            x: 54
+            y: 11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_2_d
+            align: CENTER
+            x: 44
+            y: 19
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_2_e
+            align: CENTER
+            x: 33
+            y: 11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_2_f
+            align: CENTER
+            x: 33
+            y: -11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_2_g
+            align: CENTER
+            x: 44
+            y: -1
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_3_a
+            align: CENTER
+            x: 104
+            y: -20
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_3_b
+            align: CENTER
+            x: 114
+            y: -11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_3_c
+            align: CENTER
+            x: 114
+            y: 11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_3_d
+            align: CENTER
+            x: 104
+            y: 19
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_3_e
+            align: CENTER
+            x: 93
+            y: 11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_3_f
+            align: CENTER
+            x: 93
+            y: -11
+            width: 5
+            height: 22
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_seg_3_g
+            align: CENTER
+            x: 104
+            y: -1
+            width: 26
+            height: 5
+            radius: 2
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_colon_top
+            align: CENTER
+            x: 0
+            y: -16
+            width: 10
+            height: 10
+            radius: 5
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - obj:
+            id: nx_colon_bot
+            align: CENTER
+            x: 0
+            y: 16
+            width: 10
+            height: 10
+            radius: 5
+            bg_color: ${nixie_off_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: nixie_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen

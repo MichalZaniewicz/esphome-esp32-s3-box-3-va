@@ -60,8 +60,8 @@ Whichever one you name, it exposes the same page id, `page_face`, so
 
 ### The cast
 
-Sixteen of them, and they are not one face on sixteen bodies: the eyes, the
-colours, the range of every expression and in seven cases the entire way of
+Nineteen of them, and they are not one face on nineteen bodies: the eyes, the
+colours, the range of every expression and in ten cases the entire way of
 being on screen belong to the character. Name any of them in lower case.
 
 <table>
@@ -100,6 +100,18 @@ being on screen belong to the character. Name any of them in lower case.
   <tr>
     <td width="290"><img src="base/assets/demo/demo-rhea.gif" width="272" alt="Rhea"></td>
     <td><h3>Rhea</h3>Warm, unhurried and dressed for something considerably more heroic than setting a kitchen timer. Gives the impression she is helping out between assignments and is far too polite to mention it.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-nixie.gif" width="272" alt="Nixie"></td>
+    <td><h3>Nixie</h3>Four glass tubes with a warm orange filament in each, keeping the time when there is nothing else to do. The only assistant here that earns its place on a shelf while idle. When it answers, the glow travels from tube to tube like something passing through.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-scope.gif" width="272" alt="Scope"></td>
+    <td><h3>Scope</h3>An instrument that has been left switched on and is quietly watching the room. Rests as a flat line, swells into a live waveform when you speak, ties itself into a slow rotating loop while it works, and prints your answer back as a ragged voice trace.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-vu.gif" width="272" alt="VU"></td>
+    <td><h3>VU</h3>A pair of needles behind glass, the warmest hardware in the set. They rest just off zero with a faint tremble, swing up together when you talk, and jump into the red when the reply gets loud. Nothing else here looks like it belongs to a hi-fi.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>
