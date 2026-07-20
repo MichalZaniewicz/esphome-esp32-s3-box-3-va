@@ -110,6 +110,49 @@ def check_action_shape(node, path="root", problems=None):
     return problems
 
 
+def check_wait_timeouts(node, path="root", problems=None):
+    """Every `wait_until` must carry a `timeout`.
+
+    This is the single most expensive mistake this project has made. A
+    `wait_until` whose condition never becomes true does not fail and does not
+    warn - it simply stops that automation forever, along with everything after
+    it. On 2026-07-20 one of them hung on a speaker that never reported having
+    stopped, so the line clearing `tts_reply_active` was never reached, and the
+    device stayed deaf until it was rebooted. Nothing in the log said why.
+
+    A timeout does not fix the underlying stall, but it turns "silently dead
+    until power cycled" into "late", which is recoverable and visible.
+
+    Only the canonical form is checked. `wait_until: {lambda: ...}` is the
+    shorthand where the mapping IS the condition, and a timeout cannot be
+    expressed there - those are reported separately so they get a second look
+    rather than being silently accepted.
+    """
+    if problems is None:
+        problems = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key == "wait_until" and isinstance(value, dict):
+                if "condition" in value:
+                    if "timeout" not in value:
+                        problems.append(
+                            f"{path}.wait_until: brak `timeout`. Warunek, ktory "
+                            f"nigdy nie bedzie prawdziwy, zatrzymuje ta "
+                            f"automatyzacje NA ZAWSZE i nic tego nie zglosi."
+                        )
+                else:
+                    problems.append(
+                        f"{path}.wait_until: skrocona forma bez `condition`, "
+                        f"wiec nie da sie tu dac `timeout`. Rozpisz na "
+                        f"`condition:` + `timeout:`."
+                    )
+            check_wait_timeouts(value, f"{path}.{key}", problems)
+    elif isinstance(node, list):
+        for i, item in enumerate(node):
+            check_wait_timeouts(item, f"{path}[{i}]", problems)
+    return problems
+
+
 def collect_ids(node, out, path="root", in_action=False):
     """Collect id: DECLARATIONS only.
 
@@ -168,6 +211,7 @@ def _check_merged(args) -> int:
             print(f"  FAIL  {path}: YAML nie parsuje sie:\n{exc}")
             return 1
         shape = check_action_shape(doc, str(path))
+        shape += check_wait_timeouts(doc, str(path))
         if shape:
             for msg in shape:
                 print(f"  FAIL  {msg}")
@@ -224,6 +268,15 @@ def _check(args) -> int:
             print("  FAIL  top level is not a mapping")
             problems += 1
             continue
+
+        shape = check_action_shape(doc, str(path))
+        shape += check_wait_timeouts(doc, str(path))
+        if shape:
+            for msg in shape:
+                print(f"  FAIL  {msg}")
+            problems += len(shape)
+        else:
+            print("  OK    ksztalt akcji i timeouty przy wait_until")
 
         subs = doc.get("substitutions") or {}
 
