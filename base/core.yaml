@@ -926,6 +926,12 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
+  # When the button under the screen went down, in millis(). Only the diagnostic
+  # twin of that button writes it, purely to report how long each touch lasted.
+  - id: btn_down_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
   - id: wake_start_pending
     type: bool
     restore_value: false
@@ -1536,6 +1542,34 @@ binary_sensor:
             - switch.turn_off: timer_ringing
           else:
             - script.execute: tap_to_talk
+
+  # A DIAGNOSTIC TWIN OF THE BUTTON ABOVE. It starts nothing and silences
+  # nothing; it reports how long each touch lasted, including the ones the
+  # filter above throws away.
+  #
+  # It exists because on 2026-07-20, between 22:32 and 22:42, the button started
+  # SIXTEEN pipelines - roughly one every forty seconds - and all but two ended
+  # on "stt-no-text-recognized". Nobody was pressing it. That matters far beyond
+  # a stray screen: each phantom takes the microphone for about fifteen seconds
+  # while the pipeline waits for speech that never comes, and the wake word
+  # cannot run in that time. A device that does this every forty seconds is deaf
+  # for a large part of the day, which looks exactly like "the wake word is
+  # unreliable".
+  #
+  # The debounce above is a guess until these numbers exist. If the log shows
+  # touches of a few milliseconds, it is enough; if they last longer, this twin
+  # is what will say so instead of another round of guessing.
+  - platform: gt911
+    id: home_button_raw
+    internal: true
+    index: 0
+    on_press:
+      - lambda: id(btn_down_ms) = millis();
+    on_release:
+      - logger.log:
+          level: INFO
+          format: "Touch on the button under the screen lasted %u ms"
+          args: ['(unsigned) (millis() - id(btn_down_ms))']
 
 button:
   - platform: factory_reset
