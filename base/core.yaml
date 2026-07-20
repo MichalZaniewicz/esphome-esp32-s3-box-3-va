@@ -497,8 +497,11 @@ micro_wake_word:
   # NOTE: `vad:` is currently off. The VAD model gates every detection - a wake
   # word the VAD disagrees with is suppressed - and it is a third network to run
   # per frame. Upstream's S3-Box-3 config does not use it at all. It is off here
-  # while the "wake word never fires" problem is open; turn it back on once the
-  # wake word works, and check that detections still get through.
+  # LEAVE THIS OFF. An earlier comment here invited turning it back on once the
+  # wake word worked - do not. `vad:` was part of what broke detection in the
+  # first place: together with a long sliding window it kept the running average
+  # below the cutoff, so the wake word never fired. Dropping it and shortening
+  # the window is what fixed it, and the settings below are the result.
   # vad:
 
   # Cutoffs are exposed because they are the only way to see how close a wake
@@ -736,6 +739,12 @@ globals:
   - id: first_timer
     type: voice_assistant::Timer
     restore_value: false
+  # 0 = nothing shown, 1 = a running timer, 2 = a paused one. Lets the widget
+  # visibility be touched only when it actually changes.
+  - id: timer_ui_state
+    type: int
+    restore_value: false
+    initial_value: "0"
   - id: has_timer
     type: bool
     restore_value: false
@@ -1069,7 +1078,9 @@ script:
           }
           id(first_timer) = best;
           const uint32_t total = std::max(best.total_seconds, static_cast<uint32_t>(1));
-          id(timer_percent) = static_cast<int>(lroundf(100.0f * best.seconds_left / total));
+          // Integer maths with rounding, not float + lroundf: this runs once a
+          // second for as long as a timer is counting.
+          id(timer_percent) = (int) ((100u * best.seconds_left + total / 2) / total);
 
   # Paints the timer strip and countdown that live on LVGL's top layer, above
   # whichever page is showing. Two bars rather than one recoloured bar: a running
@@ -1098,7 +1109,6 @@ script:
                     snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned) minutes, (unsigned) seconds);
                   }
                   return std::string(buf);
-            - lvgl.widget.show: timer_label
             - if:
                 condition:
                   lambda: return id(has_active_timer);
@@ -1106,18 +1116,42 @@ script:
                   - lvgl.bar.update:
                       id: timer_bar_active
                       value: !lambda return id(timer_percent);
-                  - lvgl.widget.show: timer_bar_active
-                  - lvgl.widget.hide: timer_bar_paused
                 else:
                   - lvgl.bar.update:
                       id: timer_bar_paused
                       value: !lambda return id(timer_percent);
+      # Visibility changes ONLY on a transition. draw_display runs this on every
+      # phase change, and with no timer - the normal state - it used to issue
+      # three hides on three already-hidden widgets every single time.
+      - if:
+          condition:
+            lambda: |-
+              const int want = !id(has_timer) ? 0 : (id(has_active_timer) ? 1 : 2);
+              if (want == id(timer_ui_state)) return false;
+              id(timer_ui_state) = want;
+              return true;
+          then:
+            - if:
+                condition:
+                  lambda: return id(timer_ui_state) == 0;
+                then:
+                  - lvgl.widget.hide: timer_label
+                  - lvgl.widget.hide: timer_bar_active
+                  - lvgl.widget.hide: timer_bar_paused
+            - if:
+                condition:
+                  lambda: return id(timer_ui_state) == 1;
+                then:
+                  - lvgl.widget.show: timer_label
+                  - lvgl.widget.show: timer_bar_active
+                  - lvgl.widget.hide: timer_bar_paused
+            - if:
+                condition:
+                  lambda: return id(timer_ui_state) == 2;
+                then:
+                  - lvgl.widget.show: timer_label
                   - lvgl.widget.show: timer_bar_paused
                   - lvgl.widget.hide: timer_bar_active
-          else:
-            - lvgl.widget.hide: timer_label
-            - lvgl.widget.hide: timer_bar_active
-            - lvgl.widget.hide: timer_bar_paused
 
   # Starts whichever wake word engine is selected. mWW runs on the device;
   # "In Home Assistant" streams audio continuously instead.
