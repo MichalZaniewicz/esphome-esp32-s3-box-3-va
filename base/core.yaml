@@ -580,6 +580,21 @@ voice_assistant:
     - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
     - script.execute: draw_display
   on_stt_end:
+    # FREE THE I2S BUS FOR THE REPLY, HERE, THIS EARLY.
+    #
+    # The wake word keeps running for the whole conversation, and it holds the
+    # microphone - and so the single I2S bus. When the reply URL arrives,
+    # ESPHome starts playing it immediately, hits "Parent bus is busy", and the
+    # speaker driver then retries a FULL SECOND later, leaving the device deaf
+    # for about two and a half seconds after every answer.
+    #
+    # This was first tried at on_tts_start and did NOT work: TTS_START and
+    # TTS_END are about SIX MILLISECONDS apart, and `wait_until` does not block
+    # the pipeline, so playback began long before the wake word had finished
+    # tearing down its inference task. Speech-to-text ending is roughly two
+    # seconds before the reply, which is ample - so no wait is needed here, only
+    # a head start.
+    - micro_wake_word.stop:
     - text_sensor.template.publish:
         id: text_request
         state: !lambda return x;
@@ -588,23 +603,6 @@ voice_assistant:
     - lambda: |-
         id(tts_chars) = x.length();
         id(tts_reply_active) = true;
-    # FREE THE I2S BUS BEFORE THE REPLY ARRIVES. With a media player attached,
-    # ESPHome starts playing the TTS itself the moment the URL lands at TTS_END,
-    # and it does not wait for the microphone to let go of the single I2S bus.
-    # That start then fails with "Parent bus is busy", the driver retries a FULL
-    # SECOND later, and the wake word does not come back until it has finished
-    # flailing - about two and a half seconds deaf after every single answer.
-    #
-    # It has to be done HERE rather than in on_tts_end, because by then
-    # ESPHome's own playback call has already gone out; TTS_START is the last
-    # point we get before it. This costs nothing: the wake word is stopped
-    # during a reply anyway, and on_idle starts it again afterwards.
-    - micro_wake_word.stop:
-    - wait_until:
-        condition:
-          not:
-            micro_wake_word.is_running:
-        timeout: 1s
     - text_sensor.template.publish:
         id: text_response
         state: !lambda return x;
