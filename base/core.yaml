@@ -528,6 +528,19 @@ micro_wake_word:
           switch.is_on: wake_sound_enabled
         then:
           - lambda: id(wake_sound_active) = true;
+          # WAIT FOR THE MICROPHONE TO LET GO OF THE BUS FIRST. Detection only
+          # ASKS the wake word to stop; the component then tears down its
+          # inference task, which takes a moment. Playing in that window gives
+          # "Parent bus is busy", and the speaker driver then retries after a
+          # FULL SECOND - so the beep, and everything behind it, arrives about
+          # two seconds late. That reads as the wake word being slow to trigger,
+          # which is not what is happening at all.
+          - micro_wake_word.stop:
+          - wait_until:
+              condition:
+                not:
+                  micro_wake_word.is_running:
+              timeout: 1s
           - media_player.speaker.play_on_device_media_file:
               media_file: wake_sound
               announcement: true
