@@ -692,6 +692,16 @@ voice_assistant:
     # therefore never reached the line that clears tts_reply_active, and that
     # flag gates the media-player idle handler that would otherwise restart the
     # wake word. The device went permanently deaf and only a reboot fixed it.
+    #
+    # SIXTY SECONDS, NOT TWENTY, AND THE DIFFERENCE IS VISIBLE ON SCREEN. In
+    # "This device" mode the whole hold block below is skipped, so this wait is
+    # the ONLY thing standing between the pipeline ending and the face being sent
+    # back to idle. A long local reply outlives twenty seconds easily: on
+    # 2026-07-20 one ran from 15:22:42 to 15:23:14, the timeout expired at
+    # 15:23:02, and the clock came up twelve seconds before the box stopped
+    # talking. This is a safety net for a speaker that never reports stopping,
+    # not a schedule - a reply that really has finished satisfies the condition
+    # and moves on immediately.
     - wait_until:
         condition:
           - and:
@@ -699,7 +709,7 @@ voice_assistant:
                   media_player.is_announcing:
               - not:
                   speaker.is_playing:
-        timeout: 20s
+        timeout: 60s
     # Nothing above waits for an EXTERNAL speaker - the box cannot see it. Hold
     # the replying phase for as long as the reply plausibly takes, so the face
     # keeps talking and the wake word stays off until the speaker is done.
