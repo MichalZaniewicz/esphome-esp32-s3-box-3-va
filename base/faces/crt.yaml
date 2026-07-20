@@ -120,6 +120,19 @@ script:
           const int pf = id(crt_phase_frame);
           const int f = id(crt_frame);
 
+          // Error and muted print one fixed line. Nothing in them can change
+          // until the phase does, so building the vector, concatenating the
+          // colour markup and assembling the body ten times a second only
+          // produces heap traffic for a comparison below that is always equal.
+          // The label write was already skipped; this skips the work leading up
+          // to it. Every other phase animates - even idle blinks its cursor -
+          // so they are left alone.
+          static int built_phase = -1;
+          if ((phase == ${voice_assist_error_phase_id} ||
+               phase == ${voice_assist_muted_phase_id}) && phase == built_phase)
+            return;
+          built_phase = phase;
+
           // Hard-ish wrap at COLS, breaking on spaces where one is near enough.
           // A terminal tolerates a blunt wrap; a word split mid-syllable looks
           // like a bug rather than a style.
