@@ -672,13 +672,17 @@ voice_assistant:
           - lambda: id(va).set_use_wake_word(false);
           - micro_wake_word.start:
     - script.execute: set_idle_or_mute_phase
-    - script.execute: draw_display
+    # Cleared BEFORE the redraw, not after. The other way round, draw_display
+    # read the sensors while they still held the last exchange, so the status
+    # screen kept showing the previous question and answer until some unrelated
+    # event happened to redraw it.
     - text_sensor.template.publish:
         id: text_request
         state: ""
     - text_sensor.template.publish:
         id: text_response
         state: ""
+    - script.execute: draw_display
   on_error:
     - if:
         condition:
@@ -705,7 +709,10 @@ voice_assistant:
   on_timer_updated:
     - script.execute: draw_display
   on_timer_tick:
-    - script.execute: draw_display
+    # Only the countdown and the strip can change on a tick, and both live on
+    # LVGL's top layer, above every page. draw_display here meant a whole UI
+    # recompute - and a page show - once per second for as long as a timer ran.
+    - script.execute: refresh_timer_widgets
   on_timer_finished:
     - switch.turn_on: timer_ringing
     - lambda: id(voice_assistant_phase) = ${voice_assist_timer_finished_phase_id};
@@ -852,70 +859,125 @@ script:
   - id: draw_display
     then:
       - script.execute: refresh_timer_widgets
-      - script.execute: sync_text
       - if:
           condition:
             lambda: return id(init_in_progress);
           then:
-            - lvgl.page.show: page_boot
+            - if:
+                condition:
+                  not:
+                    lvgl.page.is_showing: page_boot
+                then:
+                  - lvgl.page.show: page_boot
           else:
             - if:
                 condition:
                   not:
                     wifi.connected:
                 then:
-                  - lvgl.page.show: page_no_wifi
+                  - if:
+                      condition:
+                        not:
+                          lvgl.page.is_showing: page_no_wifi
+                      then:
+                        - lvgl.page.show: page_no_wifi
                 else:
                   - if:
                       condition:
                         not:
                           api.connected:
                       then:
-                        - lvgl.page.show: page_no_ha
+                        - if:
+                            condition:
+                              not:
+                                lvgl.page.is_showing: page_no_ha
+                            then:
+                              - lvgl.page.show: page_no_ha
                       else:
                         - script.execute: show_phase_page
+      # AFTER the page work, and only if the status page is the one on screen.
+      # These three labels live on page_status alone, which a character package
+      # claims for no phase at all - so with any assistant installed this was
+      # three string copies and three invalidates on every single state change,
+      # for widgets nobody was looking at.
+      - if:
+          condition:
+            lvgl.page.is_showing: page_status
+          then:
+            - script.execute: sync_text
 
   # Phase -> page. Flat ifs rather than a lambda `switch`, because page changes
   # must go through the LVGL component's own action: it tracks which page is
   # current, and lv_scr_load() behind its back desyncs that bookkeeping.
+  # Phase -> page. Flat ifs rather than a lambda `switch`, because page changes
+  # must go through the LVGL component's own action: it tracks which page is
+  # current, and lv_scr_load() behind its back desyncs that bookkeeping.
+  #
+  # EVERY SHOW IS GUARDED BY "not already showing", and that guard is the single
+  # most valuable line in this file. LvglComponent::show_page does NOT check
+  # whether the requested page is already current - it calls lv_screen_load()
+  # regardless, which invalidates the WHOLE screen: 320x240 against a 25% draw
+  # buffer is four passes. A character package points every phase at page_face,
+  # so listening -> thinking -> replying used to repaint the entire display three
+  # times for a page that never changed.
   - id: show_phase_page
     then:
       - if:
           condition:
-            lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
+            and:
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_listening_phase_id};
+              - not:
+                  lvgl.page.is_showing: ${listening_page}
           then:
             - lvgl.page.show: ${listening_page}
       - if:
           condition:
-            lambda: return id(voice_assistant_phase) == ${voice_assist_thinking_phase_id};
+            and:
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_thinking_phase_id};
+              - not:
+                  lvgl.page.is_showing: ${thinking_page}
           then:
             - lvgl.page.show: ${thinking_page}
       - if:
           condition:
-            lambda: return id(voice_assistant_phase) == ${voice_assist_replying_phase_id};
+            and:
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_replying_phase_id};
+              - not:
+                  lvgl.page.is_showing: ${replying_page}
           then:
             - lvgl.page.show: ${replying_page}
       - if:
           condition:
-            lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
+            and:
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_error_phase_id};
+              - not:
+                  lvgl.page.is_showing: ${error_page}
           then:
             - lvgl.page.show: ${error_page}
       - if:
           condition:
-            lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id};
+            and:
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id};
+              - not:
+                  lvgl.page.is_showing: ${muted_page}
           then:
             - lvgl.page.show: ${muted_page}
       - if:
           condition:
-            lambda: return id(voice_assistant_phase) == ${voice_assist_not_ready_phase_id};
+            and:
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_not_ready_phase_id};
+              - not:
+                  lvgl.page.is_showing: page_no_ha
           then:
             - lvgl.page.show: page_no_ha
       - if:
           condition:
-            lambda: return id(voice_assistant_phase) == ${voice_assist_timer_finished_phase_id};
+            and:
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_timer_finished_phase_id};
+              - not:
+                  lvgl.page.is_showing: ${timer_page}
           then:
             - lvgl.page.show: ${timer_page}
-      # Anything else (including the idle phase) lands on idle.
       - if:
           condition:
             lambda: |-
@@ -932,9 +994,19 @@ script:
                 condition:
                   lambda: return id(idle_alt);
                 then:
-                  - lvgl.page.show: ${idle_page_alt}
+                  - if:
+                      condition:
+                        not:
+                          lvgl.page.is_showing: ${idle_page_alt}
+                      then:
+                        - lvgl.page.show: ${idle_page_alt}
                 else:
-                  - lvgl.page.show: ${idle_page}
+                  - if:
+                      condition:
+                        not:
+                          lvgl.page.is_showing: ${idle_page}
+                      then:
+                        - lvgl.page.show: ${idle_page}
 
   # Push what was said / what was answered onto the labels. The text sensors are
   # the source of truth; LVGL labels do not follow them on their own.

@@ -127,33 +127,22 @@ script:
 
   - id: aura_draw
     then:
-      - lvgl.widget.update:
-          id: aura_bar_0
-          height: !lambda return id(aura_h)[0];
-      - lvgl.widget.update:
-          id: aura_bar_1
-          height: !lambda return id(aura_h)[1];
-      - lvgl.widget.update:
-          id: aura_bar_2
-          height: !lambda return id(aura_h)[2];
-      - lvgl.widget.update:
-          id: aura_bar_3
-          height: !lambda return id(aura_h)[3];
-      - lvgl.widget.update:
-          id: aura_bar_4
-          height: !lambda return id(aura_h)[4];
-      - lvgl.widget.update:
-          id: aura_bar_5
-          height: !lambda return id(aura_h)[5];
-      - lvgl.widget.update:
-          id: aura_bar_6
-          height: !lambda return id(aura_h)[6];
-      - lvgl.widget.update:
-          id: aura_bar_7
-          height: !lambda return id(aura_h)[7];
-      - lvgl.widget.update:
-          id: aura_bar_8
-          height: !lambda return id(aura_h)[8];
+      # One lambda, writing heights straight through LVGL, and only for bars
+      # whose height actually changed. This used to be nine lvgl.widget.update
+      # actions per tick: each one goes through ESPHome's style machinery and
+      # invalidates, which is exactly what made the jarvis HUD crawl. At rest the
+      # line barely moves, so most ticks now write nothing at all.
+      - lambda: |-
+          static lv_obj_t *bar[9] = {id(aura_bar_0), id(aura_bar_1), id(aura_bar_2), id(aura_bar_3), id(aura_bar_4), id(aura_bar_5), id(aura_bar_6), id(aura_bar_7), id(aura_bar_8)};
+          static int seen[9];
+          static bool primed = false;
+          for (int i = 0; i < 9; i++) {
+            const int h = id(aura_h)[i];
+            if (primed && seen[i] == h) continue;
+            seen[i] = h;
+            lv_obj_set_height(bar[i], h);
+          }
+          primed = true;
 
   # Colour is literal per state and only repainted when the state changes,
   # so it costs nothing per tick.

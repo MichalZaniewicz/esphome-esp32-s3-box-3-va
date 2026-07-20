@@ -128,114 +128,30 @@ script:
 
   - id: kitt_draw
     then:
-      - lvgl.widget.update:
-          id: kitt_seg_0
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[0];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
+      # One lambda instead of nine lvgl.widget.update actions, each of which
+      # recomputed the same lit colour and pushed it through ESPHome's style
+      # machinery. Only segments whose colour actually changed are written.
+      - lambda: |-
+          static lv_obj_t *seg[9] = {id(kitt_seg_0), id(kitt_seg_1), id(kitt_seg_2), id(kitt_seg_3), id(kitt_seg_4), id(kitt_seg_5), id(kitt_seg_6), id(kitt_seg_7), id(kitt_seg_8)};
+          static uint32_t seen[9];
+          static bool primed = false;
+
+          uint32_t lit = ${kitt_color};
+          if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
+          else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
+          const uint32_t off = ${kitt_dim_color};
+
+          for (int i = 0; i < 9; i++) {
+            const int v = id(kitt_lv)[i];
             const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
             const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
             const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
-      - lvgl.widget.update:
-          id: kitt_seg_1
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[1];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
-            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
-            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
-            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
-      - lvgl.widget.update:
-          id: kitt_seg_2
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[2];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
-            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
-            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
-            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
-      - lvgl.widget.update:
-          id: kitt_seg_3
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[3];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
-            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
-            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
-            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
-      - lvgl.widget.update:
-          id: kitt_seg_4
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[4];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
-            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
-            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
-            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
-      - lvgl.widget.update:
-          id: kitt_seg_5
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[5];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
-            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
-            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
-            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
-      - lvgl.widget.update:
-          id: kitt_seg_6
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[6];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
-            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
-            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
-            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
-      - lvgl.widget.update:
-          id: kitt_seg_7
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[7];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
-            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
-            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
-            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
-      - lvgl.widget.update:
-          id: kitt_seg_8
-          bg_color: !lambda |-
-            const int v = id(kitt_lv)[8];
-            uint32_t lit = ${kitt_color};
-            if (id(kitt_lit) == 2) lit = ${kitt_alarm_color};
-            else if (id(kitt_lit) == 3) lit = ${kitt_muted_color};
-            const uint32_t off = ${kitt_dim_color};
-            const int r = (int) ((off >> 16) & 0xFF) + ((int) ((lit >> 16) & 0xFF) - (int) ((off >> 16) & 0xFF)) * v / 255;
-            const int g = (int) ((off >> 8) & 0xFF) + ((int) ((lit >> 8) & 0xFF) - (int) ((off >> 8) & 0xFF)) * v / 255;
-            const int b = (int) (off & 0xFF) + ((int) (lit & 0xFF) - (int) (off & 0xFF)) * v / 255;
-            return lv_color_make((uint8_t) r, (uint8_t) g, (uint8_t) b);
+            const uint32_t packed = ((uint32_t) r << 16) | ((uint32_t) g << 8) | (uint32_t) b;
+            if (primed && seen[i] == packed) continue;
+            seen[i] = packed;
+            lv_obj_set_style_bg_color(seg[i], lv_color_hex(packed), 0);
+          }
+          primed = true;
 
   - id: kitt_tick_script
     mode: single
