@@ -130,6 +130,13 @@ globals:
   # Which expression the widgets are currently wearing. Static parts (colour,
   # resting shape) are only re-applied when this changes, so a still face costs
   # nothing per tick.
+  # Whether the pupils are currently visible. Shared by face_pupils and
+  # face_pupils_hide so neither has to touch the HIDDEN flag when it is already
+  # in the state it wants.
+  - id: face_pupils_shown
+    type: bool
+    restore_value: false
+    initial_value: "true"
   - id: face_expr
     type: int
     restore_value: false
@@ -143,16 +150,25 @@ script:
       h: int
       dx: int
     then:
-      - lvgl.widget.update:
-          id: face_eye_l
-          width: !lambda return w;
-          height: !lambda return h;
-          x: !lambda return ${face_center_x} + dx - ${face_eye_offset};
-      - lvgl.widget.update:
-          id: face_eye_r
-          width: !lambda return w;
-          height: !lambda return h;
-          x: !lambda return ${face_center_x} + dx + ${face_eye_offset};
+      # Writes only what moved. These scripts are called every tick in the
+      # animated phases, almost always with the SAME arguments: in thinking the
+      # width and height are compile-time constants and only the gaze changes,
+      # and the timer shake rewrites twelve properties per tick to move two eyes
+      # sideways. Each lv_obj_set_* marks the object dirty and invalidates both
+      # the old and the new area, so writing an unchanged value is not free.
+      - lambda: |-
+          static int p_w = -1, p_h = -1, p_dx = 0x7FFFFFFF;
+          if (w != p_w || h != p_h) {
+            lv_obj_set_width(id(face_eye_l), w);
+            lv_obj_set_height(id(face_eye_l), h);
+            lv_obj_set_width(id(face_eye_r), w);
+            lv_obj_set_height(id(face_eye_r), h);
+          }
+          if (dx != p_dx) {
+            lv_obj_set_x(id(face_eye_l), ${face_center_x} + dx - ${face_eye_offset});
+            lv_obj_set_x(id(face_eye_r), ${face_center_x} + dx + ${face_eye_offset});
+          }
+          p_w = w; p_h = h; p_dx = dx;
 
   # Pupils move independently of the eyes: `gx` is the gaze, measured inside the
   # eye, not a shift of the whole face.
@@ -162,24 +178,36 @@ script:
       h: int
       gx: int
     then:
-      - lvgl.widget.show: face_pupil_l
-      - lvgl.widget.show: face_pupil_r
-      - lvgl.widget.update:
-          id: face_pupil_l
-          width: !lambda return w;
-          height: !lambda return h;
-          x: !lambda return ${face_center_x} + gx - ${face_eye_offset};
-      - lvgl.widget.update:
-          id: face_pupil_r
-          width: !lambda return w;
-          height: !lambda return h;
-          x: !lambda return ${face_center_x} + gx + ${face_eye_offset};
+      - lambda: |-
+          static int p_w = -1, p_h = -1, p_gx = 0x7FFFFFFF;
+          // Showing was unconditional: lv_obj_clear_flag invalidates whether or
+          // not the flag actually changed, so this was two extra full-object
+          // invalidations per tick in thinking and in the timer alarm.
+          if (!id(face_pupils_shown)) {
+            lv_obj_clear_flag(id(face_pupil_l), LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(id(face_pupil_r), LV_OBJ_FLAG_HIDDEN);
+            id(face_pupils_shown) = true;
+          }
+          if (w != p_w || h != p_h) {
+            lv_obj_set_width(id(face_pupil_l), w);
+            lv_obj_set_height(id(face_pupil_l), h);
+            lv_obj_set_width(id(face_pupil_r), w);
+            lv_obj_set_height(id(face_pupil_r), h);
+          }
+          if (gx != p_gx) {
+            lv_obj_set_x(id(face_pupil_l), ${face_center_x} + gx - ${face_eye_offset});
+            lv_obj_set_x(id(face_pupil_r), ${face_center_x} + gx + ${face_eye_offset});
+          }
+          p_w = w; p_h = h; p_gx = gx;
 
   # A squashed eye has no room for a pupil - it would poke out of the slit.
   - id: face_pupils_hide
     then:
-      - lvgl.widget.hide: face_pupil_l
-      - lvgl.widget.hide: face_pupil_r
+      - lambda: |-
+          if (!id(face_pupils_shown)) return;
+          lv_obj_add_flag(id(face_pupil_l), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_add_flag(id(face_pupil_r), LV_OBJ_FLAG_HIDDEN);
+          id(face_pupils_shown) = false;
 
   - id: face_mouth
     parameters:
@@ -187,11 +215,16 @@ script:
       h: int
       dx: int
     then:
-      - lvgl.widget.update:
-          id: face_mouth_obj
-          width: !lambda return w;
-          height: !lambda return h;
-          x: !lambda return ${face_center_x} + dx;
+      - lambda: |-
+          static int p_w = -1, p_h = -1, p_dx = 0x7FFFFFFF;
+          if (w != p_w || h != p_h) {
+            lv_obj_set_width(id(face_mouth_obj), w);
+            lv_obj_set_height(id(face_mouth_obj), h);
+          }
+          if (dx != p_dx) {
+            lv_obj_set_x(id(face_mouth_obj), ${face_center_x} + dx);
+          }
+          p_w = w; p_h = h; p_dx = dx;
 
   # Colours are literal rather than templated: three tiny actions beat trusting
   # a lambda to produce an lv_color_t.
@@ -259,7 +292,9 @@ script:
   - id: face_tick_script
     mode: single
     then:
-      - lambda: id(face_frame)++;
+      # Wrapped at a multiple of the idle cycle: left free-running it would
+      # eventually cost the animation its float precision.
+      - lambda: id(face_frame) = (id(face_frame) + 1) % (${face_idle_cycle} * 360);
 
       # IDLE - open eyes, pupils centred, an occasional blink.
       - if:
@@ -297,11 +332,18 @@ script:
                     return t == 0 || t == 5;
                 then:
                   - script.execute: face_blink
+            # Gaze from a RANGE, not from equality on one frame. An interval tick
+            # that lands on a busy loop is skipped, not deferred, so `t == 40`
+            # could simply never happen - and 40 and 60 are the frames that
+            # RECENTRE the pupils, so a single missed tick left them parked off
+            # to one side for the rest of the twelve second cycle. With ranges
+            # the value is recomputed every tick and a missed tick costs nothing.
+            # Calling this every tick is free now that face_pupils only writes on
+            # a change; the guard is just to keep out of the blink's way.
             - if:
                 condition:
-                  lambda: |-
-                    const int t = id(face_frame) % ${face_idle_cycle};
-                    return t == 30 || t == 40 || t == 50 || t == 60;
+                  not:
+                    script.is_running: face_blink
                 then:
                   - script.execute:
                       id: face_pupils
@@ -310,8 +352,8 @@ script:
                       gx: !lambda |-
                         const int t = id(face_frame) % ${face_idle_cycle};
                         const int g = (${face_gaze_dx} * 2) / 3;
-                        if (t == 30) return g;
-                        if (t == 50) return -g;
+                        if (t >= 30 && t < 40) return g;
+                        if (t >= 50 && t < 60) return -g;
                         return 0;
 
       # LISTENING - eyes wide and breathing, pupils dilated, small round mouth.

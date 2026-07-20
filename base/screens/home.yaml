@@ -90,44 +90,87 @@ script:
             char buf[8];
             snprintf(buf, sizeof(buf), "%02d:%02d", now.hour, now.minute);
             return std::string(buf);
-      - lvgl.label.update:
-          id: home_date
-          text: !lambda |-
-            auto now = id(ha_time).now();
-            if (!now.is_valid()) {
-              return std::string("");
-            }
-            static const char *const WEEKDAYS[] = {${weekday_names}};
-            static const char *const MONTHS[] = {${month_names}};
-            char buf[48];
-            snprintf(buf, sizeof(buf), "%s, %d %s",
-                     WEEKDAYS[now.day_of_week - 1], now.day_of_month, MONTHS[now.month - 1]);
-            return std::string(buf);
+      # The date changes once a day, but this script runs on every minute
+      # boundary. lv_label_set_text never compares - it reallocs, copies and
+      # re-lays-out the text - so this was 1439 pointless reflows a day.
+      - if:
+          condition:
+            lambda: |-
+              auto now = id(ha_time).now();
+              if (!now.is_valid()) return false;
+              static int seen = -1;
+              if (seen == now.day_of_year) return false;
+              seen = now.day_of_year;
+              return true;
+          then:
+            - lvgl.label.update:
+                id: home_date
+                text: !lambda |-
+                  auto now = id(ha_time).now();
+                  static const char *const WEEKDAYS[] = {${weekday_names}};
+                  static const char *const MONTHS[] = {${month_names}};
+                  char buf[48];
+                  snprintf(buf, sizeof(buf), "%s, %d %s",
+                           WEEKDAYS[now.day_of_week - 1], now.day_of_month, MONTHS[now.month - 1]);
+                  return std::string(buf);
 
   - id: update_home_climate
     then:
-      - lvgl.label.update:
-          id: home_indoor
-          text: !lambda |-
-            char buf[48];
-            std::string temp = std::isnan(id(room_temp).state)
-                ? "--" : str_snprintf("%.1f", 8, id(room_temp).state);
-            if (std::isnan(id(room_hum).state)) {
-              snprintf(buf, sizeof(buf), "${home_indoor_label}  %s°", temp.c_str());
-            } else {
-              snprintf(buf, sizeof(buf), "${home_indoor_label}  %s°  %.0f%%",
-                       temp.c_str(), id(room_hum).state);
-            }
-            return std::string(buf);
-      - lvgl.label.update:
-          id: home_outdoor
-          text: !lambda |-
-            if (std::isnan(id(outdoor_temp).state)) {
-              return std::string("${home_outdoor_label}  --°");
-            }
-            char buf[48];
-            snprintf(buf, sizeof(buf), "${home_outdoor_label}  %.1f°", id(outdoor_temp).state);
-            return std::string(buf);
+      # Build both strings once, then write each label only if its text actually
+      # changed. Any one of three sensors runs this script, and Home Assistant
+      # republishes a state on every event - so a thermometer reporting the same
+      # 21.4 every 30 s used to produce a fresh, identical label write, and an
+      # outdoor reading repainted the indoor label too. lv_label_set_text never
+      # compares: it reallocs, copies and re-lays-out every time.
+      - lambda: |-
+          char buf[48];
+          const std::string temp = std::isnan(id(room_temp).state)
+              ? "--" : str_snprintf("%.1f", 8, id(room_temp).state);
+          if (std::isnan(id(room_hum).state)) {
+            snprintf(buf, sizeof(buf), "%s  %s°", "${home_indoor_label}", temp.c_str());
+          } else {
+            snprintf(buf, sizeof(buf), "%s  %s°  %.0f%%",
+                     "${home_indoor_label}", temp.c_str(), id(room_hum).state);
+          }
+          id(home_indoor_text) = buf;
+
+          if (std::isnan(id(outdoor_temp).state)) {
+            snprintf(buf, sizeof(buf), "%s  --°", "${home_outdoor_label}");
+          } else {
+            snprintf(buf, sizeof(buf), "%s  %.1f°",
+                     "${home_outdoor_label}", id(outdoor_temp).state);
+          }
+          id(home_outdoor_text) = buf;
+      - if:
+          condition:
+            lambda: |-
+              static std::string seen;
+              if (seen == id(home_indoor_text)) return false;
+              seen = id(home_indoor_text);
+              return true;
+          then:
+            - lvgl.label.update:
+                id: home_indoor
+                text: !lambda return id(home_indoor_text);
+      - if:
+          condition:
+            lambda: |-
+              static std::string seen;
+              if (seen == id(home_outdoor_text)) return false;
+              seen = id(home_outdoor_text);
+              return true;
+          then:
+            - lvgl.label.update:
+                id: home_outdoor
+                text: !lambda return id(home_outdoor_text);
+
+globals:
+  - id: home_indoor_text
+    type: std::string
+    restore_value: false
+  - id: home_outdoor_text
+    type: std::string
+    restore_value: false
 
 # Paint once at boot so the screen is not blank before the first tick or the
 # first Home Assistant value arrives.

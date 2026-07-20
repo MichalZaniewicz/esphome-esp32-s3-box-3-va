@@ -40,6 +40,43 @@ BUILTIN_SUBS = {"name", "friendly_name", "device_name", "esphome_version"}
 SUB_REF = re.compile(r"\$\{(\w+)\}|\$(\w+)")
 
 
+# Control-flow actions take a FIXED set of keys. An extra one means a line was
+# indented one level too far and became a sibling of `condition:`/`then:`
+# instead of a field inside the action underneath. That is still valid YAML, so
+# nothing else here notices - the mis-indented line is simply dropped, and the
+# widget silently never gets its text. This has bitten the repo twice.
+CONTROL_KEYS = {
+    "if": {"condition", "then", "else"},
+    "while": {"condition", "then"},
+    "wait_until": {"condition", "timeout"},
+    "repeat": {"count", "then"},
+}
+
+
+def check_action_shape(node, path="root", problems=None):
+    if problems is None:
+        problems = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key in CONTROL_KEYS and isinstance(value, dict):
+                # Only when the canonical key is present. ESPHome also accepts a
+                # shorthand where the condition is written directly - `wait_until:
+                # {lambda: ...}` - and in that form any key is fair game.
+                canon = "count" if key == "repeat" else "condition"
+                extra = set(value) - CONTROL_KEYS[key] if canon in value else set()
+                if extra:
+                    problems.append(
+                        f"{path}.{key}: obce klucze {sorted(extra)} - "
+                        f"dozwolone tylko {sorted(CONTROL_KEYS[key])}. "
+                        f"Prawie na pewno zle wciecie."
+                    )
+            check_action_shape(value, f"{path}.{key}", problems)
+    elif isinstance(node, list):
+        for i, item in enumerate(node):
+            check_action_shape(item, f"{path}[{i}]", problems)
+    return problems
+
+
 def collect_ids(node, out, path="root", in_action=False):
     """Collect id: DECLARATIONS only.
 
@@ -97,6 +134,11 @@ def _check_merged(args) -> int:
         except yaml.YAMLError as exc:
             print(f"  FAIL  {path}: YAML nie parsuje sie:\n{exc}")
             return 1
+        shape = check_action_shape(doc, str(path))
+        if shape:
+            for msg in shape:
+                print(f"  FAIL  {msg}")
+            problems += len(shape)
         if not isinstance(doc, dict):
             print(f"  FAIL  {path}: top level nie jest mapowaniem")
             return 1
