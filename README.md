@@ -198,8 +198,13 @@ base/
     face.yaml              # optional animated assistant face (the engine)
   faces/
     pip, astro, momo,      # characters; pick one with `assistant:`
-    franky, wizard,        #   each pulls the face engine itself
-    genie, flare, aura     #   aura draws itself, no artwork
+    franky, wizard,        #   artwork ones pull the face engine themselves
+    genie, flare, rhea,
+    rufus, agnes
+    aura, bit, iris,       # these draw themselves, no artwork at all
+    crt, jarvis, kitt,
+    nixie, pixel, rain,
+    scope, vu              #   eight of these are GENERATED - see scripts/gen
   lang/
     en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
   sounds/
@@ -207,7 +212,12 @@ base/
 docs/
   HARDWARE.md              # pinout, I2C map, gotchas
 scripts/
-  validate.py              # offline YAML check (syntax, substitutions, duplicate ids)
+  validate.py              # offline YAML check: syntax, substitutions, duplicate
+                           #   ids, action shape, and a wait_until with no timeout
+  check_generated.py       # are the generated characters still in step with
+                           #   their generators? fails if one was hand-edited
+  gen/                     # the generators for crt, jarvis, kitt, nixie,
+                           #   pixel, rain, scope, vu - edit these, not the YAML
   esplog.py                # stream device logs over the native API
 skill/
   esp32-s3-box-3/          # Claude Code skill: pinout + hard-won gotchas
