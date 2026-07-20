@@ -34,6 +34,41 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **The box went deaf after every reply.** `start_wake_word` refused to run
+  while a pipeline was still going and then silently did nothing. `on_end` holds
+  the replying phase while the assistant is still in `STREAMING_RESPONSE`, so it
+  called the script about two seconds before the pipeline went idle, the guard
+  was false, and nothing tried again. It now waits for the pipeline and the
+  speaker instead, with a timeout so a stuck state cannot hang it.
+- **Two windows where the wake word started underneath the microphone.**
+  Between stopping the wake word and starting the pipeline - the wake beep in
+  one path, a 100 ms gap in the button path - nothing is running and the speaker
+  is silent, so anything watching for "idle" started listening a fraction of a
+  second before the pipeline opened the microphone. That is the flood of "Not
+  enough free bytes in ring buffer". Both paths now mark the window.
+- **The idle clock appeared while the box was still speaking.** The wait for
+  local playback gave up after twenty seconds, which is shorter than a long
+  reply, and the phase was reset the moment it expired.
+- **The reply hold was measured from the wrong moment.** It estimates how long
+  the answer takes to speak, but counted from after local playback had already
+  finished - so in "Both" it was added on top, roughly doubling the silence.
+- **A stray touch could start the assistant.** The screen reports the occasional
+  touch nobody made; sixteen pipelines started this way in ten minutes, all but
+  two ending in "no text recognized", each holding the microphone for about
+  fifteen seconds. The button is now debounced.
+- **"Diag: only the alexa model" left two models running**, having been written
+  when there were two. A diagnostic that misreports its own state cannot answer
+  the question it exists for.
+- **Several widgets were repainted with values that had not changed** - the
+  timer bar every second, the face's colour on every expression change, the
+  home clock on every clock resync, and the scope trace ten times a second
+  across a 284x172 px widget. `lvgl.*.update` never compares.
+- **Constants were recomputed every frame**: the scope's edge envelope (33
+  `sinf` plus 33 `powf` per tick) and pixel's ripple distances (96 square roots
+  per tick), both fixed by geometry.
+- **`aura`, `kitt` and `scope` never wrapped their frame counters**, while every
+  other character did. `aura` matters most - it is the default, and feeds the
+  counter straight into `sinf`.
 - **The talking face stopped a moment after the reply started**, while the
   external speaker had not begun yet. Attaching the media player again woke two
   handlers that nothing had been triggering before: at `TTS_END` the assistant is
@@ -122,3 +157,17 @@ their alarm, the touchscreen, the home screen and the animated character.
 - `time: platform: homeassistant`, as groundwork for anything clock-driven.
 - `docs/HARDWARE.md`, `scripts/validate.py`, `scripts/esplog.py` and a Claude
   Code skill.
+- **A watchdog for a deaf device.** If the assistant is idle and the wake word
+  simply is not running, after 40 seconds it is started again, whatever the
+  reason. It deliberately consults none of our own flags, since those are what
+  get stuck. Covers the on-device engine only; the comment says so.
+- **`scripts/gen/`, and the eight character files that come out of it.**
+  `crt`, `jarvis`, `kitt`, `nixie`, `pixel`, `rain`, `scope` and `vu` are
+  generated - they are mostly hundreds of near-identical widget definitions. The
+  scripts used to live outside the repo, which meant nobody else could run them
+  and one of them had already drifted out of step with the file it writes.
+- **`scripts/check_generated.py`**, which regenerates all eight, compares,
+  restores whatever it touched, and fails if a file and its generator disagree.
+- **`scripts/validate.py` now rejects a `wait_until` with no `timeout`.** This
+  is the most expensive mistake made here: such a wait does not fail and does
+  not warn, it stops that automation forever, and everything after it.

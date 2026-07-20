@@ -95,6 +95,28 @@ later-listed files win substitution conflicts.
    right first time.
 4. Pull requests welcome.
 
+## Eight of these files are generated - do not edit them
+
+`crt`, `jarvis`, `kitt`, `nixie`, `pixel`, `rain`, `scope` and `vu` are written
+by the scripts in [`scripts/gen/`](../../scripts/gen). They have to be, because
+each one is mostly a few hundred near-identical widget definitions: 96 lamps for
+`pixel`, 38 for `nixie`, 30 scanlines for `crt`. Editing them by hand is fine
+right up until somebody runs the generator, and then the edit is gone with no
+warning and no diff to explain it.
+
+That is not hypothetical. `kitt.yaml` was optimised directly, its generator was
+not, and the two sat out of step until it was noticed by accident.
+
+So: **change the generator, then run it.** To check the whole set is consistent:
+
+```
+python scripts/check_generated.py
+```
+
+It regenerates everything, compares against what is committed, restores anything
+it touched, and fails if a file and its generator disagree. Run it before
+opening a pull request that touches any of the eight.
+
 ## What a character controls
 
 | Group | Substitutions |
