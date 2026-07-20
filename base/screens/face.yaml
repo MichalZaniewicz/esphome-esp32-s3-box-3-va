@@ -137,6 +137,13 @@ globals:
     type: bool
     restore_value: false
     initial_value: "true"
+  # Whether the face is currently painted in the alarm colour. Starts false
+  # because the widgets are defined in the normal colour on the page itself, so
+  # the very first tint_normal has genuinely nothing to do.
+  - id: face_alarm_tint
+    type: bool
+    restore_value: false
+    initial_value: "false"
   - id: face_expr
     type: int
     restore_value: false
@@ -228,28 +235,47 @@ script:
 
   # Colours are literal rather than templated: three tiny actions beat trusting
   # a lambda to produce an lv_color_t.
+  #
+  # BOTH ARE GUARDED, because the colour almost never actually changes. It goes
+  # red for the alarm and for an error, and back afterwards - that is all. Every
+  # other call repaints the same colour it already had, and lvgl.widget.update
+  # never compares: it sets the style property, refreshes the style and
+  # invalidates the object, three times over. Those calls sit on the expression
+  # changes, which is exactly when the audio pipeline is busiest and LVGL is
+  # already being warned about for taking too long. The rest of this file makes
+  # a point of skipping unchanged writes; this was the piece that did not.
   - id: face_tint_normal
     then:
-      - lvgl.widget.update:
-          id: face_eye_l
-          bg_color: ${face_color}
-      - lvgl.widget.update:
-          id: face_eye_r
-          bg_color: ${face_color}
-      - lvgl.widget.update:
-          id: face_mouth_obj
-          bg_color: ${face_mouth_color}
+      - if:
+          condition:
+            lambda: return id(face_alarm_tint);
+          then:
+            - lambda: id(face_alarm_tint) = false;
+            - lvgl.widget.update:
+                id: face_eye_l
+                bg_color: ${face_color}
+            - lvgl.widget.update:
+                id: face_eye_r
+                bg_color: ${face_color}
+            - lvgl.widget.update:
+                id: face_mouth_obj
+                bg_color: ${face_mouth_color}
   - id: face_tint_alarm
     then:
-      - lvgl.widget.update:
-          id: face_eye_l
-          bg_color: ${face_alarm_color}
-      - lvgl.widget.update:
-          id: face_eye_r
-          bg_color: ${face_alarm_color}
-      - lvgl.widget.update:
-          id: face_mouth_obj
-          bg_color: ${face_alarm_color}
+      - if:
+          condition:
+            lambda: return !id(face_alarm_tint);
+          then:
+            - lambda: id(face_alarm_tint) = true;
+            - lvgl.widget.update:
+                id: face_eye_l
+                bg_color: ${face_alarm_color}
+            - lvgl.widget.update:
+                id: face_eye_r
+                bg_color: ${face_alarm_color}
+            - lvgl.widget.update:
+                id: face_mouth_obj
+                bg_color: ${face_alarm_color}
 
   # A blink is a squash and a restore. `mode: single` so overlapping ticks
   # cannot leave the eyes shut.

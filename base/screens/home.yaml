@@ -80,16 +80,36 @@ time:
 script:
   - id: update_home_clock
     then:
-      - lvgl.label.update:
-          id: home_clock
-          text: !lambda |-
-            auto now = id(ha_time).now();
-            if (!now.is_valid()) {
-              return std::string("--:--");
-            }
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%02d:%02d", now.hour, now.minute);
-            return std::string(buf);
+      # ONLY WHEN THE MINUTE MOVED. The same reasoning as the date guard below,
+      # which was already here - this one was missed. It matters because the
+      # script does NOT only run on minute boundaries: on_time_sync calls it too,
+      # every time Home Assistant resynchronises the clock, landing mid-minute.
+      # Each of those reallocated, copied and re-laid-out the 64 px clock, the
+      # single most expensive widget on this screen, to draw the same characters.
+      #
+      # An invalid time maps to -1, the same as the initial value, so the call
+      # from on_boot writes nothing and the label keeps the "--:--" it is defined
+      # with. Change that default and you get a blank clock until the first sync.
+      - if:
+          condition:
+            lambda: |-
+              auto now = id(ha_time).now();
+              static int seen = -1;
+              const int m = now.is_valid() ? (now.hour * 60 + now.minute) : -1;
+              if (seen == m) return false;
+              seen = m;
+              return true;
+          then:
+            - lvgl.label.update:
+                id: home_clock
+                text: !lambda |-
+                  auto now = id(ha_time).now();
+                  if (!now.is_valid()) {
+                    return std::string("--:--");
+                  }
+                  char buf[8];
+                  snprintf(buf, sizeof(buf), "%02d:%02d", now.hour, now.minute);
+                  return std::string(buf);
       # The date changes once a day, but this script runs on every minute
       # boundary. lv_label_set_text never compares - it reallocs, copies and
       # re-lays-out the text - so this was 1439 pointless reflows a day.
