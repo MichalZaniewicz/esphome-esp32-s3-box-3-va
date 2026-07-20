@@ -901,27 +901,19 @@ globals:
     restore_value: false
     initial_value: "false"
 
-  # Set while the wake beep plays. Without it the media player's on_announcement
-  # handler would treat the beep as user-initiated playback and flash the muted
-  # screen between the wake word and the listening face.
-  # True from the moment a wake word fires until the pipeline has actually been
-  # started. Without it the wake beep finishing puts the media player into idle,
-  # and that trigger restarts the wake word - a fraction of a second before the
-  # assistant opens the microphone. The result was TFLite inference running for
-  # the whole conversation, alongside the audio streaming, for nothing.
-  # Consecutive 10 s checks during which the assistant was idle and the wake word
-  # was not running. Four in a row and the watchdog restarts it.
-  # When the replying phase must end at the latest, in millis(). The external
-  # speaker's own state ends it sooner when that state can be trusted.
   # How long to keep telling the local player to stop, in millis().
   - id: cancel_deadline
     type: uint32_t
     restore_value: false
     initial_value: "0"
+  # When the replying phase must end at the latest, in millis(). The external
+  # speaker's own state ends it sooner when that state can be trusted.
   - id: hold_deadline
     type: uint32_t
     restore_value: false
     initial_value: "0"
+  # Consecutive 10 s checks during which the assistant was idle and the wake word
+  # was not running. Four in a row and the watchdog restarts it.
   - id: deaf_ticks
     type: int
     restore_value: false
@@ -932,10 +924,18 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: "0"
+  # True from the moment a wake word fires until the pipeline has actually been
+  # started. Without it the wake beep finishing puts the media player into idle,
+  # and that trigger restarts the wake word - a fraction of a second before the
+  # assistant opens the microphone. The result was TFLite inference running for
+  # the whole conversation, alongside the audio streaming, for nothing.
   - id: wake_start_pending
     type: bool
     restore_value: false
     initial_value: "false"
+  # Set while the wake beep plays. Without it the media player's on_announcement
+  # handler would treat the beep as user-initiated playback and flash the muted
+  # screen between the wake word and the listening face.
   - id: wake_sound_active
     type: bool
     restore_value: false
