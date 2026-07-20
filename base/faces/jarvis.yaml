@@ -18,8 +18,9 @@
 # seven of the most expensive shapes LVGL draws - the device measured 250-326 ms
 # per LVGL operation and could not keep up with a 150 ms tick.
 #
-# Everything that moves now fits inside 100x100 = 10000 px, one band, one pass,
-# with room to spare under the 19200.
+# Everything that moves now fits inside 85x85 = 7225 px, one band, one pass,
+# with plenty of room under the 19200. Arc thickness was deliberately NOT scaled
+# down with the rest: below about 3 px an arc stops reading as a line at all.
 # The rings and the tick marks sit deliberately OUTSIDE that box, so they are
 # never caught in the redraw at all. If you enlarge the arcs, check this sum
 # again: crossing 19200 costs a whole extra pass over the whole area.
@@ -65,12 +66,12 @@ substitutions:
   # Core radii per phase. The core is the only part that changes size, so it
   # carries most of the character: small and still when idle, wide open while
   # listening, tight while thinking, pulsing while speaking.
-  jarvis_core_idle: '11'
-  jarvis_core_listen: '17'
-  jarvis_core_think: '10'
-  jarvis_core_reply: '13'
-  jarvis_core_alarm: '20'
-  jarvis_core_ring: '4'             # width of the core's outer band
+  jarvis_core_idle: '9'
+  jarvis_core_listen: '14'
+  jarvis_core_think: '8'
+  jarvis_core_reply: '11'
+  jarvis_core_alarm: '17'
+  jarvis_core_ring: '3'             # width of the core's outer band
 
   # Degrees per tick, outer ring then inner. Negative inner means the two rings
   # counter-rotate, which is what stops it reading as one spinning wheel.
@@ -301,8 +302,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 112
-            height: 112
+            width: 95
+            height: 95
             radius: 120
             bg_opa: TRANSP
             border_width: 1
@@ -313,8 +314,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 78
-            height: 78
+            width: 66
+            height: 66
             radius: 120
             bg_opa: TRANSP
             border_width: 2
@@ -326,8 +327,8 @@ lvgl:
             x: 0
             y: 0
             points:
+              - 211, 120
               - 220, 120
-              - 230, 120
             line_width: 2
             line_color: ${jarvis_color}
         - line:
@@ -336,8 +337,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 212, 150
-              - 216, 152
+              - 204, 146
+              - 208, 148
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -346,8 +347,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 190, 172
-              - 192, 176
+              - 186, 164
+              - 188, 168
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -356,8 +357,8 @@ lvgl:
             x: 0
             y: 0
             points:
+              - 160, 171
               - 160, 180
-              - 160, 190
             line_width: 2
             line_color: ${jarvis_color}
         - line:
@@ -366,8 +367,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 130, 172
-              - 128, 176
+              - 134, 164
+              - 132, 168
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -376,8 +377,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 108, 150
-              - 104, 152
+              - 116, 146
+              - 112, 148
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -386,8 +387,8 @@ lvgl:
             x: 0
             y: 0
             points:
+              - 109, 120
               - 100, 120
-              - 90, 120
             line_width: 2
             line_color: ${jarvis_color}
         - line:
@@ -396,8 +397,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 108, 90
-              - 104, 88
+              - 116, 94
+              - 112, 92
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -406,8 +407,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 130, 68
-              - 127, 64
+              - 134, 76
+              - 132, 72
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -416,8 +417,8 @@ lvgl:
             x: 0
             y: 0
             points:
+              - 160, 69
               - 160, 60
-              - 160, 50
             line_width: 2
             line_color: ${jarvis_color}
         - line:
@@ -426,8 +427,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 190, 68
-              - 192, 64
+              - 186, 76
+              - 188, 72
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -436,8 +437,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 212, 90
-              - 216, 87
+              - 204, 94
+              - 208, 92
             line_width: 2
             line_color: ${jarvis_dim_color}
         - arc:
@@ -445,8 +446,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 100
-            height: 100
+            width: 85
+            height: 85
             start_angle: 0
             end_angle: 38
             min_value: 0
@@ -468,8 +469,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 100
-            height: 100
+            width: 85
+            height: 85
             start_angle: 120
             end_angle: 158
             min_value: 0
@@ -491,8 +492,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 100
-            height: 100
+            width: 85
+            height: 85
             start_angle: 240
             end_angle: 278
             min_value: 0
@@ -514,8 +515,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 66
-            height: 66
+            width: 56
+            height: 56
             start_angle: 0
             end_angle: 22
             min_value: 0
@@ -537,8 +538,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 66
-            height: 66
+            width: 56
+            height: 56
             start_angle: 90
             end_angle: 112
             min_value: 0
@@ -560,8 +561,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 66
-            height: 66
+            width: 56
+            height: 56
             start_angle: 180
             end_angle: 202
             min_value: 0
@@ -583,8 +584,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 66
-            height: 66
+            width: 56
+            height: 56
             start_angle: 270
             end_angle: 292
             min_value: 0
@@ -702,8 +703,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 22
-            height: 22
+            width: 18
+            height: 18
             radius: 120
             bg_color: ${jarvis_color}
             bg_opa: COVER
@@ -714,8 +715,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 14
-            height: 14
+            width: 12
+            height: 12
             radius: 120
             bg_color: ${jarvis_hot_color}
             bg_opa: COVER
