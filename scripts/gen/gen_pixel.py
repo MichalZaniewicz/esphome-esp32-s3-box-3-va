@@ -1,0 +1,311 @@
+"""Generuje base/faces/pixel.yaml - matryce 12x8 diod."""
+import os
+
+# Sciezka liczona wzgledem tego pliku, nie zaszyta na sztywno. Generatory zyly
+# do 2026-07-20 w katalogu tymczasowym z absolutna sciezka do jednego dysku:
+# nie dalo sie ich uruchomic nigdzie indziej, a skasowanie katalogu skasowaloby
+# jedyne zrodlo tych plikow.
+_FACES = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "base", "faces")
+)
+import io
+
+COLS, ROWS, PITCH, DOT, RADIUS = 12, 8, 26, 22, 6
+N = COLS * ROWS
+OUT = os.path.join(_FACES, "pixel.yaml")
+
+ring = ([(0, c) for c in range(COLS)] +
+        [(r, COLS - 1) for r in range(1, ROWS)] +
+        [(ROWS - 1, c) for c in range(COLS - 2, -1, -1)] +
+        [(r, 0) for r in range(ROWS - 2, 0, -1)])
+RING_IDX = ", ".join(str(r * COLS + c) for r, c in ring)
+
+HEAD = '''###############################################################################
+# Pixel - an assistant that is a 12x8 LED matrix.
+#
+# No artwork: 96 dots, each a small rounded LVGL object, and every expression is
+# a pattern lit across them. Like `aura` and `bit` this costs nothing in flash
+# beyond its own code and deliberately does NOT nest base/screens/face.yaml.
+#
+# Two things make it read as a face rather than as a grid of lamps.
+#
+# Dots have BRIGHTNESS, not just on and off. Every cell is a level 0..255,
+# interpolated between the dim and the lit colour, which is what allows a
+# fading tail on the thinking spinner, a ripple while listening, and a breath
+# so slow it is felt rather than seen.
+#
+# A pupil is a DARKENED dot inside a lit 3x3 eye. At this density a separate
+# pupil would not fit, so the gaze is drawn by switching off one dot inside the
+# eye instead of by moving anything.
+#
+# COST: this is the heaviest character in the set - 96 widgets against seven for
+# a drawn face. Two things keep it affordable. Levels are computed into a buffer
+# and only the cells that actually CHANGED are repainted, so a still face costs
+# almost nothing per tick. And the repaint writes the colour straight through
+# the LVGL C API rather than through 96 YAML actions, which would repaint the
+# whole matrix every tick whether or not it changed.
+###############################################################################
+
+substitutions:
+  pixel_color: '0x4CFF7A'        # lit
+  pixel_off_color: '0x0C2413'    # unlit, but not black: the matrix stays visible
+  pixel_alarm_color: '0xFF4D4D'
+  pixel_dim_color: '0x2E4A38'    # muted, for when the microphone is off
+
+  pixel_dot: '%d'                # dot size
+  pixel_radius: '%d'
+  pixel_idle_cycle: '100'        # ticks for one blink-and-glance loop
+  pixel_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: pixel_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: pixel_expr
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # What is currently ON SCREEN. The next frame is compared against this so only
+  # changed dots are repainted.
+  - id: pixel_cur
+    type: uint8_t[%d]
+    restore_value: false
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/pixel.yaml (LED matrix %dx%d, no artwork)"
+
+script:
+  - id: pixel_tick_script
+    mode: single
+    then:
+      - lambda: |-
+''' % (DOT, RADIUS, N, COLS, ROWS)
+
+# ---------------------------------------------------------------- lambda body
+ptr_rows = []
+for r in range(ROWS):
+    ptr_rows.append("            " + ", ".join(f"id(px_{r}_{c})" for c in range(COLS)) + ",")
+PTRS = "\n".join(ptr_rows)
+
+LAMBDA = '''          // The widgets, once, in row-major order. A non-compound LVGL widget id is
+          // a plain lv_obj_t* in ESPHome, so the matrix can be walked as an array
+          // instead of unrolled into 96 separate actions.
+          static lv_obj_t *dots[%d] = {
+%s
+          };
+
+          // Perimeter walk, for the spinner that circles while thinking.
+          static const uint8_t ring[%d] = {%s};
+
+          // Wrapped: a free-running counter eventually costs sinf() its precision.
+          const int f = id(pixel_frame);
+          id(pixel_frame) = (f + 1) %% 36000;
+          const int phase = id(voice_assistant_phase);
+
+          uint8_t want[%d];
+          memset(want, 0, sizeof(want));
+
+          // PUT keeps the brightest claim on a cell, so overlapping effects (a
+          // ripple crossing the face) never darken what is already lit.
+          #define PUT(rr, cc, vv) do { \\
+              const int _i = (rr) * %d + (cc); \\
+              if ((rr) >= 0 && (rr) < %d && (cc) >= 0 && (cc) < %d && (vv) > want[_i]) \\
+                want[_i] = (uint8_t) (vv); \\
+            } while (0)
+
+          // --- the face ------------------------------------------------------
+          // Eyes are lit 3x3 blocks; the pupil is one dot switched down inside.
+          int gaze = 0;
+          bool blink = false, squint = false;
+          bool draw_face = true;
+
+          int idle_t = f %% ${pixel_idle_cycle};
+
+          if (phase == ${voice_assist_thinking_phase_id}) {
+            squint = true;
+            gaze = ((f %% 40) < 20) ? -1 : 1;
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            blink = true;
+          } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                     phase == ${voice_assist_error_phase_id}) {
+            draw_face = false;
+          } else if (phase == ${voice_assist_idle_phase_id}) {
+            blink = (idle_t == 0 || idle_t == 1 || idle_t == 5 || idle_t == 6);
+            if (idle_t >= 30 && idle_t < 40) gaze = -1;
+            else if (idle_t >= 50 && idle_t < 60) gaze = 1;
+          }
+
+          if (draw_face) {
+            const int eye_l[3] = {2, 3, 4};
+            const int eye_r[3] = {7, 8, 9};
+            if (blink) {
+              for (int k = 0; k < 3; k++) { PUT(3, eye_l[k], 255); PUT(3, eye_r[k], 255); }
+            } else {
+              const int r0 = squint ? 2 : 1;
+              const int r1 = 3;
+              for (int rr = r0; rr <= r1; rr++)
+                for (int k = 0; k < 3; k++) { PUT(rr, eye_l[k], 255); PUT(rr, eye_r[k], 255); }
+              // Pupil: assigned, not PUT, because it must darken a lit dot.
+              const int pr = squint ? 3 : 2;
+              want[pr * %d + (3 + gaze)] = 30;
+              want[pr * %d + (8 + gaze)] = 30;
+            }
+          }
+
+          // --- the mouth and whatever else the phase adds ---------------------
+          if (phase == ${voice_assist_listening_phase_id}) {
+            for (int rr = 5; rr <= 6; rr++)
+              for (int cc = 4; cc <= 7; cc++) PUT(rr, cc, 255);
+            // A ripple travelling outwards, low enough not to fight the face.
+            const float wave = fmodf(f * 0.45f, 8.0f);
+            for (int rr = 0; rr < %d; rr++)
+              for (int cc = 0; cc < %d; cc++) {
+                const float dx = (cc - 5.5f) * 0.55f, dy = rr - 3.0f;
+                const float dist = sqrtf(dx * dx + dy * dy);
+                if (fabsf(dist - wave) < 0.9f) PUT(rr, cc, 76);
+              }
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            PUT(6, 5, 217); PUT(6, 6, 217);
+            const int rl = (int) (sizeof(ring) / sizeof(ring[0]));
+            const uint8_t tail[4] = {255, 140, 76, 38};
+            for (int k = 0; k < 4; k++) {
+              const int idx = ring[((f * 2 - k) %% rl + rl) %% rl];
+              if (want[idx] < tail[k]) want[idx] = tail[k];
+            }
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            // The mouth opens and closes on deterministic noise: busy, but never
+            // flickering. Same trick as aura's equaliser.
+            uint32_t n = (uint32_t) (f * 73 + 151);
+            n = (n ^ (n >> 5)) * 2654435761u;
+            const int amp = (int) ((n >> 16) & 0xFF);
+            const int rows_open = 1 + amp * 3 / 256;
+            const int half = (amp > 140) ? 3 : 2;
+            for (int rr = 5; rr < 5 + rows_open; rr++)
+              for (int cc = 6 - half; cc < 6 + half; cc++) PUT(rr, cc, 255);
+          } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                     phase == ${voice_assist_error_phase_id}) {
+            for (int rr = 0; rr < %d; rr++)
+              // f/2, not f: keyed on `f` all 96 dots flip every tick, which is
+              // the most expensive state in this file - roughly three band passes
+              // over the whole screen, for as long as a timer rings.
+              for (int cc = 0; cc < %d; cc++) PUT(rr, cc, ((rr + cc + f / 2) %% 2) ? 255 : 51);
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            for (int cc = 3; cc <= 8; cc++) PUT(6, cc, 255);
+          } else {
+            // Idle: a smile with its corners lifted, over a breath that never
+            // quite stops.
+            for (int cc = 3; cc <= 8; cc++) PUT(6, cc, 255);
+            PUT(5, 2, 255); PUT(5, 9, 255);
+            // Quantised to steps of 8: a smooth breath would change all 96 cells
+            // on EVERY tick, which defeats the whole "repaint only what changed"
+            // scheme in the state the device sits in most of the time.
+            const int breath = ((26 + (int) (15.0f * sinf(f * 0.08f))) / 8) * 8;
+            for (int i = 0; i < %d; i++) if (want[i] < breath) want[i] = (uint8_t) breath;
+          }
+          #undef PUT
+
+          // --- paint only what changed ---------------------------------------
+          uint32_t lit = ${pixel_color};
+          if (phase == ${voice_assist_timer_finished_phase_id} ||
+              phase == ${voice_assist_error_phase_id}) lit = ${pixel_alarm_color};
+          else if (phase == ${voice_assist_muted_phase_id}) lit = ${pixel_dim_color};
+
+          // A colour change has to repaint everything, so track which colour the
+          // matrix is currently wearing.
+          static uint32_t painted = 0;
+          const bool recolour = (painted != lit);
+          painted = lit;
+
+          const uint32_t off = ${pixel_off_color};
+          const int off_r = (off >> 16) & 0xFF, off_g = (off >> 8) & 0xFF, off_b = off & 0xFF;
+          const int on_r = (lit >> 16) & 0xFF, on_g = (lit >> 8) & 0xFF, on_b = lit & 0xFF;
+
+          for (int i = 0; i < %d; i++) {
+            const uint8_t v = want[i];
+            if (!recolour && v == id(pixel_cur)[i]) continue;
+            id(pixel_cur)[i] = v;
+            const uint8_t r8 = (uint8_t) (off_r + (on_r - off_r) * v / 255);
+            const uint8_t g8 = (uint8_t) (off_g + (on_g - off_g) * v / 255);
+            const uint8_t b8 = (uint8_t) (off_b + (on_b - off_b) * v / 255);
+            lv_obj_set_style_bg_color(dots[i], lv_color_make(r8, g8, b8), 0);
+          }
+
+interval:
+  - interval: ${pixel_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: pixel_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: 0x000000
+      widgets:
+''' % (N, PTRS, len(ring), RING_IDX, N, COLS, ROWS, COLS, COLS, COLS,
+       ROWS, COLS, ROWS, COLS, N, N)
+
+widgets = []
+for r in range(ROWS):
+    for c in range(COLS):
+        x = (c - (COLS - 1) / 2) * PITCH
+        y = (r - (ROWS - 1) / 2) * PITCH
+        widgets.append(f"""        - obj:
+            id: px_{r}_{c}
+            align: CENTER
+            x: {int(x)}
+            y: {int(y)}
+            width: ${{pixel_dot}}
+            height: ${{pixel_dot}}
+            radius: ${{pixel_radius}}
+            bg_color: ${{pixel_off_color}}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0""")
+
+TAIL = """
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: pixel_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen
+"""
+
+body = HEAD + LAMBDA + "\n".join(widgets) + "\n" + TAIL
+io.open(OUT, "w", encoding="utf-8", newline="\n").write(body)
+print(f"{OUT}: {len(body.splitlines())} linii, {N} diod")

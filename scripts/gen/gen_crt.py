@@ -1,0 +1,328 @@
+"""Generuje base/faces/crt.yaml - terminal z fosforem i liniami skanowania."""
+import os
+
+# Sciezka liczona wzgledem tego pliku, nie zaszyta na sztywno. Generatory zyly
+# do 2026-07-20 w katalogu tymczasowym z absolutna sciezka do jednego dysku:
+# nie dalo sie ich uruchomic nigdzie indziej, a skasowanie katalogu skasowaloby
+# jedyne zrodlo tych plikow.
+_FACES = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "base", "faces")
+)
+import io
+
+SCAN_STEP = 8
+SCAN_N = 240 // SCAN_STEP          # 30 linii
+OUT = os.path.join(_FACES, "crt.yaml")
+
+HEAD = """###############################################################################
+# CRT - an old terminal, in green phosphor.
+#
+# No artwork: a header, a rule, one multi-line label and __SCAN_N__ static scanlines.
+# Like the other drawn characters it does NOT nest base/screens/face.yaml.
+#
+# This is the only character that SAYS anything. The core already publishes what
+# it heard and what it answered as `text_request` and `text_response`, so the
+# terminal just reads them: your words scroll up dim, the reply types itself out
+# bright underneath. That makes it the one character that doubles as subtitles,
+# which is worth knowing if anyone in the room is hard of hearing or the reply
+# went to a speaker in another room.
+#
+# The whole body is ONE label. Colours inside it come from LVGL recolor markup,
+# which is what lets a dim line and a bright line share a widget.
+#
+# The scanlines are __SCAN_N__ thin objects laid down once and never touched again. They
+# cost memory but no work: nothing in the animation writes to them.
+#
+# THIS CHARACTER HAS TEXT, and so is the only one that needs translating. Its
+# strings are all substitutions, and base/lang/*.yaml overrides them - every
+# other character is mute and reads the same in any language.
+###############################################################################
+
+substitutions:
+  crt_bg_color: '0x041208'
+  crt_text_color: '5CF58A'       # recolor markup: no 0x prefix
+  crt_dim_color: '1E6B38'
+  crt_head_color: '0x9BFFB8'
+  crt_alarm_color: 'FF8080'
+  crt_rule_color: '0x1E6B38'
+  crt_scan_color: '0x0A2415'     # barely above the background, on purpose
+
+  crt_font_family: Roboto Mono
+  crt_font_size: '15'
+  crt_line_space: '8'
+
+  # Layout. `cols` has to match the font: at size 15 a Roboto Mono glyph is
+  # about 9 px wide, so 32 columns fill 320 px with a margin either side.
+  crt_cols: '32'
+  crt_rows: '6'
+
+  # Every string the terminal prints. Override in base/lang/*.yaml.
+  crt_header: "VOICE TERMINAL"
+  crt_idle_hint: "awaiting wake word"
+  crt_listen_label: "input level"
+  crt_muted_text: "microphone off"
+  crt_timer_text: "** TIMER FINISHED **"
+  crt_error_text: "** ERROR **"
+  crt_think_text: "thinking"
+
+  crt_type_speed: '2'            # characters revealed per tick while replying
+  crt_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: crt_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # Ticks since the phase last changed. The reply types itself out against this
+  # rather than against the global frame, so it always starts from the first
+  # character however long the device has been running.
+  - id: crt_phase_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: crt_last_phase
+    type: int
+    restore_value: false
+    initial_value: "-1"
+  - id: crt_body_text
+    type: std::string
+    restore_value: false
+
+font:
+  - id: font_crt
+    file:
+      type: gfonts
+      family: ${crt_font_family}
+      weight: 400
+    size: ${crt_font_size}
+    # A terminal prints whatever the assistant says, so it needs real coverage.
+    # GF_Latin_Core carries Polish accents too.
+    glyphsets:
+      - GF_Latin_Core
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/crt.yaml (terminal, no artwork)"
+
+script:
+  - id: crt_compute
+    then:
+      - lambda: |-
+          const int COLS = ${crt_cols};
+          const int ROWS = ${crt_rows};
+          const int phase = id(voice_assistant_phase);
+
+          if (phase != id(crt_last_phase)) {
+            id(crt_last_phase) = phase;
+            id(crt_phase_frame) = 0;
+          } else {
+            id(crt_phase_frame)++;
+          }
+          const int pf = id(crt_phase_frame);
+          const int f = id(crt_frame);
+
+          // Hard-ish wrap at COLS, breaking on spaces where one is near enough.
+          // A terminal tolerates a blunt wrap; a word split mid-syllable looks
+          // like a bug rather than a style.
+          // `limit` caps how many rows one call may take. Without it the
+          // request could fill all six rows and the reply - the entire point of
+          // this character - was never printed at all.
+          auto wrap = [&](const std::string &src, const char *colour,
+                          std::vector<std::string> &out, int limit) {
+            const int cap = (int) out.size() + limit;
+            size_t i = 0;
+            while (i < src.size() && (int) out.size() < ROWS && (int) out.size() < cap) {
+              size_t take = (size_t) COLS;
+              if (i + take < src.size()) {
+                const size_t sp = src.rfind(' ', i + take);
+                if (sp != std::string::npos && sp > i + (size_t) (COLS / 2)) take = sp - i;
+              }
+              std::string line = src.substr(i, take);
+              out.push_back(std::string("#") + colour + " " + line + "#");
+              i += take;
+              while (i < src.size() && src[i] == ' ') i++;
+            }
+          };
+
+          std::vector<std::string> lines;
+          const char *BRIGHT = "${crt_text_color}";
+          const char *DIM = "${crt_dim_color}";
+
+          if (phase == ${voice_assist_listening_phase_id}) {
+            // NOT '#' for the bar. In LVGL recolor markup a '#' CLOSES the
+            // coloured run - it is not neutralised by being inside one - so a
+            // bar of hashes ended the colour at the first character and left
+            // LVGL parsing the rest as colour commands. The meter rendered as
+            // junk. '=' carries no meaning to the parser.
+            std::string bar = "> ";
+            const int span = COLS > 4 ? COLS - 4 : 1;   // never modulo by zero
+            const int n = 1 + (pf * 3 / 5) % span;
+            for (int i = 0; i < n; i++) bar += "=";
+            lines.push_back(std::string("#") + BRIGHT + " " + bar + "#");
+            lines.push_back(std::string("#") + DIM + "   ${crt_listen_label}#");
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            if (!id(text_request).state.empty())
+              wrap("> " + id(text_request).state, DIM, lines, 2);
+            std::string dots = "${crt_think_text}";
+            for (int i = 0; i < 1 + (pf / 3) % 4; i++) dots += ".";
+            lines.push_back(std::string("#") + BRIGHT + " " + dots + "#");
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            if (!id(text_request).state.empty())
+              wrap("> " + id(text_request).state, DIM, lines, 2);
+            const std::string &full = id(text_response).state;
+            const size_t shown = (size_t) (pf * ${crt_type_speed});
+            std::string part = shown >= full.size() ? full : full.substr(0, shown);
+            if (!part.empty()) wrap(part, BRIGHT, lines, ROWS);
+          } else if (phase == ${voice_assist_timer_finished_phase_id}) {
+            if (f % 6 < 3)
+              lines.push_back(std::string("#") + "${crt_alarm_color}" + " ${crt_timer_text}#");
+          } else if (phase == ${voice_assist_error_phase_id}) {
+            lines.push_back(std::string("#") + "${crt_alarm_color}" + " ${crt_error_text}#");
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            lines.push_back(std::string("#") + DIM + " ${crt_muted_text}#");
+          } else {
+            // Idle: a prompt with a cursor that blinks, and a hint far below it.
+            std::string prompt = "> ";
+            if (f % 10 < 5) prompt += "_";
+            lines.push_back(std::string("#") + BRIGHT + " " + prompt + "#");
+            while ((int) lines.size() < ROWS - 1) lines.push_back("");
+            lines.push_back(std::string("#") + DIM + " ${crt_idle_hint}#");
+          }
+
+          std::string body;
+          for (size_t i = 0; i < lines.size() && (int) i < ROWS; i++) {
+            if (i) body += "\\n";
+            body += lines[i];
+          }
+          id(crt_body_text) = body;
+
+  - id: crt_tick_script
+    mode: single
+    then:
+      - lambda: id(crt_frame) = (id(crt_frame) + 1) % 36000;
+      - script.execute: crt_compute
+      # Only when the text actually changed. lv_label_set_text never compares:
+      # it reallocs, copies and re-lays-out every time. In error and muted the
+      # string is a constant and this was rewriting it ten times a second; in
+      # idle only two ticks in ten carry a new cursor state.
+      - if:
+          condition:
+            lambda: |-
+              static std::string prev;
+              if (prev == id(crt_body_text)) return false;
+              prev = id(crt_body_text);
+              return true;
+          then:
+            - lvgl.label.update:
+                id: crt_body
+                text: !lambda return id(crt_body_text);
+
+interval:
+  - interval: ${crt_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: crt_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: ${crt_bg_color}
+      widgets:
+        - label:
+            id: crt_header_label
+            align: TOP_LEFT
+            x: 14
+            y: 10
+            text: "${crt_header}"
+            text_font: font_crt
+            text_color: ${crt_head_color}
+            pad_all: 0
+        - obj:
+            id: crt_rule
+            align: TOP_LEFT
+            x: 12
+            y: 32
+            width: 296
+            height: 1
+            radius: 0
+            bg_color: ${crt_rule_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - label:
+            id: crt_body
+            align: TOP_LEFT
+            x: 14
+            y: 44
+            # Explicit width: without one the label auto-sizes, so every text
+            # change re-runs a full layout pass instead of just redrawing.
+            width: 292
+            text: ""
+            recolor: true
+            text_font: font_crt
+            text_line_space: ${crt_line_space}
+            text_color: ${crt_head_color}
+            pad_all: 0
+
+"""
+
+scan = []
+for i in range(SCAN_N):
+    scan.append(f"""        - obj:
+            id: crt_scan_{i}
+            align: TOP_LEFT
+            x: 0
+            y: {i * SCAN_STEP}
+            width: 100%
+            height: 1
+            radius: 0
+            bg_color: ${{crt_scan_color}}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0""")
+
+TAIL = """
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: crt_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen
+"""
+
+body = HEAD.replace("__SCAN_N__", str(SCAN_N)) + "\n".join(scan) + "\n" + TAIL
+io.open(OUT, "w", encoding="utf-8", newline="\n").write(body)
+print(f"{OUT}: {len(body.splitlines())} linii, {SCAN_N} linii skanowania")

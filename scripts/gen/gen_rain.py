@@ -1,0 +1,306 @@
+"""Generuje base/faces/rain.yaml - spadajace znaki, 12 kolumn."""
+import os
+
+# Sciezka liczona wzgledem tego pliku, nie zaszyta na sztywno. Generatory zyly
+# do 2026-07-20 w katalogu tymczasowym z absolutna sciezka do jednego dysku:
+# nie dalo sie ich uruchomic nigdzie indziej, a skasowanie katalogu skasowaloby
+# jedyne zrodlo tych plikow.
+_FACES = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "base", "faces")
+)
+import io
+
+COLS, ROWS = 12, 12
+COLW = 26
+OUT = os.path.join(_FACES, "rain.yaml")
+
+HEAD = '''###############################################################################
+# Rain - falling characters, filling the screen.
+#
+# No artwork: %d columns of glyphs running down the screen, thin and slow while
+# idle, a full wall while thinking. Like the other drawn characters it does NOT
+# nest base/screens/face.yaml.
+#
+# NOTHING MOVES. Each column is a single label standing still, and the fall is
+# an illusion produced by rewriting its text every tick. That matters because
+# it means the character never touches widget coordinates, only text, which is
+# the cheapest thing a label can be asked to change.
+#
+# The brightness gradient down each trail - a white-hot head fading into a dark
+# tail - comes from LVGL's recolor markup (`recolor: true`), so one label can
+# carry many colours. Without it a label has a single colour and the whole
+# effect collapses into a flat green block.
+#
+# The font is a private one holding ONLY the glyphs below, so a monospace face
+# costs almost nothing in flash next to a full character set.
+###############################################################################
+
+substitutions:
+  rain_head_color: '7CFFA8'      # the leading glyph, brightest
+  rain_mid_color: '2EA85E'
+  rain_tail_color: '103A22'      # the last glyph before it disappears
+  rain_alarm_color: 'FF4D4D'
+  rain_dim_color: '2E4A38'
+
+  rain_font_family: Roboto Mono
+  rain_font_size: '16'
+  rain_line_spacing: '4'         # %d rows of (16 + 4) exactly fills 240 px
+
+  # How long a trail is, per phase. This is the whole personality: a short trail
+  # reads as drizzle, a trail longer than the screen reads as a downpour.
+  rain_tail_idle: '5'
+  rain_tail_listen: '7'
+  rain_tail_think: '11'
+  rain_tail_reply: '8'
+
+  # Colour shifts with the phase too. Speed alone was not enough to tell the
+  # phases apart: everything just looked like green rain going faster.
+  rain_listen_head: 'D8FFE8'     # near-white: it is paying attention
+  rain_reply_head: 'A8F0FF'      # cool, so speech does not read as thinking
+  rain_reply_mid: '2E8AA8'
+
+  # In idle only some columns run at all, which is what makes it read as
+  # drizzle rather than as a slower downpour.
+  rain_idle_cols: '5'
+
+  rain_speed_idle: '1'
+  rain_speed_listen: '2'
+  rain_speed_think: '3'
+  rain_speed_reply: '2'
+
+  rain_tick: 100ms
+
+  # Claim every phase. `page_face` is the id every character exposes, so a
+  # config can point a phase at the character without knowing which is installed.
+  idle_page: page_face
+  idle_page_alt: page_face
+  listening_page: page_face
+  thinking_page: page_face
+  replying_page: page_face
+  error_page: page_face
+  muted_page: page_face
+  timer_page: page_face
+
+globals:
+  - id: rain_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # One built string per column, filled by rain_compute and read by rain_draw.
+  - id: rain_text
+    type: std::string[%d]
+    restore_value: false
+
+font:
+  - id: font_rain
+    file:
+      type: gfonts
+      family: ${rain_font_family}
+      weight: 500
+    size: ${rain_font_size}
+    # Only what the rain actually prints. A full glyphset here would cost more
+    # flash than every other drawn character put together.
+    glyphs: "0123456789ABCDEF<>|/=+*-"
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/rain.yaml (falling glyphs, no artwork)"
+
+script:
+  - id: rain_compute
+    then:
+      - lambda: |-
+          static const char GLYPHS[] = "0123456789ABCDEF<>|/=+*-";
+          static const int NG = sizeof(GLYPHS) - 1;
+
+          const int f = id(rain_frame);
+          const int phase = id(voice_assistant_phase);
+
+          int tail = ${rain_tail_idle};
+          int speed = ${rain_speed_idle};
+          const char *head = "${rain_head_color}";
+          const char *mid = "${rain_mid_color}";
+          const char *dim = "${rain_tail_color}";
+
+          // Each phase changes the WEATHER, not just the speed:
+          //   idle       only a few columns run, short trails
+          //   listening  the rain freezes in place and shimmers
+          //   thinking   every column, full-length trails, fast
+          //   replying   all columns fall in step, as horizontal bands
+          bool frozen = false, sync = false;
+
+          if (phase == ${voice_assist_listening_phase_id}) {
+            tail = ${rain_tail_listen}; speed = ${rain_speed_listen};
+            frozen = true;
+            head = "${rain_listen_head}";
+          } else if (phase == ${voice_assist_thinking_phase_id}) {
+            tail = ${rain_tail_think}; speed = ${rain_speed_think};
+          } else if (phase == ${voice_assist_replying_phase_id}) {
+            tail = ${rain_tail_reply}; speed = ${rain_speed_reply};
+            sync = true;
+            head = "${rain_reply_head}"; mid = "${rain_reply_mid}";
+          } else if (phase == ${voice_assist_timer_finished_phase_id} ||
+                     phase == ${voice_assist_error_phase_id}) {
+            tail = ${rain_tail_think}; speed = ${rain_speed_think};
+            head = "${rain_alarm_color}"; mid = "${rain_alarm_color}"; dim = "${rain_dim_color}";
+          } else if (phase == ${voice_assist_muted_phase_id}) {
+            head = "${rain_dim_color}"; mid = "${rain_dim_color}"; dim = "${rain_dim_color}";
+          }
+
+          // While replying, one row across every column lights up and walks
+          // down the screen, so the wall pulses with the voice.
+          const int band = (phase == ${voice_assist_replying_phase_id})
+                         ? (int) ((f * 3 / 2) %% %d) : -1;
+
+          const bool idle = (phase == ${voice_assist_idle_phase_id});
+
+          for (int c = 0; c < %d; c++) {
+            // Each column gets its own offset, otherwise the rain falls as one
+            // flat wall and reads like a table rather than weather.
+            uint32_t o = (uint32_t) (c * 151);
+            o = (o ^ (o >> 5)) * 2654435761u;
+
+            // Spread by stride, not by hash: a hash happened to pick five
+            // neighbouring columns, so the drizzle fell on one half of the
+            // screen and looked like a fault rather than like weather.
+            if (idle && ((c * 5) %% %d) >= ${rain_idle_cols}) {
+              id(rain_text)[c] = "";      // this column is not raining at all
+              continue;
+            }
+
+            // Frozen: the trail stops descending and only the glyphs churn.
+            // Synced: every column shares one lead, so the rain arrives in
+            // horizontal bands instead of as independent streaks.
+            const int drift = frozen ? 0 : f * speed;
+            const int offset = sync ? 0 : (int) ((o >> 16) & 0x3F);
+            const int lead = ((drift + offset) / 2) %% (%d + tail);
+
+            std::string s;
+            s.reserve(%d * 12);
+            for (int r = 0; r < %d; r++) {
+              if (r) s += "\\n";
+              const int dist = lead - r;
+              // The band has to be tested BEFORE the trail check. It used to sit
+              // after the `continue`, so it could only recolour rows that already
+              // had a glyph - and since every column shares one `lead` while
+              // replying, the band was either exactly under the trail or nowhere
+              // at all. The documented bright row walking down the screen simply
+              // never appeared.
+              const bool on_band = (r == band);
+              if (!on_band && (dist < 0 || dist > tail)) continue;
+
+              const char *col = on_band ? head
+                                        : ((dist == 0) ? head : (dist <= 2 ? mid : dim));
+
+              // The glyph changes every few ticks, not every tick: faster and
+              // the trail stops reading as a trail and turns into static.
+              const int churn = frozen ? f : (f / 3);
+              uint32_t g = (uint32_t) (churn * 31 + r * 7 + c * 101);
+              g = (g ^ (g >> 5)) * 2654435761u;
+
+              s += "#";
+              s += col;
+              s += " ";
+              s += GLYPHS[((g >> 16) + r) %% NG];
+              s += "#";
+            }
+            id(rain_text)[c] = s;
+          }
+
+  - id: rain_draw
+    then:
+      # One lambda, and a write only when the string actually changed. This used
+      # to be twelve lvgl.label.update actions every tick. The twelve labels are
+      # adjacent and cover the whole screen, so LVGL merged them into one
+      # 320x240 dirty area - four draw-buffer passes - and re-parsed the recolor
+      # markup for every glyph. Most of it was waste: in idle seven columns are
+      # permanently empty and were still rewritten, and the glyphs only churn on
+      # every third tick, so roughly two ticks in three produced a byte-identical
+      # string.
+      - lambda: |-
+          static lv_obj_t *col[12] = {id(rain_col_0), id(rain_col_1), id(rain_col_2), id(rain_col_3), id(rain_col_4), id(rain_col_5), id(rain_col_6), id(rain_col_7), id(rain_col_8), id(rain_col_9), id(rain_col_10), id(rain_col_11)};
+          static std::string prev[12];
+          static bool primed = false;
+          for (int c = 0; c < 12; c++) {
+            const std::string &s = id(rain_text)[c];
+            if (primed && prev[c] == s) continue;
+            prev[c] = s;
+            lv_label_set_text(col[c], s.c_str());
+          }
+          primed = true;
+'''
+
+draw = []
+
+MID = '''
+  - id: rain_tick_script
+    mode: single
+    then:
+      # Wrapped: a free-running counter eventually costs sinf() its precision.
+      - lambda: id(rain_frame) = (id(rain_frame) + 1) % 36000;
+      - script.execute: rain_compute
+      - script.execute: rain_draw
+
+interval:
+  - interval: ${rain_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_face
+          then:
+            - script.execute: rain_tick_script
+
+lvgl:
+  pages:
+    - id: page_face
+      bg_color: 0x000000
+      widgets:
+'''
+
+widgets = []
+for c in range(COLS):
+    x = c * COLW + 6
+    widgets.append(f"""        - label:
+            id: rain_col_{c}
+            align: TOP_LEFT
+            x: {x}
+            y: 0
+            text: ""
+            recolor: true
+            text_font: font_rain
+            text_line_space: ${{rain_line_spacing}}
+            text_color: {'${rain_mid_color}'.replace('${rain_mid_color}', '0x2EA85E')}
+            pad_all: 0""")
+
+TAIL = """
+        # Same contract as every other character screen: a tap silences a
+        # ringing timer, or swaps idle screens when the config defines two.
+        - button:
+            id: rain_tap
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            on_click:
+              - if:
+                  condition:
+                    switch.is_on: timer_ringing
+                  then:
+                    - switch.turn_off: timer_ringing
+                  else:
+                    - if:
+                        condition:
+                          lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                        then:
+                          - script.execute: toggle_idle_screen
+"""
+
+body = (HEAD % (COLS, ROWS, COLS, ROWS, COLS, COLS, ROWS, ROWS, ROWS)
+        + "\n".join(draw) + MID + "\n".join(widgets) + "\n" + TAIL)
+io.open(OUT, "w", encoding="utf-8", newline="\n").write(body)
+print(f"{OUT}: {len(body.splitlines())} linii, {COLS} kolumn")
