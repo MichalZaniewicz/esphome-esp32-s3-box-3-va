@@ -785,18 +785,31 @@ voice_assistant:
     # microphone. That is what floods the log with "Not enough free bytes in ring
     # buffer" and "Wake word detection is already running".
     - script.execute: start_wake_word
-    - script.execute: set_idle_or_mute_phase
-    # Cleared BEFORE the redraw, not after. The other way round, draw_display
-    # read the sensors while they still held the last exchange, so the status
-    # screen kept showing the previous question and answer until some unrelated
-    # event happened to redraw it.
-    - text_sensor.template.publish:
-        id: text_request
-        state: ""
-    - text_sensor.template.publish:
-        id: text_response
-        state: ""
-    - script.execute: draw_display
+    # THE TAIL NEEDS THE SAME GUARD, for the same reason spelled out above. This
+    # handler can arrive here a full minute late - the wait above allows sixty
+    # seconds and the hold below as much again - and by then the pipeline has
+    # ended, so nothing stops the user starting a NEW conversation with the
+    # button or the wake word. Without this the late tail then forces the idle
+    # phase over a live listening screen and wipes the question and answer out
+    # from under it. start_wake_word above carries its own guards, which is why
+    # it stays outside.
+    - if:
+        condition:
+          not:
+            voice_assistant.is_running:
+        then:
+          - script.execute: set_idle_or_mute_phase
+          # Cleared BEFORE the redraw, not after. The other way round,
+          # draw_display read the sensors while they still held the last
+          # exchange, so the status screen kept showing the previous question
+          # and answer until some unrelated event happened to redraw it.
+          - text_sensor.template.publish:
+              id: text_request
+              state: ""
+          - text_sensor.template.publish:
+              id: text_response
+              state: ""
+          - script.execute: draw_display
   on_error:
     - if:
         condition:
@@ -805,8 +818,16 @@ voice_assistant:
           - lambda: id(voice_assistant_phase) = ${voice_assist_error_phase_id};
           - script.execute: draw_display
           - delay: 1s
-          - script.execute: set_idle_or_mute_phase
-          - script.execute: draw_display
+          # A second is long enough for the next conversation to have begun -
+          # on_end restarts the wake word after an error - and forcing the idle
+          # phase on top of it would blank a live listening screen.
+          - if:
+              condition:
+                not:
+                  voice_assistant.is_running:
+              then:
+                - script.execute: set_idle_or_mute_phase
+                - script.execute: draw_display
   on_client_connected:
     - lambda: id(init_in_progress) = false;
     - script.execute: start_wake_word
@@ -1394,9 +1415,18 @@ script:
             - logger.log:
                 level: INFO
                 format: "Assistant started by the button under the screen"
+            # THE SAME WINDOW AS on_wake_word_detected, and it needs the same
+            # flag. Between stopping the wake word and starting the pipeline
+            # there are 100 ms in which nothing is running and nothing is
+            # playing - so the watchdog, the media player's idle handler, or a
+            # start_wake_word parked in its wait would all happily start the
+            # wake word right before the pipeline opens the microphone. That is
+            # the ring buffer flood, reached by a second route.
+            - lambda: id(wake_start_pending) = true;
             - script.execute: stop_wake_word
             - delay: 100ms
             - voice_assistant.start:
+            - lambda: id(wake_start_pending) = false;
 
 # A DEAF DEVICE IS THE ONE FAILURE THAT MATTERS HERE, so this is the backstop.
 #
@@ -1658,10 +1688,17 @@ switch:
     optimistic: true
     restore_mode: DISABLED   # see diag_pause_lvgl above - fires in setup() otherwise
     entity_category: diagnostic
+    # BOTH of the others, because there are three models, not two. This used to
+    # disable okay_nabu alone and so left TWO running while claiming to leave
+    # one - a diagnostic that misreports its own state is worse than none, since
+    # the whole point is to answer "does the inference budget explain the missed
+    # wake words" with a number you can trust.
     on_turn_on:
       - micro_wake_word.disable_model: mww_okay_nabu
+      - micro_wake_word.disable_model: mww_hey_jarvis
     on_turn_off:
       - micro_wake_word.enable_model: mww_okay_nabu
+      - micro_wake_word.enable_model: mww_hey_jarvis
 
 select:
   - platform: template
