@@ -125,11 +125,6 @@ substitutions:
   hey_jarvis_probability_cutoff: '0.7'
   hey_jarvis_sliding_window: '3'
 
-  # Clock timezone in POSIX form - the device has no IANA database. It is only a
-  # fallback: HA's time platform syncs the clock at runtime. Grab yours from
-  # https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
-  posix_timezone: "UTC0"
-
   # ---------------------------------------------------------------------------
   # TTS routing (see the header). `tts_output_default` picks the boot default of
   # the "TTS output" select; the user can change it live in HA.
@@ -288,12 +283,15 @@ wifi:
 
 captive_portal:
 
-# HA owns the clock; the POSIX string is only the pre-sync fallback. Having a
-# real clock on the device is groundwork for anything time-based on the screen.
+# HA owns the clock, and the timezone with it. There is deliberately no
+# `timezone:` here: ESPHome's Home Assistant time platform defines
+# USE_HOMEASSISTANT_TIMEZONE only when the option is ABSENT, and then takes the
+# zone from Home Assistant along with the time. Setting a POSIX string here
+# would switch that off and pin the device to whatever was compiled in, which is
+# the opposite of what you want on a device that already talks to HA.
 time:
   - platform: homeassistant
     id: ha_time
-    timezone: ${posix_timezone}
 
 ###############################################################################
 # DISPLAY + TOUCH

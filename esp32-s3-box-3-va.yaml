@@ -21,11 +21,6 @@ substitutions:
   name: esp32-s3-box-3-va
   friendly_name: "S3 Box 3 Voice"
 
-  # POSIX form, not an IANA name - the device has no timezone database. Only a
-  # fallback until Home Assistant syncs the clock.
-  # https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
-  posix_timezone: "CET-1CEST,M3.5.0,M10.5.0/3"
-
   # Where spoken replies come out. `tts_output_default` is the boot default of
   # the "TTS output" select; you can change it live in Home Assistant.
   #   This device / External player / Both        (see README.md)

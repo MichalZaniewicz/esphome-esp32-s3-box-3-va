@@ -149,7 +149,7 @@ or smaller face rescales without touching the engine. Details:
 
 1. Copy `secrets.example.yaml` to `secrets.yaml` and fill in your Wi-Fi.
 2. Copy **`esp32-s3-box-3-va.yaml`** next to it and edit the `substitutions:` at
-   the top (device name, timezone, external media player, artwork). That thin
+   the top (device name, external media player, room sensors). That thin
    file is the only firmware file you keep; the core is pulled from GitHub at
    compile time, see its `packages:` block.
 3. **First flash over USB**, then updates go wireless:
@@ -199,12 +199,12 @@ Day-to-day settings are Home Assistant entities, not config edits: microphone
 mute, wake sound, screen brightness, TTS output, wake word engine location, the
 wake word itself and the timer switch.
 
-Four substitutions are worth deciding before the first flash:
+Three substitutions are worth deciding before the first flash. The clock is not
+among them: Home Assistant supplies the time zone along with the time.
 
 | Substitution | Default | What it does |
 |---|---|---|
 | `name` / `friendly_name` | `esp32-s3-box-3-va` / `S3 Box 3 Voice` | Device name. Changing `name` re-creates every entity in Home Assistant. |
-| `posix_timezone` | `UTC0` | Clock zone in POSIX form, since the device has no IANA database. Only a fallback until Home Assistant syncs the clock. |
 | `external_media_player_id` | `media_player.living_room` | Where the reply goes when `TTS output` is `External player` or `Both`. |
 | `tts_output_default` | `This device` | Boot default of that select. |
 
