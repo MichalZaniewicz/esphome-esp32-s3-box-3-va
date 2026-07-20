@@ -1487,6 +1487,17 @@ binary_sensor:
     id: home_button
     internal: true
     index: 0
+    # DEBOUNCE, because on_press fires on a single reported touch and the
+    # touchscreen occasionally reports one that nobody made. On 2026-07-20 at
+    # 22:32 the assistant started here with no wake sound and no detection, then
+    # listened for fifteen seconds and ended on "stt-no-text-recognized" -
+    # somebody who presses this button deliberately says something. A real
+    # fingertip rests well past 50 ms, so this costs nothing perceptible and
+    # drops single-frame noise. It will NOT help if a phantom touch turns out to
+    # last longer than the filter; if the log keeps showing unexplained starts,
+    # raise it or gate the button on the screen being awake.
+    filters:
+      - delayed_on: 50ms
     on_press:
       - if:
           condition:
