@@ -148,6 +148,9 @@ substitutions:
   # second or so of buffering, during which the box is already animating. This is
   # added to the hold so the mouth is still moving when the speaker finishes,
   # rather than stopping early by exactly that lag.
+  # How long to wait for the external speaker to actually start before
+  # giving up on it. Only used when its state is visible.
+  tts_wait_start_ms: '4000'
   tts_hold_lead_ms: '1200'
   tts_hold_base_ms: '700'
   tts_hold_ms_per_char: '70'
@@ -461,6 +464,10 @@ media_player:
               - not:
                   voice_assistant.is_running:
               - lambda: return !id(tts_reply_active);
+              # The wake beep ending lands here, milliseconds before the pipeline
+              # starts. Without this guard the wake word was restarted into the
+              # conversation it had just triggered.
+              - lambda: return !id(wake_start_pending);
           then:
             - script.execute: start_wake_word
             - script.execute: set_idle_or_mute_phase
@@ -523,6 +530,7 @@ micro_wake_word:
       probability_cutoff: ${hey_jarvis_probability_cutoff}
       sliding_window_size: ${hey_jarvis_sliding_window}
   on_wake_word_detected:
+    - lambda: id(wake_start_pending) = true;
     # The beep has to finish before the assistant opens the microphone: one I2S
     # bus, so capture and playback cannot overlap. `wait_until` rather than a
     # fixed delay, so a longer replacement sound still works.
@@ -559,6 +567,7 @@ micro_wake_word:
           - lambda: id(wake_sound_active) = false;
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
+    - lambda: id(wake_start_pending) = false;
 
 voice_assistant:
   id: va
@@ -663,10 +672,35 @@ voice_assistant:
         condition:
           lambda: return id(tts_output).current_option() != "This device";
         then:
-          - delay: !lambda |-
-              uint32_t ms = ${tts_hold_lead_ms} + ${tts_hold_base_ms}
-                          + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
-              return ms > ${tts_hold_max_ms} ? ${tts_hold_max_ms} : ms;
+          # FOLLOW THE SPEAKER IF WE CAN SEE IT. The original design assumed the
+          # box has no idea what the external player is doing, so the replying
+          # phase was held for a guess: a lead-in for cast buffering plus so many
+          # milliseconds per character. That guess is always wrong in one
+          # direction - the mouth stops early, or the wake word stays deaf for
+          # seconds after the room has gone quiet.
+          #
+          # Home Assistant knows exactly, and we already name the entity, so it
+          # costs one text sensor to subscribe to it. The estimate stays as the
+          # fallback for when that state is not available.
+          - if:
+              condition:
+                lambda: |-
+                  const std::string &st = id(external_player_state).state;
+                  return !st.empty() && st != "unknown" && st != "unavailable";
+              then:
+                - wait_until:
+                    condition:
+                      lambda: return id(external_player_state).state == "playing";
+                    timeout: ${tts_wait_start_ms}ms
+                - wait_until:
+                    condition:
+                      lambda: return id(external_player_state).state != "playing";
+                    timeout: ${tts_hold_max_ms}ms
+              else:
+                - delay: !lambda |-
+                    uint32_t ms = ${tts_hold_lead_ms} + ${tts_hold_base_ms}
+                                + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
+                    return ms > ${tts_hold_max_ms} ? ${tts_hold_max_ms} : ms;
     - lambda: id(tts_reply_active) = false;
     # Was an inline copy of start_wake_word's "On device" branch - MINUS its
     # `not voice_assistant.is_running` guard. That mattered: this handler waits
@@ -774,6 +808,15 @@ globals:
   # Set while the wake beep plays. Without it the media player's on_announcement
   # handler would treat the beep as user-initiated playback and flash the muted
   # screen between the wake word and the listening face.
+  # True from the moment a wake word fires until the pipeline has actually been
+  # started. Without it the wake beep finishing puts the media player into idle,
+  # and that trigger restarts the wake word - a fraction of a second before the
+  # assistant opens the microphone. The result was TFLite inference running for
+  # the whole conversation, alongside the audio streaming, for nothing.
+  - id: wake_start_pending
+    type: bool
+    restore_value: false
+    initial_value: "false"
   - id: wake_sound_active
     type: bool
     restore_value: false
@@ -1494,6 +1537,13 @@ select:
     initial_option: ${tts_output_default}
 
 text_sensor:
+  # What the external speaker is doing. Used to end the replying phase exactly
+  # when it stops, instead of estimating - see on_end.
+  - platform: homeassistant
+    id: external_player_state
+    entity_id: ${external_media_player_id}
+    internal: true
+
   - platform: template
     id: text_request
     internal: true
