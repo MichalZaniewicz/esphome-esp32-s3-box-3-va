@@ -73,10 +73,6 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
-  - id: pixel_expr
-    type: int
-    restore_value: false
-    initial_value: "0"
   # What is currently ON SCREEN. The next frame is compared against this so only
   # changed dots are repainted.
   - id: pixel_cur
@@ -174,13 +170,28 @@ LAMBDA = '''          // The widgets, once, in row-major order. A non-compound L
             for (int rr = 5; rr <= 6; rr++)
               for (int cc = 4; cc <= 7; cc++) PUT(rr, cc, 255);
             // A ripple travelling outwards, low enough not to fight the face.
+            //
+            // The distance of each lamp from the centre is fixed by the grid, so
+            // it is a table built once. It used to be __N__ square roots per
+            // tick, recomputing the same geometry, with only `wave` moving.
+            //
+            // Named markers rather than the positional kind: this template is
+            // filled from one long tuple, so adding a placeholder in the middle
+            // silently shifts every value after it.
+            static float DIST[__N__];
+            static bool dist_ready = false;
+            if (!dist_ready) {
+              for (int rr = 0; rr < __ROWS__; rr++)
+                for (int cc = 0; cc < __COLS__; cc++) {
+                  const float dx = (cc - 5.5f) * 0.55f, dy = rr - 3.0f;
+                  DIST[rr * __COLS__ + cc] = sqrtf(dx * dx + dy * dy);
+                }
+              dist_ready = true;
+            }
             const float wave = fmodf(f * 0.45f, 8.0f);
-            for (int rr = 0; rr < %d; rr++)
-              for (int cc = 0; cc < %d; cc++) {
-                const float dx = (cc - 5.5f) * 0.55f, dy = rr - 3.0f;
-                const float dist = sqrtf(dx * dx + dy * dy);
-                if (fabsf(dist - wave) < 0.9f) PUT(rr, cc, 76);
-              }
+            for (int rr = 0; rr < __ROWS__; rr++)
+              for (int cc = 0; cc < __COLS__; cc++)
+                if (fabsf(DIST[rr * __COLS__ + cc] - wave) < 0.9f) PUT(rr, cc, 76);
           } else if (phase == ${voice_assist_thinking_phase_id}) {
             PUT(6, 5, 217); PUT(6, 6, 217);
             const int rl = (int) (sizeof(ring) / sizeof(ring[0]));
@@ -262,7 +273,7 @@ lvgl:
       bg_color: 0x000000
       widgets:
 ''' % (N, PTRS, len(ring), RING_IDX, N, COLS, ROWS, COLS, COLS, COLS,
-       ROWS, COLS, ROWS, COLS, N, N)
+       ROWS, COLS, N, N)
 
 widgets = []
 for r in range(ROWS):
@@ -307,5 +318,9 @@ TAIL = """
 """
 
 body = HEAD + LAMBDA + "\n".join(widgets) + "\n" + TAIL
+# Named markers, resolved after the positional %-formatting above has run.
+body = (body.replace("__ROWS__", str(ROWS))
+            .replace("__COLS__", str(COLS))
+            .replace("__N__", str(N)))
 io.open(OUT, "w", encoding="utf-8", newline="\n").write(body)
 print(f"{OUT}: {len(body.splitlines())} linii, {N} diod")

@@ -156,7 +156,11 @@ script:
   - id: kitt_tick_script
     mode: single
     then:
-      - lambda: id(kitt_frame)++;
+      # WRAPPED, like every other character's counter. The idle patrol is what
+      # this thing does almost all the time, and it drives fmodf(f * speed, ...)
+      # - so an unbounded f is exactly the value that loses precision first, and
+      # in the animation that is on screen most.
+      - lambda: id(kitt_frame) = (id(kitt_frame) + 1) % 36000;
       - script.execute: kitt_compute
       - script.execute: kitt_draw
 

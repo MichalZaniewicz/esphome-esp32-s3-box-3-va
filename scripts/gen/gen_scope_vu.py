@@ -79,6 +79,12 @@ globals:
     type: int
     restore_value: false
     initial_value: "0"
+  # 0 = nothing painted yet, 1 = normal trace colour, 2 = alarm. Only used to
+  # skip repainting a colour that is already on the widget.
+  - id: scope_tint_state
+    type: int
+    restore_value: false
+    initial_value: "0"
 
 font:
   - id: font_scope
@@ -106,7 +112,24 @@ script:
           // the call. Static, not local.
           static lv_point_precise_t pts[__NPT__];
 
-          const int f = id(scope_frame)++;
+          // The envelope that fades the trace towards both edges depends only on
+          // the point index, never on the frame or the phase, so it is a
+          // constant table - but it was being rebuilt every tick: __NPT__ sinf
+          // AND __NPT__ powf, ten times a second. powf has no hardware behind it
+          // on this chip and is the most expensive call in the file.
+          static float ENV[__NPT__];
+          static bool env_ready = false;
+          if (!env_ready) {
+            for (int k = 0; k < __NPT__; k++)
+              ENV[k] = powf(sinf(3.14159f * k / (__NPT__ - 1)), 0.6f);
+            env_ready = true;
+          }
+
+          // WRAPPED. vu.yaml comes out of this same generator and has always
+          // wrapped; scope did not, and it feeds f into every sinf it draws, so
+          // it was the one that would eventually go coarse and jerky.
+          const int f = id(scope_frame);
+          id(scope_frame) = (f + 1) % 36000;
           const int phase = id(voice_assistant_phase);
           const float X0 = __GX0__, X1 = __GX1__;
           const float MID = (__GY0__ + __GY1__) / 2.0f;
@@ -138,7 +161,7 @@ script:
                 // envelope fades the edges, so it reads as a signal coming in
                 // rather than as a test pattern standing still.
                 const float swell = 0.38f + 0.62f * (0.5f + 0.5f * sinf(f * 0.24f));
-                const float env = powf(sinf(3.14159f * k / (N - 1)), 0.6f);
+                const float env = ENV[k];
                 const float wave = (sinf(u * 3.0f - f * 0.55f)
                                   + 0.38f * sinf(u * 7.0f - f * 0.95f)) / 1.38f;
                 y = MID - AMP * 0.92f * swell * env * wave;
@@ -158,15 +181,32 @@ script:
           }
           lv_line_set_points(id(scope_trace)->obj, pts, N);
 
+  # ONLY WHEN THE COLOUR ACTUALLY CHANGES. This used to run on every tick, ten
+  # times a second, and it was the last place in the whole character set still
+  # doing that. The colour has exactly two values and moves only when the phase
+  # crosses into or out of alarm, so almost every call repainted what was
+  # already there - and lvgl.widget.update never compares. It is not a cheap
+  # repaint either: the trace widget spans __GW__x__GH__ px, more than two
+  # passes of the draw buffer, on top of what lv_line_set_points already dirties.
   - id: scope_tint
     then:
-      - lvgl.widget.update:
-          id: scope_trace
-          line_color: !lambda |-
-            const int p = id(voice_assistant_phase);
-            if (p == ${voice_assist_timer_finished_phase_id} ||
-                p == ${voice_assist_error_phase_id}) return lv_color_hex(${scope_alarm_color});
-            return lv_color_hex(${scope_trace_color});
+      - if:
+          condition:
+            lambda: |-
+              const int p = id(voice_assistant_phase);
+              const int want = (p == ${voice_assist_timer_finished_phase_id} ||
+                                p == ${voice_assist_error_phase_id}) ? 2 : 1;
+              if (want == id(scope_tint_state)) return false;
+              id(scope_tint_state) = want;
+              return true;
+          then:
+            - lvgl.widget.update:
+                id: scope_trace
+                line_color: !lambda |-
+                  const int p = id(voice_assistant_phase);
+                  if (p == ${voice_assist_timer_finished_phase_id} ||
+                      p == ${voice_assist_error_phase_id}) return lv_color_hex(${scope_alarm_color});
+                  return lv_color_hex(${scope_trace_color});
 
 interval:
   - interval: ${scope_tick}
@@ -275,6 +315,7 @@ scope = (SCOPE.replace("__GRID__", "\n".join(grid))
               .replace("__NPT__", str(NPT))
               .replace("__GX0__", str(GX0)).replace("__GX1__", str(GX1))
               .replace("__GY0__", str(GY0)).replace("__GY1__", str(GY1))
+              .replace("__GW__", str(GX1 - GX0)).replace("__GH__", str(GY1 - GY0))
               .replace("__MIDY__", str((GY0 + GY1) // 2)))
 io.open(R + "scope.yaml", "w", encoding="utf-8", newline="\n").write(scope)
 print(f"scope.yaml: {len(scope.splitlines())} linii")

@@ -239,7 +239,13 @@ script:
   - id: aura_tick_script
     mode: single
     then:
-      - lambda: id(aura_frame)++;
+      # Wrapped, like every other character's counter. Aura feeds this straight
+      # into sinf() for the breathing and the sweep, and it is the DEFAULT
+      # character - the one left on screen longest - so it is the one where an
+      # unbounded counter would eventually turn the breath into a visible
+      # stutter. 36000 is divisible by the cycles used below, so the wrap itself
+      # does not show.
+      - lambda: id(aura_frame) = (id(aura_frame) + 1) % 36000;
       # Repaint the colour only on a phase change.
       - if:
           condition:

@@ -220,8 +220,20 @@ script:
             lv_obj_set_height((lv_obj_t *) id(bit_pupil_r), ph);
             lv_obj_set_x((lv_obj_t *) id(bit_pupil_r), gx + ${bit_eye_offset});
           }
-          p_ew = ew; p_eh = eh; p_pw = pw; p_ph = ph;
-          p_gx = gx; p_mw = mw; p_mh = mh; p_pup = pup;
+          p_ew = ew; p_eh = eh; p_mw = mw; p_mh = mh; p_pup = pup;
+          // ONLY WHEN THE PUPILS WERE ACTUALLY WRITTEN. These three used to be
+          // updated unconditionally, including on ticks where the block above
+          // was skipped because the pupils were hidden - so the cache claimed a
+          // geometry that had never been sent to the widget. Hide the pupils and
+          // bring them back at the same size and position, and the write would
+          // be skipped as a no-op while the widget still held the old one.
+          //
+          // Not reachable today: hiding always comes with eh == 6, which forces
+          // ph negative, and returning forces ph positive, so the value always
+          // differs and the block always runs. That is luck, resting on the
+          // relationship between bit_eye_h, bit_pupil_size and the constant in
+          // the ph line - change any of them and it becomes a stuck pupil.
+          if (pup) { p_pw = pw; p_ph = ph; p_gx = gx; }
           primed = true;
 
   # Colours are repainted only when the phase group changes, so they cost
