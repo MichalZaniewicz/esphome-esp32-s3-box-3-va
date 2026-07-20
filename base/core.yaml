@@ -588,6 +588,23 @@ voice_assistant:
     - lambda: |-
         id(tts_chars) = x.length();
         id(tts_reply_active) = true;
+    # FREE THE I2S BUS BEFORE THE REPLY ARRIVES. With a media player attached,
+    # ESPHome starts playing the TTS itself the moment the URL lands at TTS_END,
+    # and it does not wait for the microphone to let go of the single I2S bus.
+    # That start then fails with "Parent bus is busy", the driver retries a FULL
+    # SECOND later, and the wake word does not come back until it has finished
+    # flailing - about two and a half seconds deaf after every single answer.
+    #
+    # It has to be done HERE rather than in on_tts_end, because by then
+    # ESPHome's own playback call has already gone out; TTS_START is the last
+    # point we get before it. This costs nothing: the wake word is stopped
+    # during a reply anyway, and on_idle starts it again afterwards.
+    - micro_wake_word.stop:
+    - wait_until:
+        condition:
+          not:
+            micro_wake_word.is_running:
+        timeout: 1s
     - text_sensor.template.publish:
         id: text_response
         state: !lambda return x;
