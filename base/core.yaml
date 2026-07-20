@@ -622,6 +622,7 @@ voice_assistant:
   on_tts_start:
     - lambda: |-
         id(tts_chars) = x.length();
+        id(tts_started_ms) = millis();
         id(tts_reply_active) = true;
     - text_sensor.template.publish:
         id: text_response
@@ -735,11 +736,18 @@ voice_assistant:
                 # back to roughly the old behaviour instead of standing deaf for
                 # the full timeout. A flat 30 s cap here would mean half a minute
                 # of not listening after every single reply.
+                # FROM WHEN THE REPLY STARTED, not from now. The estimate says
+                # how long the whole answer takes to speak, so measuring it from
+                # here adds it ON TOP of everything already waited for above -
+                # and above is a wait for local playback that can itself run the
+                # length of the reply. In "Both" that doubled the deafness: the
+                # box finished speaking, and only then did the clock for the
+                # external speaker start.
                 - lambda: |-
                     uint32_t ms = ${tts_hold_lead_ms} + ${tts_hold_base_ms}
                                 + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
                     if (ms > ${tts_hold_max_ms}) ms = ${tts_hold_max_ms};
-                    id(hold_deadline) = millis() + ms;
+                    id(hold_deadline) = id(tts_started_ms) + ms;
                 - wait_until:
                     condition:
                       lambda: |-
@@ -768,10 +776,17 @@ voice_assistant:
                             lambda: return millis() > id(hold_deadline);
                           timeout: ${tts_hold_max_ms}ms
               else:
+                # Same correction as above: what is left of the estimate counted
+                # from the start of the reply, not the whole estimate counted
+                # from here. Clamped at zero, because by this point the reply has
+                # often already outlived it.
                 - delay: !lambda |-
                     uint32_t ms = ${tts_hold_lead_ms} + ${tts_hold_base_ms}
                                 + (uint32_t) id(tts_chars) * ${tts_hold_ms_per_char};
-                    return ms > ${tts_hold_max_ms} ? ${tts_hold_max_ms} : ms;
+                    if (ms > ${tts_hold_max_ms}) ms = ${tts_hold_max_ms};
+                    const uint32_t deadline = id(tts_started_ms) + ms;
+                    const uint32_t now = millis();
+                    return now >= deadline ? 0 : deadline - now;
     - lambda: id(tts_reply_active) = false;
     # Was an inline copy of start_wake_word's "On device" branch - MINUS its
     # `not voice_assistant.is_running` guard. That mattered: this handler waits
@@ -950,6 +965,13 @@ globals:
   # Length of the reply being spoken, for the external-playback hold above.
   - id: tts_chars
     type: int
+    restore_value: false
+    initial_value: "0"
+  # When the reply began, in millis(). The hold below is an estimate of how long
+  # the whole answer takes to SPEAK, so it has to be measured from here - on_end
+  # reaches that code long after this, having already waited out local playback.
+  - id: tts_started_ms
+    type: uint32_t
     restore_value: false
     initial_value: "0"
 
