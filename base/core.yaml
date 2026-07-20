@@ -1327,6 +1327,14 @@ script:
               - not:
                   voice_assistant.is_running:
           then:
+            # Says so in the log. A pipeline that starts with no "Detected" line
+            # and no wake beep looks identical whether it came from the button
+            # under the screen or from Home Assistant calling start_va - and
+            # those need very different debugging. Without this the log cannot
+            # tell them apart.
+            - logger.log:
+                level: INFO
+                format: "Assistant started by the button under the screen"
             - script.execute: stop_wake_word
             - delay: 100ms
             - voice_assistant.start:
