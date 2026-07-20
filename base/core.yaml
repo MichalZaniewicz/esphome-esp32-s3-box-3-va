@@ -1563,6 +1563,7 @@ binary_sensor:
     filters:
       - delayed_on: 50ms
     on_press:
+      - lambda: id(btn_down_ms) = millis();
       - if:
           condition:
             switch.is_on: timer_ringing
@@ -1570,29 +1571,14 @@ binary_sensor:
             - switch.turn_off: timer_ringing
           else:
             - script.execute: tap_to_talk
-
-  # A DIAGNOSTIC TWIN OF THE BUTTON ABOVE. It starts nothing and silences
-  # nothing; it reports how long each touch lasted, including the ones the
-  # filter above throws away.
-  #
-  # It exists because on 2026-07-20, between 22:32 and 22:42, the button started
-  # SIXTEEN pipelines - roughly one every forty seconds - and all but two ended
-  # on "stt-no-text-recognized". Nobody was pressing it. That matters far beyond
-  # a stray screen: each phantom takes the microphone for about fifteen seconds
-  # while the pipeline waits for speech that never comes, and the wake word
-  # cannot run in that time. A device that does this every forty seconds is deaf
-  # for a large part of the day, which looks exactly like "the wake word is
-  # unreliable".
-  #
-  # The debounce above is a guess until these numbers exist. If the log shows
-  # touches of a few milliseconds, it is enough; if they last longer, this twin
-  # is what will say so instead of another round of guessing.
-  - platform: gt911
-    id: home_button_raw
-    internal: true
-    index: 0
-    on_press:
-      - lambda: id(btn_down_ms) = millis();
+    # How long the touch lasted, which is the number the debounce above was set
+    # blind. A real fingertip rests for well over a hundred milliseconds; if the
+    # phantom presses report far less, the filter is doing its job, and if they
+    # report more, this says by how much instead of inviting another guess.
+    #
+    # NOTE that the filter above delays on_press, so this measures the touch
+    # MINUS the debounce. Anything the filter drops entirely never appears here
+    # at all - a press that is invisible in this log is one the debounce ate.
     on_release:
       - logger.log:
           level: INFO
@@ -1783,35 +1769,39 @@ select:
           condition:
             lambda: return !id(init_in_progress);
           then:
-            # Never switch engines mid-pipeline.
+            # Wait out a conversation before swapping engines - up to thirty
+            # seconds. NOT "never switch mid-pipeline", which is what this said
+            # before: wait_until CONTINUES when its timeout expires, it does not
+            # abandon the rest of the actions. So a conversation still running
+            # after thirty seconds gets the switch anyway. That is the lesser
+            # evil, since the select already shows the new value and refusing
+            # would leave the UI lying about which engine is live.
             - wait_until:
                 condition:
                   lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id} || id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
                 timeout: 30s
+            # Stop the engine being LEFT. This cannot go through stop_wake_word:
+            # that script reads the select, and the select already holds the new
+            # value by the time this runs - it would stop the engine we are
+            # about to start.
             - if:
                 condition:
                   lambda: return x == "In Home Assistant";
                 then:
                   - micro_wake_word.stop:
-                  - delay: 500ms
-                  - if:
-                      condition:
-                        switch.is_off: mute
-                      then:
-                        - lambda: id(va).set_use_wake_word(true);
-                        - voice_assistant.start_continuous:
-            - if:
-                condition:
-                  lambda: return x == "On device";
-                then:
+                else:
                   - lambda: id(va).set_use_wake_word(false);
                   - voice_assistant.stop:
-                  - delay: 500ms
-                  - if:
-                      condition:
-                        switch.is_off: mute
-                      then:
-                        - micro_wake_word.start:
+            - delay: 500ms
+            # Starting DOES go through the script, which reads the select and so
+            # picks the right engine by itself. It also carries the guards this
+            # used to bypass: not into a running pipeline, not while the speaker
+            # holds the I2S bus, and not inside the wake-beep window.
+            - if:
+                condition:
+                  switch.is_off: mute
+                then:
+                  - script.execute: start_wake_word
 
   # Where spoken replies come out. (The timer alarm ignores this and always rings
   # on the box.) "External player" keeps the box from downloading and decoding
