@@ -11,6 +11,18 @@
 # speeds in opposite directions, which is what makes it look mechanical rather
 # than merely animated.
 #
+# WHY THE HUD IS THIS SIZE, AND NOT BIGGER. The core's draw buffer is 25% of
+# the screen, 19200 px. LVGL renders a dirty area in bands that fit that buffer,
+# redrawing every widget intersecting each band. The first version put the arcs
+# on a 200 px circle: 40000 px of dirty area, three bands, three passes over
+# seven of the most expensive shapes LVGL draws - the device measured 250-326 ms
+# per LVGL operation and could not keep up with a 150 ms tick.
+#
+# Everything that moves now fits inside 132x132 = 17424 px, one band, one pass.
+# The rings and the tick marks sit deliberately OUTSIDE that box, so they are
+# never caught in the redraw at all. If you enlarge the arcs, check this sum
+# again: crossing 19200 costs a whole extra pass over the whole area.
+#
 # HOW THE ARCS ARE TURNED, AND WHY NOT THE OBVIOUS WAY. `lvgl.arc.update` can
 # set start_angle and end_angle, and that is how this was written first - but it
 # routes each property through ESPHome's style machinery, so fourteen style
@@ -52,12 +64,12 @@ substitutions:
   # Core radii per phase. The core is the only part that changes size, so it
   # carries most of the character: small and still when idle, wide open while
   # listening, tight while thinking, pulsing while speaking.
-  jarvis_core_idle: '20'
-  jarvis_core_listen: '30'
-  jarvis_core_think: '18'
-  jarvis_core_reply: '22'
-  jarvis_core_alarm: '34'
-  jarvis_core_ring: '6'             # width of the core's outer band
+  jarvis_core_idle: '15'
+  jarvis_core_listen: '23'
+  jarvis_core_think: '13'
+  jarvis_core_reply: '17'
+  jarvis_core_alarm: '26'
+  jarvis_core_ring: '5'             # width of the core's outer band
 
   # Degrees per tick, outer ring then inner. Negative inner means the two rings
   # counter-rotate, which is what stops it reading as one spinning wheel.
@@ -288,8 +300,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 200
-            height: 200
+            width: 150
+            height: 150
             radius: 120
             bg_opa: TRANSP
             border_width: 1
@@ -300,8 +312,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 132
-            height: 132
+            width: 104
+            height: 104
             radius: 120
             bg_opa: TRANSP
             border_width: 2
@@ -313,8 +325,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 266, 120
-              - 280, 120
+              - 240, 120
+              - 253, 120
             line_width: 2
             line_color: ${jarvis_color}
         - line:
@@ -323,8 +335,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 252, 173
-              - 259, 177
+              - 229, 160
+              - 235, 164
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -333,8 +345,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 213, 212
-              - 217, 219
+              - 200, 189
+              - 204, 195
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -343,8 +355,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 160, 226
-              - 160, 240
+              - 160, 200
+              - 160, 213
             line_width: 2
             line_color: ${jarvis_color}
         - line:
@@ -353,8 +365,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 107, 212
-              - 103, 219
+              - 120, 189
+              - 117, 195
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -363,8 +375,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 68, 173
-              - 61, 177
+              - 91, 160
+              - 85, 164
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -373,8 +385,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 54, 120
-              - 40, 120
+              - 80, 120
+              - 67, 120
             line_width: 2
             line_color: ${jarvis_color}
         - line:
@@ -383,8 +395,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 68, 67
-              - 61, 63
+              - 91, 80
+              - 85, 76
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -393,8 +405,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 107, 28
-              - 103, 21
+              - 120, 51
+              - 116, 45
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -403,8 +415,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 160, 14
-              - 160, 0
+              - 160, 40
+              - 160, 27
             line_width: 2
             line_color: ${jarvis_color}
         - line:
@@ -413,8 +425,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 213, 28
-              - 217, 21
+              - 200, 51
+              - 204, 45
             line_width: 2
             line_color: ${jarvis_dim_color}
         - line:
@@ -423,8 +435,8 @@ lvgl:
             x: 0
             y: 0
             points:
-              - 252, 67
-              - 259, 63
+              - 229, 80
+              - 235, 76
             line_width: 2
             line_color: ${jarvis_dim_color}
         - arc:
@@ -432,8 +444,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 176
-            height: 176
+            width: 132
+            height: 132
             start_angle: 0
             end_angle: 38
             min_value: 0
@@ -455,8 +467,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 176
-            height: 176
+            width: 132
+            height: 132
             start_angle: 120
             end_angle: 158
             min_value: 0
@@ -478,8 +490,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 176
-            height: 176
+            width: 132
+            height: 132
             start_angle: 240
             end_angle: 278
             min_value: 0
@@ -501,8 +513,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 116
-            height: 116
+            width: 88
+            height: 88
             start_angle: 0
             end_angle: 22
             min_value: 0
@@ -524,8 +536,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 116
-            height: 116
+            width: 88
+            height: 88
             start_angle: 90
             end_angle: 112
             min_value: 0
@@ -547,8 +559,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 116
-            height: 116
+            width: 88
+            height: 88
             start_angle: 180
             end_angle: 202
             min_value: 0
@@ -570,8 +582,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 116
-            height: 116
+            width: 88
+            height: 88
             start_angle: 270
             end_angle: 292
             min_value: 0
@@ -689,8 +701,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 40
-            height: 40
+            width: 30
+            height: 30
             radius: 120
             bg_color: ${jarvis_color}
             bg_opa: COVER
@@ -701,8 +713,8 @@ lvgl:
             align: CENTER
             x: 0
             y: 0
-            width: 28
-            height: 28
+            width: 20
+            height: 20
             radius: 120
             bg_color: ${jarvis_hot_color}
             bg_opa: COVER
