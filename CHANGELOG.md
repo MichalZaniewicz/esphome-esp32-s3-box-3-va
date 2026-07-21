@@ -15,12 +15,21 @@ their alarm, the touchscreen, the home screen and the animated character.
 - **The display layer is LVGL, not `display:` + `pages:`.** Same phases and same
   illustrations, but as LVGL pages, with the GT911 touchscreen wired in. The two
   approaches cannot coexist in one ESPHome config, so this is a replacement.
-- **`voice_assistant:` no longer has a `media_player:`.** With one attached,
-  ESPHome fetches and decodes the TTS URL on-device at `TTS_END` in addition to
-  anything `on_tts_end` does; on long replies that rebooted the box. Routing is
-  now explicit in the `TTS output` select (`This device` / `External player` /
-  `Both`). Timer sounds and HA announcements still go through the
-  `speaker_media_player` component.
+- **Routing is explicit, in the `TTS output` select** (`This device` /
+  `External player` / `Both`), rather than implied by the hardware.
+
+  `voice_assistant:` was going to drop its `media_player:` to stop ESPHome
+  fetching and decoding the TTS URL on-device at `TTS_END`, which is the
+  suspected cause of mid-answer reboots on long replies. **That did not survive
+  contact with Home Assistant and the attachment is still there.**
+  `get_feature_flags()` only advertises ANNOUNCE when a media player is present,
+  and Home Assistant only asks a satellite for its configuration - the wake word
+  list - inside `if feature_flags & ANNOUNCE`. Without one there is no wake word
+  picker in HA and the satellite never returns to `idle`.
+
+  So the box downloads and decodes every reply whatever the routing says, and
+  `External player` currently means "the external speaker also gets it", not
+  "the box leaves it alone". See the header of `base/core.yaml`.
 - **Illustrations are `RGB565`** instead of 24-bit `RGB`, matching LVGL's colour
   depth: no conversion at draw time and ~150 KB of flash each instead of ~230 KB.
 - **Timer UI moved to LVGL's top layer**, so the countdown and progress strip
