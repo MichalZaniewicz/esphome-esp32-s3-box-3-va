@@ -804,6 +804,24 @@ voice_assistant:
     # phase over a live listening screen and wipes the question and answer out
     # from under it. start_wake_word above carries its own guards, which is why
     # it stays outside.
+    #
+    # AND IT HAS TO WAIT, not test once. Testing once was wrong by 24 ms and it
+    # left the screen saying "speaking" indefinitely. On 2026-07-21 the reply
+    # finished at 07:24:44.844, this line was reached about 07:24:44.85 while the
+    # assistant was still in RESPONSE_FINISHED - so "not running" was false, the
+    # tail was skipped, and nothing else resets the phase. The pipeline reached
+    # IDLE at 07:24:44.874, thirty milliseconds too late to be seen. The wake
+    # word survived the same race only because it waits.
+    #
+    # The timeout is short on purpose. It is long enough to cover the gap between
+    # the announcement ending and the pipeline settling, and far too short to
+    # cover a real new conversation - so a genuinely late tail arriving over a
+    # live interaction still finds the assistant running and still stands down.
+    - wait_until:
+        condition:
+          not:
+            voice_assistant.is_running:
+        timeout: 2s
     - if:
         condition:
           not:
