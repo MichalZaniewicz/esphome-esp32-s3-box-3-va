@@ -1,6 +1,6 @@
 """Sprawdza, czy generatory nadal produkuja to, co lezy w repo.
 
-Osiem plikow postaci nie jest pisanych recznie - powstaja ze skryptow w
+Siedem plikow postaci nie jest pisanych recznie - powstaja ze skryptow w
 scripts/gen/. Taki uklad ma jedna cicha pulapke i wpadlismy w nia 2026-07-20:
 zoptymalizowalem kitt.yaml bezposrednio, generatora nie tknalem, i przez tydzien
 nikt tego nie zauwazyl. Uruchomienie generatora skasowaloby te prace bez slowa

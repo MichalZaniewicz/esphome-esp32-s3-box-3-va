@@ -10,10 +10,10 @@ config can point a phase at it without knowing which one is in use.
 
 ![The seven characters across five phases](../assets/characters.png)
 
-Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [iris](../assets/demo/demo-iris.gif) · [rain](../assets/demo/demo-rain.gif) · [crt](../assets/demo/demo-crt.gif) · [jarvis](../assets/demo/demo-jarvis.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif) · [kitt](../assets/demo/demo-kitt.gif) · [nixie](../assets/demo/demo-nixie.gif) · [scope](../assets/demo/demo-scope.gif) · [vu](../assets/demo/demo-vu.gif) · [rhea](../assets/demo/demo-rhea.gif) · [rufus](../assets/demo/demo-rufus.gif) · [agnes](../assets/demo/demo-agnes.gif)
+Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [iris](../assets/demo/demo-iris.gif) · [rain](../assets/demo/demo-rain.gif) · [crt](../assets/demo/demo-crt.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif) · [kitt](../assets/demo/demo-kitt.gif) · [nixie](../assets/demo/demo-nixie.gif) · [scope](../assets/demo/demo-scope.gif) · [vu](../assets/demo/demo-vu.gif) · [rhea](../assets/demo/demo-rhea.gif) · [rufus](../assets/demo/demo-rufus.gif) · [agnes](../assets/demo/demo-agnes.gif)
 
 The preview image above shows only the characters that use artwork; `aura`, `bit`, `pixel`,
-`iris`, `rain`, `crt`, `jarvis`, `kitt`, `nixie`, `scope` and `vu` draw themselves and are in the clips.
+`iris`, `rain`, `crt`, `kitt`, `nixie`, `scope` and `vu` draw themselves and are in the clips.
 
 | Character | Look | Face style |
 |---|---|---|
@@ -35,7 +35,6 @@ The preview image above shows only the characters that use artwork; `aura`, `bit
 | **Iris** | No artwork at all | One eye filling the screen. Draws itself. Everything it does is a size change on the iris and pupil plus a height change on two eyelid rectangles, which is why it is the cheapest full-screen character here. |
 | **Rain** | No artwork at all | Falling glyphs, drawing itself. Nothing moves: each column is a still label whose text is rewritten every tick. The brightness gradient down a trail needs LVGL's `recolor` markup, since one label otherwise carries one colour. |
 | **CRT** | No artwork at all | A green terminal, drawing itself. Reads `text_request` and `text_response` from the core, so it prints what was said and types out the reply. The only character with words in it, and so the only one `base/lang/*.yaml` has to translate. |
-| **Jarvis** | No artwork at all | A sci-fi HUD, drawing itself. Seven arc segments spun by writing `start_angle` and `end_angle` every tick, at two radii turning opposite ways. Its brackets and arc colours are deliberately fixed: both would need runtime properties this project has not proven, and a wrong guess there fails the build rather than looking odd. |
 | **Pixel** | No artwork at all | A 12x8 LED matrix, drawing itself. Dots carry brightness rather than just on and off, and a pupil is an unlit dot inside a lit 3x3 eye, because at that density a separate pupil would not fit. |
 | **Flare** | Burning blob, flames on top | Dark features cut into a bright body, with the pupil lit in the body's own yellow. The only inverted face here, and a useful demonstration that `face_color` need not be the bright one. |
 
@@ -71,7 +70,7 @@ before descending into its nested packages, and earlier-collected values win, so
 the character's geometry beats the engine's defaults rather than the other way
 round.
 
-`aura`, `bit`, `pixel`, `iris`, `rain`, `crt`, `jarvis`, `kitt`, `nixie`, `scope` and `vu` are the exceptions: they have no
+`aura`, `bit`, `pixel`, `iris`, `rain`, `crt`, `kitt`, `nixie`, `scope` and `vu` are the exceptions: they have no
 artwork and no engine, and draw themselves. Naming one is still all you do, which
 is the point of a character pulling its own dependencies rather than the config
 having to know which of them needs what.
@@ -95,9 +94,9 @@ later-listed files win substitution conflicts.
    right first time.
 4. Pull requests welcome.
 
-## Eight of these files are generated - do not edit them
+## Seven of these files are generated - do not edit them
 
-`crt`, `jarvis`, `kitt`, `nixie`, `pixel`, `rain`, `scope` and `vu` are written
+`crt`, `kitt`, `nixie`, `pixel`, `rain`, `scope` and `vu` are written
 by the scripts in [`scripts/gen/`](../../scripts/gen). They have to be, because
 each one is mostly a few hundred near-identical widget definitions: 96 lamps for
 `pixel`, 38 for `nixie`, 30 scanlines for `crt`. Editing them by hand is fine

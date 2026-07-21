@@ -147,7 +147,7 @@ script:
       # One lambda, writing heights straight through LVGL, and only for bars
       # whose height actually changed. This used to be nine lvgl.widget.update
       # actions per tick: each one goes through ESPHome's style machinery and
-      # invalidates, which is exactly what made the jarvis HUD crawl. At rest the
+      # invalidates, which is what makes a per-tick character crawl. At rest the
       # line barely moves, so most ticks now write nothing at all.
       - lambda: |-
           static lv_obj_t *bar[9] = {id(aura_bar_0), id(aura_bar_1), id(aura_bar_2), id(aura_bar_3), id(aura_bar_4), id(aura_bar_5), id(aura_bar_6), id(aura_bar_7), id(aura_bar_8)};

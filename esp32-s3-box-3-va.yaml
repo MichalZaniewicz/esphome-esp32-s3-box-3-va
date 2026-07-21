@@ -11,7 +11,7 @@
 
 substitutions:
   # Pick an assistant and a language by name. Characters:
-  #   aura, bit, pixel, iris, rain, crt, jarvis, kitt, nixie, scope, vu
+  #   aura, bit, pixel, iris, rain, crt, kitt, nixie, scope, vu
   #     (no artwork, they draw themselves)
   #   pip, astro, momo, franky, wizard, genie, flare, rhea, rufus, agnes
   # Languages: en, pl - or add your own, see base/lang/README.md
