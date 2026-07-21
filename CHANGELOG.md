@@ -43,6 +43,25 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **The timer countdown was rewritten sixty times a minute to show the same
+  string.** Above an hour the label reads `HH:MM`, so it changes once a minute,
+  but the tick runs every second - and `lvgl.label.update` never compares, so
+  each of the other fifty-nine did a `snprintf`, a `std::string`, a `strdup`
+  inside LVGL and a re-layout of a 26 px font to arrive at identical pixels. The
+  bar beside it already had exactly this guard; the label had been missed. The
+  key compares what is *shown* (`left / 60` above an hour), not `seconds_left`.
+- **`nixie` repainted its whole display on most idle ticks.** Its idle breath was
+  a smooth sine, so every lit segment changed together roughly 57% of the time -
+  about 140 LVGL writes a second in the state the device sits in almost
+  permanently. Quantised to steps of 8, exactly as `pixel` already did with the
+  comment explaining why, which lands as under 2% of brightness on screen and
+  cuts it to about 27 writes a second.
+- **`scope` re-pushed its trace every tick even when the shape was identical.**
+  One write, but the most expensive one in the character set: it dirties the
+  whole trace bounding box, over two passes of the draw buffer. While muted the
+  trace is a flat constant and was being re-sent ten times a second forever. Now
+  guarded by a point comparison, the same way the `vu` needles already were.
+
 - **The box went deaf after every reply.** `start_wake_word` refused to run
   while a pipeline was still going and then silently did nothing. `on_end` holds
   the replying phase while the assistant is still in `STREAMING_RESPONSE`, so it
@@ -141,6 +160,13 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Removed
 
+- **The `jarvis` character**, along with its generator and demo clip. It was the
+  most expensive face in the set and the one that made the HUD visibly crawl -
+  the comment in `aura.yaml` explaining why that file writes through
+  `lv_obj_set_*` instead of `lvgl.widget.update` was written about jarvis. The
+  three wake words are untouched: **"hey jarvis" still works**, it is a
+  `micro_wake_word` model and has nothing to do with the character.
+
 - **The per-phase illustrations.** Nine full-screen PNGs, every one of them
   hidden the moment a character package is installed. The core now compiles a
   single image - the character - and falls back to plain text status pages when
@@ -160,6 +186,20 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Added
 
+- **Performance instrumentation**, all `disabled_by_default` so it costs nothing
+  until you switch it on in Home Assistant: `loop_time`, free heap, largest free
+  block and free PSRAM. The reason it exists: the only signal this project had
+  for "the device is struggling" was the log line `lvgl took a long time for an
+  operation`, which says *that* it happened but not how long or how often. With
+  `loop_time` on, "is this faster" stops being a judgement call about the code
+  and becomes a number. Largest-free-block sits next to free-heap deliberately -
+  a fragmented heap can have plenty free and still refuse a decoder buffer, and
+  free-heap alone will not show it.
+- **`scripts/flash.py`**: compiles, then reads the SSID back out of the generated
+  `main.cpp` and refuses to upload if it looks like a placeholder. Checking the
+  config dump no longer works for this - since 2026.7.1 it prints
+  `ssid: !secret '...'` rather than the value - and a placeholder SSID takes the
+  device off the network and needs someone physically at it to recover.
 - Tap-to-talk: a tap anywhere on the idle page, or on the GT911 "home" button
   under the screen, starts a pipeline without a wake word.
 - Tapping the timer-ringing screen silences it.
@@ -170,12 +210,12 @@ their alarm, the touchscreen, the home screen and the animated character.
   simply is not running, after 40 seconds it is started again, whatever the
   reason. It deliberately consults none of our own flags, since those are what
   get stuck. Covers the on-device engine only; the comment says so.
-- **`scripts/gen/`, and the eight character files that come out of it.**
-  `crt`, `jarvis`, `kitt`, `nixie`, `pixel`, `rain`, `scope` and `vu` are
+- **`scripts/gen/`, and the seven character files that come out of it.**
+  `crt`, `kitt`, `nixie`, `pixel`, `rain`, `scope` and `vu` are
   generated - they are mostly hundreds of near-identical widget definitions. The
   scripts used to live outside the repo, which meant nobody else could run them
   and one of them had already drifted out of step with the file it writes.
-- **`scripts/check_generated.py`**, which regenerates all eight, compares,
+- **`scripts/check_generated.py`**, which regenerates all seven, compares,
   restores whatever it touched, and fails if a file and its generator disagree.
 - **`scripts/validate.py` now rejects a `wait_until` with no `timeout`.** This
   is the most expensive mistake made here: such a wait does not fail and does

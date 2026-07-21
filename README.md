@@ -74,10 +74,6 @@ being on screen belong to the character. Name any of them in lower case.
     <td><h3>Kitt</h3>A red eye sweeping patiently back and forth, like something that has been on duty a long time and expects to be on duty a while longer. Understated until you ask it for something, then all business.</td>
   </tr>
   <tr>
-    <td width="290"><img src="base/assets/demo/demo-jarvis.gif" width="272" alt="Jarvis"></td>
-    <td><h3>Jarvis</h3>Immaculately composed: rings turning inside rings, corners squared off, everything measured. Opens up when you address him, tightens while he works the problem, and never once looks flustered.</td>
-  </tr>
-  <tr>
     <td width="290"><img src="base/assets/demo/demo-crt.gif" width="272" alt="CRT"></td>
     <td><h3>CRT</h3>An old terminal that never got switched off. Prints back what it heard and types out its answer a character at a time, in green phosphor, as though someone is still at the keyboard on the other end.</td>
   </tr>
@@ -202,9 +198,9 @@ base/
     genie, flare, rhea,
     rufus, agnes
     aura, bit, iris,       # these draw themselves, no artwork at all
-    crt, jarvis, kitt,
-    nixie, pixel, rain,
-    scope, vu              #   eight of these are GENERATED - see scripts/gen
+    crt, kitt, nixie,
+    pixel, rain,
+    scope, vu              #   seven of these are GENERATED - see scripts/gen
   lang/
     en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
   sounds/
@@ -216,9 +212,11 @@ scripts/
                            #   ids, action shape, and a wait_until with no timeout
   check_generated.py       # are the generated characters still in step with
                            #   their generators? fails if one was hand-edited
-  gen/                     # the generators for crt, jarvis, kitt, nixie,
-                           #   pixel, rain, scope, vu - edit these, not the YAML
+  gen/                     # the generators for crt, kitt, nixie, pixel,
+                           #   rain, scope, vu - edit these, not the YAML
   esplog.py                # stream device logs over the native API
+  flash.py                 # compile + OTA, but refuses to upload if the SSID
+                           #   compiled into main.cpp looks like a placeholder
 skill/
   esp32-s3-box-3/          # Claude Code skill: pinout + hard-won gotchas
 ```

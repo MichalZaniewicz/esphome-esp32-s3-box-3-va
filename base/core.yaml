@@ -921,6 +921,14 @@ globals:
     type: int
     restore_value: false
     initial_value: "-1"
+  # The countdown as it is actually DISPLAYED, so the tick can skip rewriting an
+  # identical string. Not the same as seconds_left: above an hour the label shows
+  # HH:MM, so the displayed value is left/60 and only moves once a minute.
+  # -1 means "nothing written yet", same convention as timer_percent_drawn.
+  - id: timer_label_drawn
+    type: int
+    restore_value: false
+    initial_value: "-1"
   # false = idle_page, true = idle_page_alt. Survives reboots so the device comes
   # back showing whichever screen was last chosen.
   - id: idle_alt
@@ -1298,27 +1306,42 @@ script:
           condition:
             lambda: return id(has_timer);
           then:
-            - lvgl.label.update:
-                id: timer_label
-                text: !lambda |-
-                  const uint32_t left = id(first_timer).seconds_left;
-                  const uint32_t hours = left / 3600;
-                  const uint32_t minutes = (left % 3600) / 60;
-                  const uint32_t seconds = left % 60;
-                  char buf[16];
-                  // Cast for the format: uint32_t is `long unsigned` on this
-                  // toolchain, so %u warned on every build.
-                  if (hours > 0) {
-                    snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned) hours, (unsigned) minutes);
-                  } else {
-                    snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned) minutes, (unsigned) seconds);
-                  }
-                  return std::string(buf);
-            # ONLY WHEN THE PERCENTAGE ACTUALLY MOVED. The label really does
-            # change every second, but the bar is a whole number out of a
-            # hundred: a thirty minute timer advances it once every eighteen
-            # seconds, so seventeen writes in eighteen invalidated a 320 px bar
-            # to redraw exactly the same pixels. Same reasoning as the
+            # ONLY WHEN THE DISPLAYED TEXT MOVED. Below an hour it moves every
+            # second and this guard costs one comparison. Above an hour the label
+            # is HH:MM, so it moves once a MINUTE while the tick still runs sixty
+            # times - and each of those writes was a snprintf, a std::string, a
+            # strdup inside LVGL and a re-layout of a 26 px font, to end up with
+            # the same pixels. The key is therefore what is SHOWN (left/60 above
+            # an hour, left below it), not seconds_left.
+            - if:
+                condition:
+                  lambda: |-
+                    const uint32_t left = id(first_timer).seconds_left;
+                    const int shown = left >= 3600 ? (int) (left / 60) : (int) left;
+                    if (shown == id(timer_label_drawn)) return false;
+                    id(timer_label_drawn) = shown;
+                    return true;
+                then:
+                  - lvgl.label.update:
+                      id: timer_label
+                      text: !lambda |-
+                        const uint32_t left = id(first_timer).seconds_left;
+                        const uint32_t hours = left / 3600;
+                        const uint32_t minutes = (left % 3600) / 60;
+                        const uint32_t seconds = left % 60;
+                        char buf[16];
+                        // Cast for the format: uint32_t is `long unsigned` on this
+                        // toolchain, so %u warned on every build.
+                        if (hours > 0) {
+                          snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned) hours, (unsigned) minutes);
+                        } else {
+                          snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned) minutes, (unsigned) seconds);
+                        }
+                        return std::string(buf);
+            # ONLY WHEN THE PERCENTAGE ACTUALLY MOVED. The bar is a whole number
+            # out of a hundred: a thirty minute timer advances it once every
+            # eighteen seconds, so seventeen writes in eighteen invalidated a
+            # 320 px bar to redraw exactly the same pixels. Same reasoning as the
             # visibility block just below.
             - if:
                 condition:
@@ -1349,8 +1372,10 @@ script:
               id(timer_ui_state) = want;
               // The OTHER bar is about to become the visible one and it still
               // holds whatever it was left at. Forcing the next tick to write
-              // is what stops it appearing at zero.
+              // is what stops it appearing at zero. The label needs the same
+              // treatment for the same reason: it was hidden holding old text.
               id(timer_percent_drawn) = -1;
+              id(timer_label_drawn) = -1;
               return true;
           then:
             - if:
@@ -1874,12 +1899,47 @@ text_sensor:
     id: text_response
     internal: true
 
+# Instrumentacja wydajnosci. Wszystko `disabled_by_default`, wiec domyslnie nie
+# kosztuje nic poza kilkoma bajtami RAM - wlaczasz encje w HA tylko wtedy, gdy
+# cos mierzysz.
+#
+# Po co: objawem przeciazenia jest ostrzezenie "lvgl took a long time for an
+# operation" w logu, ktore mowi ZE bylo zle, ale nie ile i nie jak czesto.
+# `loop_time` to maksymalny czas jednego przebiegu petli glownej od poprzedniego
+# odczytu, czyli bezposrednia miara tego samego zjawiska, tylko liczbowa. Dzieki
+# temu "szybciej" przestaje byc opinia z czytania kodu.
+#
+# `block` (najwiekszy ciagly wolny blok) obok `free` nie jest nadmiarem: sterta
+# potrafi miec duzo wolnego miejsca i mimo to nie oddac bufora dekodera, bo jest
+# pofragmentowana. Rozjazd miedzy tymi dwoma to sygnal, ktorego samo `free` nie
+# pokaze.
+debug:
+  update_interval: 30s
+
 sensor:
   - platform: wifi_signal
     name: Wi-Fi signal
     entity_category: diagnostic
     update_interval: 60s
     disabled_by_default: true
+
+  - platform: debug
+    free:
+      name: "Diag: free heap"
+      entity_category: diagnostic
+      disabled_by_default: true
+    block:
+      name: "Diag: largest free block"
+      entity_category: diagnostic
+      disabled_by_default: true
+    loop_time:
+      name: "Diag: loop time max"
+      entity_category: diagnostic
+      disabled_by_default: true
+    psram:
+      name: "Diag: free PSRAM"
+      entity_category: diagnostic
+      disabled_by_default: true
 
 ###############################################################################
 # ASSETS

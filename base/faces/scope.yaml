@@ -154,7 +154,26 @@ script:
               pts[k].y = (lv_value_precise_t) y;
             }
           }
-          lv_line_set_points(id(scope_trace)->obj, pts, N);
+          // Only re-set the trace when a point actually moved, same reasoning as
+          // the needles in vu below. This is the single most expensive write in
+          // the character set: it dirties the trace widget's whole bounding box,
+          // more than two passes of the draw buffer, and lv_line_set_points
+          // never compares. In muted the shape is a flat constant, so the same
+          // 33 points were being pushed ten times a second forever; the alarm
+          // sawtooth repeats every other tick for the same reason.
+          static lv_value_precise_t seen_x[33], seen_y[33];
+          static bool primed = false;
+          bool moved = !primed;
+          if (primed) {
+            for (int k = 0; k < N; k++) {
+              if (pts[k].x != seen_x[k] || pts[k].y != seen_y[k]) { moved = true; break; }
+            }
+          }
+          if (moved) {
+            for (int k = 0; k < N; k++) { seen_x[k] = pts[k].x; seen_y[k] = pts[k].y; }
+            primed = true;
+            lv_line_set_points(id(scope_trace)->obj, pts, N);
+          }
 
   # ONLY WHEN THE COLOUR ACTUALLY CHANGES. This used to run on every tick, ten
   # times a second, and it was the last place in the whole character set still
