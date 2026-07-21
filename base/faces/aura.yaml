@@ -40,6 +40,21 @@ substitutions:
   aura_h_max: '84'              # tallest a bar ever gets
   aura_tick: 100ms              # faster than the face: an equaliser needs it
 
+  # The idle breath, and the only animation on screen most of the time. These
+  # two were buried in the lambda, so tuning the pace of the DEFAULT character
+  # meant editing the character itself - every other timing here is a
+  # substitution a thin config can override, and these should have been too.
+  #
+  # `speed` is radians per tick, so one breath takes 2*pi/speed ticks: at 0.16
+  # and a 100 ms tick that is about four seconds. `depth` is how many pixels the
+  # bars rise above the resting line at the top of the breath.
+  #
+  # It was 0.08 and 6 px, which read as almost motionless. Raise the speed for
+  # something livelier, lower it for something calmer; much past 0.4 it stops
+  # looking like breathing and starts looking nervous.
+  aura_idle_speed: '0.16'
+  aura_idle_depth: '9'
+
   # Claim every phase. The page id is `page_face` even though nothing here draws
   # a face: every character package exposes that one id, so a config can point
   # `idle_page_alt` (or any phase) at the character without knowing which one is
@@ -118,9 +133,11 @@ script:
                        phase == ${voice_assist_error_phase_id}) {
               h = REST;
             } else {
-              // Idle: a barely-there breath, so the line is alive but still.
-              const float w = sinf(f * 0.08f - i * 0.35f);
-              h = REST + (int) ((1.0f + w) * 3.0f);
+              // Idle: a slow breath, so the line is alive but not busy. The
+              // `- i * 0.35f` makes it travel along the bars rather than pulse
+              // as one block, which is what stops it reading as a progress bar.
+              const float w = sinf(f * ${aura_idle_speed}f - i * 0.35f);
+              h = REST + (int) ((1.0f + w) * ${aura_idle_depth} / 2.0f);
             }
             id(aura_h)[i] = h < REST ? REST : h;
           }
