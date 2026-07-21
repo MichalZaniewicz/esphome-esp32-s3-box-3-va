@@ -1584,6 +1584,23 @@ interval:
 ###############################################################################
 
 binary_sensor:
+  # WHICH IDLE SCREEN IS ACTUALLY SELECTED. `idle_alt` is flipped by tapping the
+  # screen and it is `restore_value: true`, so it survives reboots - which means
+  # the `idle_page` / `idle_page_alt` substitutions in the config describe the
+  # boot default and NOT what the device is showing. Reading the config and
+  # assuming it matched reality produced a wrong performance diagnosis on
+  # 2026-07-21: idle was on the character, not the clock, so a stall was
+  # attributed to a page reload that the `is_showing` guard was in fact
+  # preventing. Same trap as "TTS output", which is also restored from flash.
+  #
+  # Diagnostic and disabled by default: this exists to be switched on while
+  # measuring, so that a number can be tied to a known screen state.
+  - platform: template
+    name: "Diag: idle shows the character"
+    entity_category: diagnostic
+    disabled_by_default: true
+    lambda: return id(idle_alt);
+
   - platform: gpio
     id: top_button_sensor
     internal: true
