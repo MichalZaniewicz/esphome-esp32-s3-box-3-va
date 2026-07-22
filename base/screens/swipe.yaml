@@ -1,0 +1,125 @@
+###############################################################################
+# Swipe screens: three placeholders around the idle screen.
+#
+# MOCKUPS. They carry a title and a number and nothing else - the point of this
+# package is the navigation, not the content. Replace the bodies once the
+# movement feels right.
+#
+# An OPTIONAL package. Add it after `base/screens/home.yaml` and point the three
+# substitutions at these pages:
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/screens/swipe.yaml
+#   substitutions:
+#     idle_page:      page_home
+#     idle_page_alt:  page_face
+#     idle_page_up:   page_swipe_up
+#     idle_page_down: page_swipe_down
+#     idle_page_side: page_swipe_side
+#
+# The layout is a cross with home in the middle:
+#
+#                     page_swipe_up
+#                           |
+#   page_swipe_side --    home    -- page_swipe_side     (carousel, wraps)
+#                           |
+#                    page_swipe_down
+#
+# Vertical is one level deep and does not loop: swipe up from home and the
+# BOTTOM screen rises into view, swipe down and you are back. Horizontal wraps.
+#
+# What happens during a conversation: the assistant takes the screen as it
+# always has, and when it finishes you are put back on whichever of these you
+# were reading. That is `idle_pos` in the core doing the work - see the swipe
+# scripts there.
+#
+# NOT WIRED ON THE CHARACTER PAGE. Swiping works here and on home; from the
+# character you tap to get back to home first. Every character package owns its
+# own page and there are twenty of them, so that comes after the movement is
+# confirmed to be right.
+###############################################################################
+
+substitutions:
+  swipe_title_font: font_home_small
+  swipe_bg_color: '0x000000'
+  swipe_title_color: '0xFFFFFF'
+  swipe_hint_color: '0x5A5A5A'
+  # Shown small under each title, so it is obvious which gesture got you here.
+  swipe_up_title: "Ekran górny"
+  swipe_up_hint: "swipe w dół z home"
+  swipe_down_title: "Ekran dolny"
+  swipe_down_hint: "swipe w górę z home"
+  swipe_side_title: "Ekran boczny"
+  swipe_side_hint: "swipe w lewo lub prawo"
+
+lvgl:
+  pages:
+    # `skip: true` keeps these out of `lvgl.page.next` / `previous`. Nothing uses
+    # those today, but leaving them in the ring would mean any future use of
+    # next/previous silently walked onto a mockup.
+    - id: page_swipe_up
+      skip: true
+      bg_color: ${swipe_bg_color}
+      on_swipe_up:
+        - script.execute: idle_swipe_up
+      on_swipe_down:
+        - script.execute: idle_swipe_down
+      widgets:
+        - label:
+            align: CENTER
+            y: -12
+            text: "${swipe_up_title}"
+            text_font: ${swipe_title_font}
+            text_color: ${swipe_title_color}
+        - label:
+            align: CENTER
+            y: 14
+            text: "${swipe_up_hint}"
+            text_font: ${swipe_title_font}
+            text_color: ${swipe_hint_color}
+
+    - id: page_swipe_down
+      skip: true
+      bg_color: ${swipe_bg_color}
+      on_swipe_up:
+        - script.execute: idle_swipe_up
+      on_swipe_down:
+        - script.execute: idle_swipe_down
+      widgets:
+        - label:
+            align: CENTER
+            y: -12
+            text: "${swipe_down_title}"
+            text_font: ${swipe_title_font}
+            text_color: ${swipe_title_color}
+        - label:
+            align: CENTER
+            y: 14
+            text: "${swipe_down_hint}"
+            text_font: ${swipe_title_font}
+            text_color: ${swipe_hint_color}
+
+    - id: page_swipe_side
+      skip: true
+      bg_color: ${swipe_bg_color}
+      on_swipe_left:
+        - script.execute: idle_swipe_left
+      on_swipe_right:
+        - script.execute: idle_swipe_right
+      widgets:
+        - label:
+            align: CENTER
+            y: -12
+            text: "${swipe_side_title}"
+            text_font: ${swipe_title_font}
+            text_color: ${swipe_title_color}
+        - label:
+            align: CENTER
+            y: 14
+            text: "${swipe_side_hint}"
+            text_font: ${swipe_title_font}
+            text_color: ${swipe_hint_color}

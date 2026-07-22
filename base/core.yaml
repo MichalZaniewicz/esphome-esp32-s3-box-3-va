@@ -202,6 +202,22 @@ substitutions:
   # character and the tap becomes "show me the robot" / "show me the time".
   # Leave them equal and tapping does nothing.
   idle_page_alt: page_status
+  # SWIPE NEIGHBOURS of the idle screen. Home sits in the middle of a cross:
+  #
+  #                    ${idle_page_up}
+  #                          |
+  #   ${idle_page_side} -- home -- ${idle_page_side}      (carousel, wraps)
+  #                          |
+  #                   ${idle_page_down}
+  #
+  # Vertical is one level deep and not a loop: swiping up from home brings the
+  # screen in from the bottom, and swiping down takes you back. Horizontal wraps
+  # like a carousel. Left at `page_status` these all collapse onto the same page,
+  # so swiping does nothing and nothing breaks - which is what a config without
+  # `base/screens/swipe.yaml` gets.
+  idle_page_up: page_status
+  idle_page_down: page_status
+  idle_page_side: page_status
   listening_page: page_status
   thinking_page: page_status
   replying_page: page_status
@@ -963,6 +979,17 @@ globals:
     type: bool
     restore_value: true
     initial_value: "false"
+  # WHERE ON THE CROSS the idle screen currently sits. 0 is home, and `idle_alt`
+  # above only means anything there - it is home's own tap toggle, not a
+  # position. Survives reboots for the same reason `idle_alt` does.
+  #   0 = home     1 = the screen above     2 = below     3 = the side screen
+  # It is deliberately a position rather than "whatever page is loaded": after a
+  # conversation the phase pages have been and gone, and `draw_display` needs to
+  # know where to put you back without asking LVGL what it happens to be showing.
+  - id: idle_pos
+    type: int
+    restore_value: true
+    initial_value: "0"
   # Set from the moment a reply starts until the talking animation is done with
   # it. The media player's own handlers must not touch the screen or the wake
   # word in that window: at TTS_END the assistant has already gone IDLE, so
@@ -1123,6 +1150,141 @@ script:
       - lambda: id(idle_alt) = !id(idle_alt);
       - script.execute: draw_display
 
+  # --- SWIPE NAVIGATION -------------------------------------------------------
+  #
+  # These animate; `draw_display` does not. That split is on purpose. A swipe is
+  # a direct manipulation and should look like one - the new screen arrives from
+  # the side you pushed. Coming back after a conversation is not a gesture and
+  # should just be there, with no animation to sit through.
+  #
+  # Each script moves `idle_pos` and shows the page itself rather than delegating
+  # to `draw_display`, because `draw_display` has no way to express "and slide it
+  # in from the left". The position it leaves behind is what puts you back here
+  # when the assistant is finished.
+  #
+  # `MOVE_*` rather than `OVER_*`: it drags both screens, so the old one leaves as
+  # the new one arrives and the gesture reads as moving a surface rather than
+  # dealing a card on top of it.
+  #
+  # All four ignore the gesture unless the assistant is idle. Swiping mid-answer
+  # would fight `draw_display` for the screen and the screen would win by
+  # accident, which is not a behaviour anyone could predict.
+
+  # Swiping back onto home always lands on `idle_page`, never on the character,
+  # and clears the tap toggle with it. Two ways to reach one screen that
+  # disagreed about which of its two faces you get would be worse than the small
+  # surprise of "swipe home, tap for the robot".
+  #
+  # Each script is guarded on being idle. Swiping mid-answer would fight
+  # `draw_display` for the screen, and which one won would come down to timing.
+
+  - id: idle_swipe_up             # the screen below rises into view
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: return id(idle_pos) == 0 || id(idle_pos) == 1;
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+          then:
+            - lambda: |-
+                const bool home = (id(idle_pos) == 1);
+                id(idle_pos) = home ? 0 : 2;
+                if (home) id(idle_alt) = false;
+            - if:
+                condition:
+                  lambda: return id(idle_pos) == 0;
+                then:
+                  - lvgl.page.show:
+                      id: ${idle_page}
+                      animation: MOVE_TOP
+                      time: 250ms
+                else:
+                  - lvgl.page.show:
+                      id: ${idle_page_down}
+                      animation: MOVE_TOP
+                      time: 250ms
+
+  - id: idle_swipe_down           # the screen above drops into view
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: return id(idle_pos) == 0 || id(idle_pos) == 2;
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+          then:
+            - lambda: |-
+                const bool home = (id(idle_pos) == 2);
+                id(idle_pos) = home ? 0 : 1;
+                if (home) id(idle_alt) = false;
+            - if:
+                condition:
+                  lambda: return id(idle_pos) == 0;
+                then:
+                  - lvgl.page.show:
+                      id: ${idle_page}
+                      animation: MOVE_BOTTOM
+                      time: 250ms
+                else:
+                  - lvgl.page.show:
+                      id: ${idle_page_up}
+                      animation: MOVE_BOTTOM
+                      time: 250ms
+
+  # LEFT and RIGHT are the carousel and it wraps. Only home and the side screen
+  # are on it today, so it is a two-stop loop; adding more side screens means
+  # extending this the same way, not rewriting it.
+  - id: idle_swipe_left
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: return id(idle_pos) == 0 || id(idle_pos) == 3;
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+          then:
+            - lambda: |-
+                const bool home = (id(idle_pos) == 3);
+                id(idle_pos) = home ? 0 : 3;
+                if (home) id(idle_alt) = false;
+            - if:
+                condition:
+                  lambda: return id(idle_pos) == 0;
+                then:
+                  - lvgl.page.show:
+                      id: ${idle_page}
+                      animation: MOVE_LEFT
+                      time: 250ms
+                else:
+                  - lvgl.page.show:
+                      id: ${idle_page_side}
+                      animation: MOVE_LEFT
+                      time: 250ms
+
+  - id: idle_swipe_right
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: return id(idle_pos) == 0 || id(idle_pos) == 3;
+              - lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+          then:
+            - lambda: |-
+                const bool home = (id(idle_pos) == 3);
+                id(idle_pos) = home ? 0 : 3;
+                if (home) id(idle_alt) = false;
+            - if:
+                condition:
+                  lambda: return id(idle_pos) == 0;
+                then:
+                  - lvgl.page.show:
+                      id: ${idle_page}
+                      animation: MOVE_RIGHT
+                      time: 250ms
+                else:
+                  - lvgl.page.show:
+                      id: ${idle_page_side}
+                      animation: MOVE_RIGHT
+                      time: 250ms
+
   # Single entry point for "put the right thing on screen". Every state change
   # calls this rather than switching pages itself, so there is one place where
   # the precedence (booting > no wifi > no HA > phase) is decided.
@@ -1260,23 +1422,64 @@ script:
                   && p != ${voice_assist_not_ready_phase_id}
                   && p != ${voice_assist_timer_finished_phase_id};
           then:
+            # BACK TO WHEREVER THE SWIPE LEFT YOU. `idle_pos` is the whole point
+            # of that global: the phase pages have been and gone, and without it
+            # every conversation would dump you back on home no matter which
+            # screen you were reading. No animation here - this is not a gesture,
+            # it is the assistant getting out of the way.
             - if:
                 condition:
-                  lambda: return id(idle_alt);
+                  lambda: return id(idle_pos) == 1;
                 then:
                   - if:
                       condition:
                         not:
-                          lvgl.page.is_showing: ${idle_page_alt}
+                          lvgl.page.is_showing: ${idle_page_up}
                       then:
-                        - lvgl.page.show: ${idle_page_alt}
-                else:
+                        - lvgl.page.show: ${idle_page_up}
+            - if:
+                condition:
+                  lambda: return id(idle_pos) == 2;
+                then:
                   - if:
                       condition:
                         not:
-                          lvgl.page.is_showing: ${idle_page}
+                          lvgl.page.is_showing: ${idle_page_down}
                       then:
-                        - lvgl.page.show: ${idle_page}
+                        - lvgl.page.show: ${idle_page_down}
+            - if:
+                condition:
+                  lambda: return id(idle_pos) == 3;
+                then:
+                  - if:
+                      condition:
+                        not:
+                          lvgl.page.is_showing: ${idle_page_side}
+                      then:
+                        - lvgl.page.show: ${idle_page_side}
+            # Position 0 is home, and only there does the tap toggle mean
+            # anything - it picks which of home's two faces you get.
+            - if:
+                condition:
+                  lambda: return id(idle_pos) == 0;
+                then:
+                  - if:
+                      condition:
+                        lambda: return id(idle_alt);
+                      then:
+                        - if:
+                            condition:
+                              not:
+                                lvgl.page.is_showing: ${idle_page_alt}
+                            then:
+                              - lvgl.page.show: ${idle_page_alt}
+                      else:
+                        - if:
+                            condition:
+                              not:
+                                lvgl.page.is_showing: ${idle_page}
+                            then:
+                              - lvgl.page.show: ${idle_page}
 
   # Push what was said / what was answered onto the labels. The text sensors are
   # the source of truth; LVGL labels do not follow them on their own.
