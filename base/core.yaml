@@ -624,6 +624,30 @@ voice_assistant:
         id(tts_chars) = x.length();
         id(tts_started_ms) = millis();
         id(tts_reply_active) = true;
+    # CUT THE AMPLIFIER for an External-player reply. The box downloads and
+    # decodes every reply whatever the routing says, because `voice_assistant:`
+    # has to keep its `media_player:` - without one Home Assistant stops offering
+    # a wake word picker and the satellite never returns to idle. So "External
+    # player" means the answer comes out of BOTH speakers, which is measurable:
+    # `media_player.<device>` goes to `playing` for the length of every reply.
+    #
+    # Cancelling the local playback does not work. The fetch alone was measured at
+    # sixteen seconds, a stop issued during it is discarded, and a forty-five
+    # second retry loop killed nothing.
+    #
+    # This kills the SOUND rather than the playback: GPIO46 is the amplifier
+    # enable line, so the decode continues untouched and the room just does not
+    # hear it. Deliberately NOT `speaker.mute_on` - that was tried on 2026-07-22
+    # and the next pipeline hung in `listening` and never came out. The mechanism
+    # was never understood, so the codec is left alone entirely.
+    #
+    # Three paths switch it back on and two of them are unconditional; a stuck
+    # amplifier would silence the timer alarm and the wake beep too.
+    - if:
+        condition:
+          lambda: return id(tts_output).current_option() == "External player";
+        then:
+          - switch.turn_off: speaker_enable
     - text_sensor.template.publish:
         id: text_response
         state: !lambda return x;
@@ -787,6 +811,10 @@ voice_assistant:
                     const uint32_t deadline = id(tts_started_ms) + ms;
                     const uint32_t now = millis();
                     return now >= deadline ? 0 : deadline - now;
+    # AMPLIFIER BACK ON, unconditionally. Not "if we turned it off" - if that ever
+    # disagreed with reality the box would be mute for good, timer alarm and wake
+    # beep included. Turning on a GPIO that is already on costs nothing.
+    - switch.turn_on: speaker_enable
     - lambda: id(tts_reply_active) = false;
     # Was an inline copy of start_wake_word's "On device" branch - MINUS its
     # `not voice_assistant.is_running` guard. That mattered: this handler waits
@@ -1558,6 +1586,24 @@ script:
 # continuously, and getting it wrong would restart the stream every 40 seconds
 # forever. Left deliberately uncovered rather than covered by guesswork.
 interval:
+  # THE THIRD WAY BACK. An External reply cuts the amplifier; `on_end` restores it
+  # and the timer alarm restores it, both unconditionally. This covers the case
+  # where `on_end` never arrives at all - a reboot mid-reply, or a handler that
+  # died before its tail.
+  #
+  # Unconditional on purpose, and cheap enough to be: writing a GPIO that is
+  # already high costs nothing, and consulting a flag would mean a flag that can
+  # disagree with the hardware - which is exactly how a box ends up permanently
+  # silent. The only guard is "no reply in progress", so it cannot fight a live
+  # one.
+  - interval: 30s
+    then:
+      - if:
+          condition:
+            lambda: return !id(tts_reply_active);
+          then:
+            - switch.turn_on: speaker_enable
+
   - interval: 10s
     then:
       - if:
@@ -1782,6 +1828,12 @@ switch:
       #
       # NOTE this means a muted `speaker_media_player` entity silences the alarm.
       #
+      # AMPLIFIER ON FIRST, unconditionally, before anything else here. An
+      # External reply cuts it for the length of the answer; if that ever failed
+      # to restore, the alarm would ring into a dead amplifier - the one failure
+      # this arrangement must not have. Costs one GPIO write and does not care
+      # whether anything actually turned it off.
+      - switch.turn_on: speaker_enable
       # Free the I2S bus first. The microphone holds it while the wake word is
       # listening, and `on_announcement` stops the wake word only once playback
       # has already begun - too late, so the speaker's first attempt fails with
