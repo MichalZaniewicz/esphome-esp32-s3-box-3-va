@@ -264,6 +264,21 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             pad_all: 0
+        - label:
+            id: crt_body
+            align: TOP_LEFT
+            x: 14
+            y: 44
+            # Explicit width: without one the label auto-sizes, so every text
+            # change re-runs a full layout pass instead of just redrawing.
+            width: 292
+            text: ""
+            recolor: true
+            text_font: font_crt
+            text_line_space: ${crt_line_space}
+            text_color: ${crt_head_color}
+            pad_all: 0
+
         - obj:
             id: crt_scan_0
             align: TOP_LEFT
@@ -624,27 +639,6 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             pad_all: 0
-        # BELOW THE TEXT, deliberately - the marker above puts the scanlines here
-        # rather than after this label. LVGL draws widgets in list order, so they
-        # used to sit ON TOP of the body: the label spans y 44..182 and seventeen
-        # of the thirty lines cross it, which meant every text change repainted
-        # all seventeen over the top of it. They are barely above the background
-        # colour, so underneath looks the same and costs nothing.
-        - label:
-            id: crt_body
-            align: TOP_LEFT
-            x: 14
-            y: 44
-            # Explicit width: without one the label auto-sizes, so every text
-            # change re-runs a full layout pass instead of just redrawing.
-            width: 292
-            text: ""
-            recolor: true
-            text_font: font_crt
-            text_line_space: ${crt_line_space}
-            text_color: ${crt_head_color}
-            pad_all: 0
-
 
         # Same contract as every other character screen: a tap silences a
         # ringing timer, or swaps idle screens when the config defines two.
