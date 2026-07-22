@@ -968,6 +968,24 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: "0"
+  # Raw, UNFILTERED touches on the button under the screen, and how long the last
+  # one lasted. These exist to settle a question the log cannot answer: a touch
+  # shorter than the 50 ms debounce produces no on_press, no on_release and no
+  # log line, so "the debounce is working" and "nothing touched the screen" look
+  # exactly alike. A counter that climbs while the real button stays silent is
+  # the difference between them.
+  - id: raw_touch_count
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: raw_touch_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: raw_touch_down_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
   # True from the moment a wake word fires until the pipeline has actually been
   # started. Without it the wake beep finishing puts the media player into idle,
   # and that trigger restarts the wake word - a fraction of a second before the
@@ -1667,6 +1685,35 @@ binary_sensor:
           format: "Touch on the button under the screen lasted %u ms"
           args: ['(unsigned) (millis() - id(btn_down_ms))']
 
+  # THE UNFILTERED TWIN, and it starts nothing. Same GT911 index as the button
+  # above, no `filters:`, so it sees every reported touch including the ones the
+  # 50 ms debounce eats. All it does is count them and remember how long the last
+  # one was.
+  #
+  # Why this rather than reading the log: a touch shorter than the debounce
+  # produces no on_press, no on_release and no log line at all on the real
+  # button, so a working filter and an untouched screen are indistinguishable
+  # there. On 2026-07-20 the button started sixteen pipelines in ten minutes with
+  # nobody near it; the debounce was added and nothing has fired since, which is
+  # encouraging and proves nothing. If this counter climbs while the button stays
+  # quiet, the phantom touches are real and the filter is earning its place. If
+  # it stays at zero for a day of normal use, they stopped for some other reason
+  # and the debounce is not what fixed it.
+  #
+  # A twin like this was tried once before and removed after being blamed for a
+  # device dropping off the network. That was a mis-diagnosis: the real cause was
+  # a placeholder SSID compiled into the firmware. The twin was innocent.
+  - platform: gt911
+    id: home_button_raw
+    internal: true
+    index: 0
+    on_press:
+      - lambda: |-
+          id(raw_touch_count) += 1;
+          id(raw_touch_down_ms) = millis();
+    on_release:
+      - lambda: id(raw_touch_ms) = millis() - id(raw_touch_down_ms);
+
 button:
   - platform: factory_reset
     id: factory_reset_btn
@@ -1938,6 +1985,30 @@ sensor:
     name: Wi-Fi signal
     entity_category: diagnostic
     update_interval: 60s
+    disabled_by_default: true
+
+  # The two numbers that settle the phantom-touch question. Read them together:
+  # a count climbing while "Assistant started by the button" never appears in the
+  # log means real touches are arriving and the debounce is catching them, and
+  # the duration says how short they are, which is the number the 50 ms filter
+  # was originally set blind. A count that stays at zero across a normal day
+  # means nothing is touching the screen at all.
+  - platform: template
+    name: "Diag: raw touches on the button"
+    id: diag_raw_touches
+    lambda: return id(raw_touch_count);
+    update_interval: 60s
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    disabled_by_default: true
+  - platform: template
+    name: "Diag: last raw touch length"
+    id: diag_raw_touch_ms
+    lambda: return id(raw_touch_ms);
+    update_interval: 60s
+    unit_of_measurement: ms
+    accuracy_decimals: 0
+    entity_category: diagnostic
     disabled_by_default: true
 
   - platform: debug
