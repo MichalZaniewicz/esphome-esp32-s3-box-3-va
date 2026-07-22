@@ -43,6 +43,34 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **The face engine wrote a width nobody had changed, every tick, for the whole
+  of every answer.** `face_eyes`, `face_pupils` and `face_mouth` tested width and
+  height together and then set both. The phases that actually run per tick move
+  one of them: listening pulses eye height against a compile-time width, and
+  replying - the longest phase there is - changes only the mouth height. Each
+  `lv_obj_set_width` marks the object dirty and invalidates its old and new area,
+  so this was pure loss 8.3 times a second. Tested separately now. Affects all ten
+  artwork characters, which is most installs.
+- **`rain` built twelve strings a tick and threw most of them away.** A column's
+  text is a pure function of the phase, its `lead`, the band row and `churn`; with
+  those unchanged the result is identical byte for byte, and `rain_draw` compared
+  it and discarded it. That was roughly 120 heap allocations a second next to the
+  audio pipeline, worst in listening where `frozen` pins the drift so nothing moves
+  at all. Now skipped when the inputs match. `churn` also moved out of the row
+  loop, where it was recomputed 144 times a tick to produce one number.
+- **`scope` recomputed constants every frame.** Three of them, all depending only
+  on the point index: the `k/(N-1)*2pi` both branches rebuilt under different
+  names, the left-to-right spacing, and the entire vertical half of the thinking
+  figure - which contains no frame counter at all, so it was 33 `sinf` calls a tick
+  arriving at the same numbers. Pulled into tables beside the `ENV` one that was
+  already there, filled once. About 66 float divisions and 33 `sinf` per tick gone.
+- **`crt` drew its scanlines on top of the text.** LVGL paints in list order and
+  the thirty lines were appended after the body label, seventeen of them crossing
+  it, so every text change repainted all seventeen over the top. They now sit
+  underneath, placed by an explicit `__SCANLINES__` marker in the generator rather
+  than by which string happened to be concatenated last. They are barely above the
+  background colour, so it looks the same.
+
 - **The timer countdown was rewritten sixty times a minute to show the same
   string.** Above an hour the label reads `HH:MM`, so it changes once a minute,
   but the tick runs every second - and `lvgl.label.update` never compares, so

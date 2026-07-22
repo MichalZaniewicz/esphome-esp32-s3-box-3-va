@@ -158,6 +158,27 @@ script:
 
           const bool idle = (phase == ${voice_assist_idle_phase_id});
 
+          // Hoisted out of the row loop, where it did not belong: it depends on
+          // `f` and `frozen` and on nothing else, so it was being recomputed for
+          // every row of every column - 144 times a tick to produce one number.
+          const int churn = frozen ? f : (f / 3);
+
+          // SKIP COLUMNS WHOSE TEXT CANNOT HAVE CHANGED. A column's string is a
+          // pure function of the phase, its `lead`, the band row and `churn`;
+          // with all four the same the result is identical byte for byte. Without
+          // this, every tick built twelve strings with a reserve(144) heap
+          // allocation each - about 120 allocations a second next to the audio
+          // pipeline - for `rain_draw` to compare them and throw most away.
+          // Worst in listening, where `frozen` pins the drift and the leads never
+          // move at all.
+          static int seen_phase = -1, seen_band = -2, seen_churn = -1;
+          static int seen_lead[%d];
+          static bool primed = false;
+          const bool ctx_same = primed && phase == seen_phase
+                             && band == seen_band && churn == seen_churn;
+          seen_phase = phase; seen_band = band; seen_churn = churn;
+          primed = true;
+
           for (int c = 0; c < %d; c++) {
             // Each column gets its own offset, otherwise the rain falls as one
             // flat wall and reads like a table rather than weather.
@@ -179,6 +200,9 @@ script:
             const int offset = sync ? 0 : (int) ((o >> 16) & 0x3F);
             const int lead = ((drift + offset) / 2) %% (%d + tail);
 
+            if (ctx_same && lead == seen_lead[c]) continue;   // identyczny wynik
+            seen_lead[c] = lead;
+
             std::string s;
             s.reserve(%d * 12);
             for (int r = 0; r < %d; r++) {
@@ -198,7 +222,7 @@ script:
 
               // The glyph changes every few ticks, not every tick: faster and
               // the trail stops reading as a trail and turns into static.
-              const int churn = frozen ? f : (f / 3);
+              // `churn` is computed once per tick, above the column loop.
               uint32_t g = (uint32_t) (churn * 31 + r * 7 + c * 101);
               g = (g ^ (g >> 5)) * 2654435761u;
 
@@ -300,7 +324,7 @@ TAIL = """
                           - script.execute: toggle_idle_screen
 """
 
-body = (HEAD % (COLS, ROWS, COLS, ROWS, COLS, COLS, ROWS, ROWS, ROWS)
+body = (HEAD % (COLS, ROWS, COLS, ROWS, COLS, COLS, COLS, ROWS, ROWS, ROWS)
         + "\n".join(draw) + MID + "\n".join(widgets) + "\n" + TAIL)
 io.open(OUT, "w", encoding="utf-8", newline="\n").write(body)
 print(f"{OUT}: {len(body.splitlines())} linii, {COLS} kolumn")

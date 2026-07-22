@@ -171,10 +171,18 @@ script:
       # the old and the new area, so writing an unchanged value is not free.
       - lambda: |-
           static int p_w = -1, p_h = -1, p_dx = 0x7FFFFFFF;
-          if (w != p_w || h != p_h) {
+          // Width and height are tested SEPARATELY, because in the phases that
+          // run every tick only one of them moves. Listening pulses the height
+          // against a width that is a compile-time constant; testing them
+          // together meant two pointless lv_obj_set_width calls on every frame
+          // of the longest phases, each one dirtying the object and invalidating
+          // its old and new area.
+          if (w != p_w) {
             lv_obj_set_width(id(face_eye_l), w);
-            lv_obj_set_height(id(face_eye_l), h);
             lv_obj_set_width(id(face_eye_r), w);
+          }
+          if (h != p_h) {
+            lv_obj_set_height(id(face_eye_l), h);
             lv_obj_set_height(id(face_eye_r), h);
           }
           if (dx != p_dx) {
@@ -201,10 +209,14 @@ script:
             lv_obj_clear_flag(id(face_pupil_r), LV_OBJ_FLAG_HIDDEN);
             id(face_pupils_shown) = true;
           }
-          if (w != p_w || h != p_h) {
+          // Separately, same reasoning as the eyes above: the phases that run
+          // every tick move one dimension, not both.
+          if (w != p_w) {
             lv_obj_set_width(id(face_pupil_l), w);
-            lv_obj_set_height(id(face_pupil_l), h);
             lv_obj_set_width(id(face_pupil_r), w);
+          }
+          if (h != p_h) {
+            lv_obj_set_height(id(face_pupil_l), h);
             lv_obj_set_height(id(face_pupil_r), h);
           }
           if (gx != p_gx) {
@@ -230,8 +242,14 @@ script:
     then:
       - lambda: |-
           static int p_w = -1, p_h = -1, p_dx = 0x7FFFFFFF;
-          if (w != p_w || h != p_h) {
+          // Separately, and this is the one that matters most. Replying is the
+          // longest animated phase and it changes the mouth HEIGHT every tick
+          // against a fixed width, so testing the pair together wrote a width
+          // nobody asked for 8.3 times a second for the whole of every answer.
+          if (w != p_w) {
             lv_obj_set_width(id(face_mouth_obj), w);
+          }
+          if (h != p_h) {
             lv_obj_set_height(id(face_mouth_obj), h);
           }
           if (dx != p_dx) {

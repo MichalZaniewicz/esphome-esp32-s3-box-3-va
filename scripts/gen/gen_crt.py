@@ -280,6 +280,13 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             pad_all: 0
+__SCANLINES__
+        # BELOW THE TEXT, deliberately - the marker above puts the scanlines here
+        # rather than after this label. LVGL draws widgets in list order, so they
+        # used to sit ON TOP of the body: the label spans y 44..182 and seventeen
+        # of the thirty lines cross it, which meant every text change repainted
+        # all seventeen over the top of it. They are barely above the background
+        # colour, so underneath looks the same and costs nothing.
         - label:
             id: crt_body
             align: TOP_LEFT
@@ -336,6 +343,8 @@ TAIL = """
                           - script.execute: toggle_idle_screen
 """
 
-body = HEAD.replace("__SCAN_N__", str(SCAN_N)) + "\n".join(scan) + "\n" + TAIL
+body = (HEAD.replace("__SCAN_N__", str(SCAN_N))
+            .replace("__SCANLINES__", "\n".join(scan))
+        + TAIL)
 io.open(OUT, "w", encoding="utf-8", newline="\n").write(body)
 print(f"{OUT}: {len(body.splitlines())} linii, {SCAN_N} linii skanowania")

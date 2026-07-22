@@ -117,11 +117,24 @@ script:
           // constant table - but it was being rebuilt every tick: __NPT__ sinf
           // AND __NPT__ powf, ten times a second. powf has no hardware behind it
           // on this chip and is the most expensive call in the file.
-          static float ENV[__NPT__];
+          // Three more that depend only on the index and were missed when ENV
+          // was pulled out. THETA is the k/(N-1)*2pi both branches recomputed
+          // under different names, XPOS is the left-to-right spacing, and LISS_Y
+          // is the whole vertical half of the thinking figure - which contains no
+          // `f` at all, so it was __NPT__ sinf calls a tick to arrive at the same
+          // numbers every time. Together that was about 66 float divisions and
+          // __NPT__ needless sinf per tick.
+          static float ENV[__NPT__], THETA[__NPT__], XPOS[__NPT__], LISS_Y[__NPT__];
           static bool env_ready = false;
           if (!env_ready) {
-            for (int k = 0; k < __NPT__; k++)
+            const float mid0 = (__GY0__ + __GY1__) / 2.0f;
+            const float amp0 = (__GY1__ - __GY0__) / 2.0f - 8.0f;
+            for (int k = 0; k < __NPT__; k++) {
               ENV[k] = powf(sinf(3.14159f * k / (__NPT__ - 1)), 0.6f);
+              THETA[k] = (float) k / (__NPT__ - 1) * 6.2831853f;
+              XPOS[k] = __GX0__ + (__GX1__ - __GX0__) * k / (__NPT__ - 1);
+              LISS_Y[k] = mid0 + amp0 * 0.8f * sinf(2.0f * THETA[k]);
+            }
             env_ready = true;
           }
 
@@ -146,14 +159,14 @@ script:
             // A Lissajous loop, turning. A closed figure reads as "working on
             // it" in a way no left-to-right trace does.
             for (int k = 0; k < N; k++) {
-              const float t = (float) k / (N - 1) * 6.2831853f;
+              const float t = THETA[k];
               pts[k].x = (lv_value_precise_t) (160.0f + (X1 - X0) / 2.6f * sinf(3.0f * t + f * 0.09f));
-              pts[k].y = (lv_value_precise_t) (MID + AMP * 0.8f * sinf(2.0f * t));
+              pts[k].y = (lv_value_precise_t) LISS_Y[k];
             }
           } else {
             for (int k = 0; k < N; k++) {
-              const float u = (float) k / (N - 1) * 6.2831853f;
-              const float x = X0 + (X1 - X0) * k / (N - 1);
+              const float u = THETA[k];
+              const float x = XPOS[k];
               float y;
               if (phase == ${voice_assist_listening_phase_id}) {
                 // Deliberately not a textbook sine: the amplitude swells and
