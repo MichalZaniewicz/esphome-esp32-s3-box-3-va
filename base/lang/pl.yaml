@@ -44,3 +44,16 @@ substitutions:
   crt_timer_text: "** KONIEC ODLICZANIA **"
   crt_error_text: "** BŁĄD **"
   crt_think_text: "myślę"
+
+  # --- Ekran ustawień (base/screens/settings.yaml) --------------------------
+  # Podpisy siedzą pod ikonami na kafelkach szerokich na 96 px, więc muszą być
+  # krótkie. "Sygnał" zamiast "Dźwięk wybudzenia": chodzi o beep potwierdzający
+  # usłyszenie słowa aktywującego, a nie o dźwięk urządzenia w ogóle.
+  settings_title: "Ustawienia"
+  settings_mic_label: "Mikrofon"
+  settings_bell_label: "Sygnał"
+  settings_volume_label: "Głośność"
+  # Wartości kafelka routingu. Muszą odpowiadać opcjom selecta "TTS output".
+  settings_tts_this: "Box"
+  settings_tts_external: "Głośnik"
+  settings_tts_both: "Oba"

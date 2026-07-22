@@ -17,8 +17,8 @@
 #   substitutions:
 #     idle_page:      page_home
 #     idle_page_alt:  page_face
-#     idle_page_up:   page_swipe_up
-#     idle_page_down: page_swipe_down
+#     idle_page_above:   page_swipe_up
+#     idle_page_below: page_swipe_down
 #     idle_page_side: page_swipe_side
 #
 # The layout is a cross with home in the middle:

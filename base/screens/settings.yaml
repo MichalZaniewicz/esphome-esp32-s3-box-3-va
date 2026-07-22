@@ -1,0 +1,370 @@
+###############################################################################
+# Settings screen: the device's own switches, as icons you can tap.
+#
+# An OPTIONAL package. Add it after base/core.yaml and point the downward swipe
+# at it:
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/screens/settings.yaml
+#   substitutions:
+#     idle_page_above: page_settings
+#
+# Then swiping DOWN from home brings it in from the top, and swiping UP puts it
+# away again. See the swipe scripts in the core for the rest of the cross.
+#
+# WHAT IS ON IT, and why not more: the box exposes exactly three things that are
+# genuinely on/off and genuinely a user's business - the microphone, the wake
+# sound and the screen. Everything else is either a choice from a list (TTS
+# output, wake word engine location), a diagnostic, or a state rather than a
+# setting (Timer ringing). `Speaker enable` is deliberately absent: it is the
+# amplifier, it is hardware rather than preference, and the External-player mute
+# drives it, so a switch here would fight that and lose.
+#
+# The icons come from the Material Design Icons webfont, downloaded at compile
+# time. Only the six glyphs used are compiled in, so the flash cost is small.
+# Each setting has a pair - on and off look different in shape, not only in
+# colour, which is what makes the screen readable at a glance from across a
+# kitchen.
+###############################################################################
+
+substitutions:
+  # English by default like every other package here; base/lang/*.yaml overrides
+  # these, and has to be listed AFTER this file in `files:`.
+  #
+  # Keep them short. The tiles are 96 px wide and the label sits under the icon,
+  # so anything much past ten characters will not fit.
+  settings_title: "Settings"
+  settings_mic_label: "Microphone"
+  # Not "sound": this is the beep that confirms the wake word was heard, not the
+  # device's audio in general.
+  settings_bell_label: "Wake sound"
+  # The third tile shows where replies come out, and its label IS the value, so
+  # these have to match the options of the core's `TTS output` select.
+  settings_tts_this: "Box"
+  settings_tts_external: "Speaker"
+  settings_tts_both: "Both"
+
+  settings_bg_color: '0x000000'
+  settings_title_color: '0x8A8A8A'
+  settings_tile_off_color: '0x161A22'
+  settings_tile_on_color: '0x2E6F5E'
+  settings_icon_off_color: '0x5A5A5A'
+  settings_icon_on_color: '0xFFFFFF'
+  settings_label_color: '0xBFD2DA'
+  settings_tile_radius: '8'
+
+  # A COLOUR PER ROUTE, not on/off. Where a reply comes out is three states, not
+  # two, and colour carries that faster than reading the label - which matters on
+  # a tile you glance at rather than study.
+  settings_tts_this_color: '0x2E6F5E'      # local: same green as the on tiles
+  settings_tts_external_color: '0x3A4A7A'  # elsewhere: cool, clearly not local
+  settings_tts_both_color: '0x7A4A2E'      # both at once: warm, obviously neither
+
+  # Volume. The core clamps the speaker to volume_min..volume_max, so 0 and 100
+  # here mean the ends of THAT range, not silence and full power.
+  settings_volume_label: "Volume"
+  settings_slider_bg_color: '0x161A22'
+  settings_slider_fill_color: '0x2E6F5E'
+
+  # How often the tiles re-read the switches while this page is up. They also
+  # change from Home Assistant, not only from a tap here, so polling is the
+  # honest way to stay in step - but it is gated on the page being visible, so
+  # it costs nothing the rest of the time.
+  settings_refresh: 400ms
+
+font:
+  - id: font_settings_icon
+    file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    size: 38
+    bpp: 4
+    glyphs:
+      - "\U000F036C"   # microphone   (F036C, zweryfikowane w _variables.scss)
+      - "\U000F036D"   # microphone-off (F036D)
+      - "\U000F009A"   # bell
+      - "\U000F009B"   # bell-off
+      - "\U000F04C3"   # speaker
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/settings.yaml (device switches)"
+
+script:
+  # Repaint the tiles from the switches. Every write is guarded: this runs while
+  # the page is visible and almost every pass finds nothing changed, and
+  # lvgl.widget.update never compares for itself.
+  - id: settings_refresh_tiles
+    then:
+      - lambda: |-
+          // The two on/off tiles. Muted means the microphone is OFF, so it is
+          // inverted here: the tile shows what is working, not what is set.
+          const bool want[2] = {!id(mute).state, id(wake_sound_enabled).state};
+          static int seen[2] = {-1, -1};
+          lv_obj_t *tile[2] = {(lv_obj_t *) id(set_tile_mic), (lv_obj_t *) id(set_tile_bell)};
+          lv_obj_t *icon[2] = {(lv_obj_t *) id(set_icon_mic), (lv_obj_t *) id(set_icon_bell)};
+          static const char *GLYPH_ON[2]  = {"\U000F036C", "\U000F009A"};
+          static const char *GLYPH_OFF[2] = {"\U000F036D", "\U000F009B"};
+
+          for (int i = 0; i < 2; i++) {
+            if (seen[i] == (int) want[i]) continue;
+            seen[i] = (int) want[i];
+            lv_obj_set_style_bg_color(tile[i],
+                lv_color_hex(want[i] ? ${settings_tile_on_color} : ${settings_tile_off_color}), 0);
+            lv_obj_set_style_text_color(icon[i],
+                lv_color_hex(want[i] ? ${settings_icon_on_color} : ${settings_icon_off_color}), 0);
+            lv_label_set_text(icon[i], want[i] ? GLYPH_ON[i] : GLYPH_OFF[i]);
+          }
+
+          // The routing tile carries its value as text, because three states do
+          // not reduce to an icon anyone would read correctly - and a colour
+          // each, so the state registers before the word is read.
+          // NO EXTERNAL SPEAKER, NO CHOICE TO MAKE. Not everyone configures one,
+          // and without it two of the three routes do nothing - so the tile goes
+          // dim and stops responding rather than offering settings that cannot
+          // take effect. Same test the core uses when it waits on that speaker.
+          const std::string &est = id(external_player_state).state;
+          const bool ext_ok = !est.empty() && est != "unknown" && est != "unavailable";
+
+          const std::string opt = id(tts_output).current_option();
+          static std::string seen_opt;
+          static int seen_ext = -1;
+          if (opt != seen_opt || (int) ext_ok != seen_ext) {
+            seen_opt = opt;
+            seen_ext = (int) ext_ok;
+            const bool here  = (opt == "This device");
+            const bool there = (opt == "External player");
+            // With no external player the box is the only thing that can speak,
+            // whatever the select says, so say that rather than repeat a setting
+            // which is not happening.
+            lv_label_set_text((lv_obj_t *) id(set_label_tts),
+                !ext_ok ? "${settings_tts_this}" :
+                here    ? "${settings_tts_this}" :
+                there   ? "${settings_tts_external}" : "${settings_tts_both}");
+            lv_obj_set_style_bg_color((lv_obj_t *) id(set_tile_tts),
+                lv_color_hex(!ext_ok ? ${settings_tile_off_color} :
+                             here    ? ${settings_tts_this_color} :
+                             there   ? ${settings_tts_external_color}
+                                     : ${settings_tts_both_color}), 0);
+            // Lit in all three routes - every one is a real setting, none is
+            // "off" - but dimmed when there is nothing to choose between.
+            lv_obj_set_style_text_color((lv_obj_t *) id(set_icon_tts),
+                lv_color_hex(ext_ok ? ${settings_icon_on_color}
+                                    : ${settings_icon_off_color}), 0);
+          }
+
+          // VOLUME, unless a finger is on it. Dragging while this writes back
+          // would snap the knob out from under the touch on every pass.
+          lv_obj_t *sl = (lv_obj_t *) id(set_volume_slider);
+          if (!lv_obj_has_state(sl, LV_STATE_PRESSED)) {
+            const int want_v = (int) lroundf(id(speaker_media_player).volume * 100.0f);
+            if (lv_slider_get_value(sl) != want_v) lv_slider_set_value(sl, want_v, LV_ANIM_OFF);
+          }
+
+interval:
+  - interval: ${settings_refresh}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_settings
+          then:
+            - script.execute: settings_refresh_tiles
+
+lvgl:
+  pages:
+    - id: page_settings
+      bg_color: ${settings_bg_color}
+      scrollbar_mode: "OFF"
+      # The same four gestures as every other idle screen, so the cross works
+      # from here too. Up is the way back to home.
+      on_swipe_up:
+        - script.execute: idle_swipe_up
+      on_swipe_down:
+        - script.execute: idle_swipe_down
+      on_swipe_left:
+        - script.execute: idle_swipe_left
+      on_swipe_right:
+        - script.execute: idle_swipe_right
+      widgets:
+        - label:
+            align: TOP_MID
+            y: 10
+            text: "${settings_title}"
+            text_font: font_home_small
+            text_color: ${settings_title_color}
+
+        # VOLUME, above the tiles. This is the local speaker, clamped by the
+        # core's volume_min / volume_max - so the ends of this slider are the
+        # ends of THAT range, not silence and full power.
+        - label:
+            align: TOP_LEFT
+            x: 16
+            y: 38
+            text: "${settings_volume_label}"
+            text_font: font_home_small
+            text_color: ${settings_label_color}
+        - slider:
+            id: set_volume_slider
+            align: TOP_MID
+            y: 62
+            width: 288
+            height: 14
+            min_value: 0
+            max_value: 100
+            # Gestures have to reach the page from here too, or a swipe that
+            # begins on the slider is swallowed. Dragging still works: LVGL only
+            # calls it a gesture once the finger leaves the widget's own axis.
+            gesture_bubble: true
+            bg_color: ${settings_slider_bg_color}
+            indicator:
+              bg_color: ${settings_slider_fill_color}
+            knob:
+              bg_color: ${settings_icon_on_color}
+            on_value:
+              - media_player.volume_set:
+                  id: speaker_media_player
+                  volume: !lambda return x / 100.0f;
+
+        # Three tiles across. 96 wide at x -104 / 0 / +104 leaves an even gutter
+        # on a 320 px screen. `gesture_bubble` on each, or a swipe that starts on
+        # a tile never reaches the page - the same trap as the tap button on the
+        # home screen.
+        - button:
+            id: set_tile_mic
+            align: CENTER
+            x: -104
+            y: 32
+            width: 96
+            height: 118
+            radius: ${settings_tile_radius}
+            bg_color: ${settings_tile_off_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - if:
+                  # Ignore a click that arrives on the heels of a swipe. LVGL
+                  # reports both when a gesture starts on a button, so without
+                  # this a swipe across the tiles changed the screen and toggled
+                  # whatever it set off from.
+                  condition:
+                    lambda: return millis() - id(last_swipe_ms) > 400;
+                  then:
+                      - switch.toggle: mute
+                      - script.execute: settings_refresh_tiles
+            widgets:
+              - label:
+                  id: set_icon_mic
+                  align: CENTER
+                  y: -18
+                  text: "\U000F036C"
+                  text_font: font_settings_icon
+                  text_color: ${settings_icon_off_color}
+              - label:
+                  align: CENTER
+                  y: 34
+                  text: "${settings_mic_label}"
+                  text_font: font_home_small
+                  text_color: ${settings_label_color}
+
+        - button:
+            id: set_tile_bell
+            align: CENTER
+            x: 0
+            y: 32
+            width: 96
+            height: 118
+            radius: ${settings_tile_radius}
+            bg_color: ${settings_tile_off_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - if:
+                  # Ignore a click that arrives on the heels of a swipe. LVGL
+                  # reports both when a gesture starts on a button, so without
+                  # this a swipe across the tiles changed the screen and toggled
+                  # whatever it set off from.
+                  condition:
+                    lambda: return millis() - id(last_swipe_ms) > 400;
+                  then:
+                      - switch.toggle: wake_sound_enabled
+                      - script.execute: settings_refresh_tiles
+            widgets:
+              - label:
+                  id: set_icon_bell
+                  align: CENTER
+                  y: -18
+                  text: "\U000F009A"
+                  text_font: font_settings_icon
+                  text_color: ${settings_icon_off_color}
+              - label:
+                  align: CENTER
+                  y: 34
+                  text: "${settings_bell_label}"
+                  text_font: font_home_small
+                  text_color: ${settings_label_color}
+
+        # WHERE REPLIES COME OUT, cycling through the core's three options.
+        #
+        # This slot was going to be a screen on/off toggle and that was a bad
+        # idea: turning the backlight off from a button on the screen leaves you
+        # tapping blind to find the same button again. Routing is just as useful,
+        # changes just as often, and cannot lock you out.
+        - button:
+            id: set_tile_tts
+            align: CENTER
+            x: 104
+            y: 32
+            width: 96
+            height: 118
+            radius: ${settings_tile_radius}
+            bg_color: ${settings_tile_off_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - if:
+                  # Ignore a click that arrives on the heels of a swipe. LVGL
+                  # reports both when a gesture starts on a button, so without
+                  # this a swipe across the tiles changed the screen and toggled
+                  # whatever it set off from.
+                  condition:
+                    lambda: return millis() - id(last_swipe_ms) > 400;
+                  then:
+                      - lambda: |-
+                          // Nothing to cycle through without an external speaker,
+                          // and the tile is already dimmed to say so.
+                          const std::string &est = id(external_player_state).state;
+                          if (est.empty() || est == "unknown" || est == "unavailable") return;
+                          // Cycle in the order the select declares, so this and Home
+                          // Assistant always agree about what "next" means.
+                          const std::string o = id(tts_output).current_option();
+                          id(tts_output).make_call().set_option(
+                              o == "This device"     ? "External player" :
+                              o == "External player" ? "Both" : "This device").perform();
+                      - script.execute: settings_refresh_tiles
+            widgets:
+              - label:
+                  id: set_icon_tts
+                  align: CENTER
+                  y: -18
+                  text: "\U000F04C3"
+                  text_font: font_settings_icon
+                  text_color: ${settings_icon_off_color}
+              - label:
+                  id: set_label_tts
+                  align: CENTER
+                  y: 34
+                  text: "${settings_tts_this}"
+                  text_font: font_home_small
+                  text_color: ${settings_label_color}

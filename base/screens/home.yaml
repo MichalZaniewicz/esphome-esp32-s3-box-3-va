@@ -324,4 +324,11 @@ lvgl:
             # one. The click behaviour is unaffected.
             gesture_bubble: true
             on_click:
-              - script.execute: toggle_idle_screen
+              - if:
+                  # Same guard as the settings tiles: a swipe that starts here
+                  # makes this button report a click too, so without it every
+                  # swipe across home also flipped clock and character.
+                  condition:
+                    lambda: return millis() - id(last_swipe_ms) > 400;
+                  then:
+                    - script.execute: toggle_idle_screen

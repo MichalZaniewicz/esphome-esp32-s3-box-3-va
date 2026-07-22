@@ -204,19 +204,19 @@ substitutions:
   idle_page_alt: page_status
   # SWIPE NEIGHBOURS of the idle screen. Home sits in the middle of a cross:
   #
-  #                    ${idle_page_up}
+  #                    ${idle_page_above}
   #                          |
   #   ${idle_page_side} -- home -- ${idle_page_side}      (carousel, wraps)
   #                          |
-  #                   ${idle_page_down}
+  #                   ${idle_page_below}
   #
   # Vertical is one level deep and not a loop: swiping up from home brings the
   # screen in from the bottom, and swiping down takes you back. Horizontal wraps
   # like a carousel. Left at `page_status` these all collapse onto the same page,
   # so swiping does nothing and nothing breaks - which is what a config without
   # `base/screens/swipe.yaml` gets.
-  idle_page_up: page_status
-  idle_page_down: page_status
+  idle_page_above: page_status
+  idle_page_below: page_status
   idle_page_side: page_status
   # HOW HARD YOU HAVE TO SWIPE. LVGL wants 50 px of travel and 3 px of velocity
   # at release before it calls something a gesture. On a 320 px screen 50 px is a
@@ -1039,6 +1039,25 @@ globals:
     type: int
     restore_value: true
     initial_value: "0"
+  # WHEN THE LAST SWIPE HAPPENED, in millis(). A swipe that starts on a button
+  # still makes that button report a click when the finger lifts - LVGL treats
+  # the two as independent - so a swipe across the settings tiles changed the
+  # screen AND toggled whatever it started on. Seen on hardware 2026-07-22.
+  #
+  # Anything clickable that shares a screen with the gestures checks this and
+  # stands down if a swipe just went past. A timestamp rather than a flag,
+  # because a flag has to be cleared by someone and there is no reliable moment
+  # to do it in; a timestamp goes stale by itself.
+  - id: last_swipe_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  # Set on press when the assistant was already running, so the release knows
+  # this press was reaching for the brake rather than the accelerator.
+  - id: btn_wants_cancel
+    type: bool
+    restore_value: false
+    initial_value: "false"
   # Set from the moment a reply starts until the talking animation is done with
   # it. The media player's own handlers must not touch the screen or the wake
   # word in that window: at TTS_END the assistant has already gone IDLE, so
@@ -1229,11 +1248,19 @@ script:
 
   - id: idle_swipe_up             # the screen below rises into view
     then:
+      - lambda: id(last_swipe_ms) = millis();
       - if:
           condition:
             and:
               - lambda: return id(idle_pos) == 0 || id(idle_pos) == 1;
-              - lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+              # Idle OR muted. Muting is a resting state, not something
+              # happening, and refusing to navigate while muted meant the
+              # one screen you reach for to unmute was the one you could
+              # not swipe away from.
+              - lambda: |-
+                  const int p = id(voice_assistant_phase);
+                  return p == ${voice_assist_idle_phase_id}
+                      || p == ${voice_assist_muted_phase_id};
           then:
             - lambda: |-
                 const bool home = (id(idle_pos) == 1);
@@ -1249,17 +1276,25 @@ script:
                       time: ${swipe_anim_ms}ms
                 else:
                   - lvgl.page.show:
-                      id: ${idle_page_down}
+                      id: ${idle_page_below}
                       animation: ${swipe_anim_TOP}
                       time: ${swipe_anim_ms}ms
 
   - id: idle_swipe_down           # the screen above drops into view
     then:
+      - lambda: id(last_swipe_ms) = millis();
       - if:
           condition:
             and:
               - lambda: return id(idle_pos) == 0 || id(idle_pos) == 2;
-              - lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+              # Idle OR muted. Muting is a resting state, not something
+              # happening, and refusing to navigate while muted meant the
+              # one screen you reach for to unmute was the one you could
+              # not swipe away from.
+              - lambda: |-
+                  const int p = id(voice_assistant_phase);
+                  return p == ${voice_assist_idle_phase_id}
+                      || p == ${voice_assist_muted_phase_id};
           then:
             - lambda: |-
                 const bool home = (id(idle_pos) == 2);
@@ -1275,7 +1310,7 @@ script:
                       time: ${swipe_anim_ms}ms
                 else:
                   - lvgl.page.show:
-                      id: ${idle_page_up}
+                      id: ${idle_page_above}
                       animation: ${swipe_anim_BOTTOM}
                       time: ${swipe_anim_ms}ms
 
@@ -1284,11 +1319,19 @@ script:
   # extending this the same way, not rewriting it.
   - id: idle_swipe_left
     then:
+      - lambda: id(last_swipe_ms) = millis();
       - if:
           condition:
             and:
               - lambda: return id(idle_pos) == 0 || id(idle_pos) == 3;
-              - lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+              # Idle OR muted. Muting is a resting state, not something
+              # happening, and refusing to navigate while muted meant the
+              # one screen you reach for to unmute was the one you could
+              # not swipe away from.
+              - lambda: |-
+                  const int p = id(voice_assistant_phase);
+                  return p == ${voice_assist_idle_phase_id}
+                      || p == ${voice_assist_muted_phase_id};
           then:
             - lambda: |-
                 const bool home = (id(idle_pos) == 3);
@@ -1310,11 +1353,19 @@ script:
 
   - id: idle_swipe_right
     then:
+      - lambda: id(last_swipe_ms) = millis();
       - if:
           condition:
             and:
               - lambda: return id(idle_pos) == 0 || id(idle_pos) == 3;
-              - lambda: return id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+              # Idle OR muted. Muting is a resting state, not something
+              # happening, and refusing to navigate while muted meant the
+              # one screen you reach for to unmute was the one you could
+              # not swipe away from.
+              - lambda: |-
+                  const int p = id(voice_assistant_phase);
+                  return p == ${voice_assist_idle_phase_id}
+                      || p == ${voice_assist_muted_phase_id};
           then:
             - lambda: |-
                 const bool home = (id(idle_pos) == 3);
@@ -1436,9 +1487,20 @@ script:
           then:
             - lvgl.page.show: ${error_page}
       - if:
+          # MUTED ONLY CLAIMS THE SCREEN ON HOME. Muting is a resting state, not
+          # something happening, and it is usually switched on from the settings
+          # screen - where being thrown onto the character and left there is
+          # exactly wrong. Worse, it used to be a trap: the swipe scripts only run
+          # while the phase is idle, so muting from another screen took you to the
+          # character and disabled the way back.
+          #
+          # On home the old behaviour is right and stays: the character showing a
+          # muted face is the clearest indication there is that the microphone is
+          # off.
           condition:
             and:
               - lambda: return id(voice_assistant_phase) == ${voice_assist_muted_phase_id};
+              - lambda: return id(idle_pos) == 0;
               - not:
                   lvgl.page.is_showing: ${muted_page}
           then:
@@ -1483,9 +1545,9 @@ script:
                   - if:
                       condition:
                         not:
-                          lvgl.page.is_showing: ${idle_page_up}
+                          lvgl.page.is_showing: ${idle_page_above}
                       then:
-                        - lvgl.page.show: ${idle_page_up}
+                        - lvgl.page.show: ${idle_page_above}
             - if:
                 condition:
                   lambda: return id(idle_pos) == 2;
@@ -1493,9 +1555,9 @@ script:
                   - if:
                       condition:
                         not:
-                          lvgl.page.is_showing: ${idle_page_down}
+                          lvgl.page.is_showing: ${idle_page_below}
                       then:
-                        - lvgl.page.show: ${idle_page_down}
+                        - lvgl.page.show: ${idle_page_below}
             - if:
                 condition:
                   lambda: return id(idle_pos) == 3;
@@ -1968,13 +2030,41 @@ binary_sensor:
       - delayed_on: 50ms
     on_press:
       - lambda: id(btn_down_ms) = millis();
+      # THREE THINGS, in order of what is most urgent to interrupt.
+      #
+      # A ringing timer wins: you are reaching for the box to make it stop.
+      #
+      # Then, if the assistant is already running, this CANCELS it. A false wake
+      # word used to mean standing there for fifteen seconds while it listened to
+      # a room that was not talking to it, because `tap_to_talk` declines to start
+      # a second pipeline and so the button did nothing at all. Same button, same
+      # press, and now it is the way out.
+      #
+      # Only then does a press start one.
+      #
+      # Cancelling mid-REPLY stops the pipeline but will not reliably cut audio
+      # that is already playing: a stop issued while the box is still fetching is
+      # discarded, which is documented at length around `on_tts_end`. It ends the
+      # turn, it does not always end the sound.
       - if:
           condition:
             switch.is_on: timer_ringing
           then:
             - switch.turn_off: timer_ringing
           else:
-            - script.execute: tap_to_talk
+            - if:
+                condition:
+                  not:
+                    voice_assistant.is_running:
+                then:
+                  # Starting stays on PRESS, because a button that starts talking
+                  # should feel immediate.
+                  - lambda: id(btn_wants_cancel) = false;
+                  - script.execute: tap_to_talk
+                else:
+                  # Cancelling is decided here but CARRIED OUT ON RELEASE, and
+                  # only if the press was long enough - see on_release below.
+                  - lambda: id(btn_wants_cancel) = true;
     # How long the touch lasted, which is the number the debounce above was set
     # blind. A real fingertip rests for well over a hundred milliseconds; if the
     # phantom presses report far less, the filter is doing its job, and if they
@@ -1988,6 +2078,35 @@ binary_sensor:
           level: INFO
           format: "Touch on the button under the screen lasted %u ms"
           args: ['(unsigned) (millis() - id(btn_down_ms))']
+      # CANCEL, IF THIS WAS A REAL PRESS. Deciding on press and acting on release
+      # is not ceremony - it is the only way to tell a finger from a phantom.
+      #
+      # This screen produces touches nobody made: seventeen of them in half an
+      # hour on 2026-07-22, measured. They used to be harmless, because
+      # `tap_to_talk` declines to start a second pipeline, so a phantom arriving
+      # mid-conversation did nothing. The moment a press started CANCELLING
+      # instead, every phantom became a conversation killer - which is exactly
+      # what was reported: listening ending after one second, over and over.
+      #
+      # The numbers separate them cleanly. Measured phantoms last 21 ms; measured
+      # fingers last 119-151 ms. The 50 ms debounce already eats the short ones,
+      # and this catches anything that slips past it. 100 ms sits five times above
+      # the phantom and comfortably below a real press.
+      #
+      # Starting is left forgiving on purpose: a phantom that starts a pipeline
+      # wastes fifteen seconds, a phantom that cancels one loses what you said.
+      - if:
+          condition:
+            and:
+              - lambda: return id(btn_wants_cancel);
+              - lambda: return (millis() - id(btn_down_ms)) >= 100;
+              - voice_assistant.is_running:
+          then:
+            - logger.log:
+                level: INFO
+                format: "Assistant cancelled by the button under the screen"
+            - voice_assistant.stop:
+      - lambda: id(btn_wants_cancel) = false;
 
   # THE UNFILTERED TWIN, and it starts nothing. Same GT911 index as the button
   # above, no `filters:`, so it sees every reported touch including the ones the
