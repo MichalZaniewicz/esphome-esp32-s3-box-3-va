@@ -244,6 +244,23 @@ lvgl:
       # side. Seen on `rain` on hardware 2026-07-22; every page is the same shape
       # of risk, and turning it off costs nothing.
       scrollbar_mode: "OFF"
+      # SWIPE OFF HOME. Home sits in the middle of a cross - see the swipe
+      # scripts in the core, and base/screens/swipe.yaml for the pages. Without
+      # that package these scripts find every direction pointing back at home and
+      # do nothing, which is why this is safe to wire unconditionally.
+      #
+      # The triggers are here on the PAGE, and the full-screen tap button below
+      # carries `gesture_bubble` so they can be reached at all: LVGL delivers a
+      # gesture to the object that was pressed, and that button covers the whole
+      # screen. Without the flag the page would never see a swipe.
+      on_swipe_left:
+        - script.execute: idle_swipe_left
+      on_swipe_right:
+        - script.execute: idle_swipe_right
+      on_swipe_up:
+        - script.execute: idle_swipe_up
+      on_swipe_down:
+        - script.execute: idle_swipe_down
       widgets:
         # Date, top left.
         - label:
@@ -301,5 +318,10 @@ lvgl:
             bg_opa: TRANSP
             border_width: 0
             shadow_width: 0
+            # LET GESTURES THROUGH. This button covers the entire screen, and
+            # LVGL sends a gesture to whichever object was pressed - so without
+            # this flag it swallows every swipe and the page above never hears
+            # one. The click behaviour is unaffected.
+            gesture_bubble: true
             on_click:
               - script.execute: toggle_idle_screen

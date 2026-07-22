@@ -218,6 +218,42 @@ substitutions:
   idle_page_up: page_status
   idle_page_down: page_status
   idle_page_side: page_status
+  # HOW HARD YOU HAVE TO SWIPE. LVGL wants 50 px of travel and 3 px of velocity
+  # at release before it calls something a gesture. On a 320 px screen 50 px is a
+  # sixth of the width, which is enough that deliberate swipes get dropped -
+  # reported on hardware 2026-07-22. 28 px is a little over a fingertip and lands
+  # far short of anything anyone would consider a tap.
+  #
+  # Raise `swipe_min_px` if taps start being read as swipes; lower it if swipes
+  # get missed. These are applied at boot through the LVGL runtime API rather
+  # than as build flags, because LVGL defines its defaults without an #ifndef
+  # guard and a -D would be a redefinition rather than an override.
+  swipe_min_px: '28'
+  swipe_min_velocity: '2'
+
+  # HOW THE SWIPE ANIMATES, and the honest position on it: a smooth slide is not
+  # available on this hardware. A full screen is 320*240*2 = 153,600 bytes, so at
+  # the panel's 40 MHz the transfer alone is 30.7 ms before anything is drawn,
+  # and `buffer_size: 25%` sends it in four passes. `MOVE_*` slides BOTH screens,
+  # so every frame composites two of them. That caps a 250 ms slide at about
+  # eight frames, and it judders - reported on hardware 2026-07-22.
+  #
+  # Raising the SPI clock was the one lever that would have changed this and it
+  # is closed: 80 MHz gives a blank white panel on this controller.
+  #
+  # So this is a taste setting, not a tuning knob:
+  #   MOVE_*  both screens slide - the most direct feel, the most work
+  #   OVER_*  the new screen slides over a stationary old one - less to composite
+  #   NONE    instant, no animation at all, and no judder to look at
+  # `swipe_anim_ms` is ignored when the animation is NONE.
+  # OVER rather than MOVE, chosen on hardware: MOVE composites two full screens
+  # every frame and visibly juddered, OVER leaves the old one still and only
+  # slides the incoming page over it.
+  swipe_anim_TOP: OVER_TOP
+  swipe_anim_BOTTOM: OVER_BOTTOM
+  swipe_anim_LEFT: OVER_LEFT
+  swipe_anim_RIGHT: OVER_RIGHT
+  swipe_anim_ms: '180'
   listening_page: page_status
   thinking_page: page_status
   replying_page: page_status
@@ -254,6 +290,19 @@ esphome:
   # List form, not a bare mapping: screen packages add their own on_boot, and
   # ESPHome appends lists while two mappings under one key would collide.
   on_boot:
+    # Gesture thresholds, applied to the touchscreen input device. Priority 250
+    # so LVGL has finished registering it - at 600 there is no indev to find yet.
+    # Guarded on the pointer, so a build with no touchscreen skips it rather than
+    # dereferencing null.
+    - priority: 250
+      then:
+        - lambda: |-
+            lv_indev_t *indev = lv_indev_get_next(NULL);
+            while (indev != NULL) {
+              lv_indev_set_gesture_min_distance(indev, ${swipe_min_px});
+              lv_indev_set_gesture_min_velocity(indev, ${swipe_min_velocity});
+              indev = lv_indev_get_next(indev);
+            }
     - priority: 600
       then:
         - script.execute: draw_display
@@ -1196,13 +1245,13 @@ script:
                 then:
                   - lvgl.page.show:
                       id: ${idle_page}
-                      animation: MOVE_TOP
-                      time: 250ms
+                      animation: ${swipe_anim_TOP}
+                      time: ${swipe_anim_ms}ms
                 else:
                   - lvgl.page.show:
                       id: ${idle_page_down}
-                      animation: MOVE_TOP
-                      time: 250ms
+                      animation: ${swipe_anim_TOP}
+                      time: ${swipe_anim_ms}ms
 
   - id: idle_swipe_down           # the screen above drops into view
     then:
@@ -1222,13 +1271,13 @@ script:
                 then:
                   - lvgl.page.show:
                       id: ${idle_page}
-                      animation: MOVE_BOTTOM
-                      time: 250ms
+                      animation: ${swipe_anim_BOTTOM}
+                      time: ${swipe_anim_ms}ms
                 else:
                   - lvgl.page.show:
                       id: ${idle_page_up}
-                      animation: MOVE_BOTTOM
-                      time: 250ms
+                      animation: ${swipe_anim_BOTTOM}
+                      time: ${swipe_anim_ms}ms
 
   # LEFT and RIGHT are the carousel and it wraps. Only home and the side screen
   # are on it today, so it is a two-stop loop; adding more side screens means
@@ -1251,13 +1300,13 @@ script:
                 then:
                   - lvgl.page.show:
                       id: ${idle_page}
-                      animation: MOVE_LEFT
-                      time: 250ms
+                      animation: ${swipe_anim_LEFT}
+                      time: ${swipe_anim_ms}ms
                 else:
                   - lvgl.page.show:
                       id: ${idle_page_side}
-                      animation: MOVE_LEFT
-                      time: 250ms
+                      animation: ${swipe_anim_LEFT}
+                      time: ${swipe_anim_ms}ms
 
   - id: idle_swipe_right
     then:
@@ -1277,13 +1326,13 @@ script:
                 then:
                   - lvgl.page.show:
                       id: ${idle_page}
-                      animation: MOVE_RIGHT
-                      time: 250ms
+                      animation: ${swipe_anim_RIGHT}
+                      time: ${swipe_anim_ms}ms
                 else:
                   - lvgl.page.show:
                       id: ${idle_page_side}
-                      animation: MOVE_RIGHT
-                      time: 250ms
+                      animation: ${swipe_anim_RIGHT}
+                      time: ${swipe_anim_ms}ms
 
   # Single entry point for "put the right thing on screen". Every state change
   # calls this rather than switching pages itself, so there is one place where
