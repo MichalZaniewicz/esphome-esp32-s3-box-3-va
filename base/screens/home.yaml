@@ -238,6 +238,12 @@ lvgl:
   pages:
     - id: page_home
       bg_color: 0x000000
+      # No scrollbar. This page is drawn to fill the screen and there is nothing
+      # to scroll to, but content sized to exactly 240 px renders a hair taller
+      # than the arithmetic says and LVGL then draws a bar down the right hand
+      # side. Seen on `rain` on hardware 2026-07-22; every page is the same shape
+      # of risk, and turning it off costs nothing.
+      scrollbar_mode: "OFF"
       widgets:
         # Date, top left.
         - label:

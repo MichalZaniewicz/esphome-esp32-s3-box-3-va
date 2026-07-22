@@ -206,6 +206,12 @@ lvgl:
   pages:
     - id: page_face
       bg_color: ${nixie_bg_color}
+      # No scrollbar. These pages are drawn to fill the screen and there is
+      # nothing to scroll to, but content sized to exactly 240 px renders a hair
+      # taller than the arithmetic says and LVGL then draws a bar down the right
+      # hand side. Seen on `rain` on hardware 2026-07-22; every page here is the
+      # same shape of risk, and turning it off costs nothing.
+      scrollbar_mode: "OFF"
       widgets:
         - obj:
             # the tube body

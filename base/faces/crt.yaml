@@ -242,6 +242,12 @@ lvgl:
   pages:
     - id: page_face
       bg_color: ${crt_bg_color}
+      # No scrollbar. These pages are drawn to fill the screen and there is
+      # nothing to scroll to, but content sized to exactly 240 px renders a hair
+      # taller than the arithmetic says and LVGL then draws a bar down the right
+      # hand side. Seen on `rain` on hardware 2026-07-22; every page here is the
+      # same shape of risk, and turning it off costs nothing.
+      scrollbar_mode: "OFF"
       widgets:
         - label:
             id: crt_header_label
@@ -264,6 +270,21 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             pad_all: 0
+        - label:
+            id: crt_body
+            align: TOP_LEFT
+            x: 14
+            y: 44
+            # Explicit width: without one the label auto-sizes, so every text
+            # change re-runs a full layout pass instead of just redrawing.
+            width: 292
+            text: ""
+            recolor: true
+            text_font: font_crt
+            text_line_space: ${crt_line_space}
+            text_color: ${crt_head_color}
+            pad_all: 0
+
         - obj:
             id: crt_scan_0
             align: TOP_LEFT
@@ -624,27 +645,6 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             pad_all: 0
-        # BELOW THE TEXT, deliberately - the marker above puts the scanlines here
-        # rather than after this label. LVGL draws widgets in list order, so they
-        # used to sit ON TOP of the body: the label spans y 44..182 and seventeen
-        # of the thirty lines cross it, which meant every text change repainted
-        # all seventeen over the top of it. They are barely above the background
-        # colour, so underneath looks the same and costs nothing.
-        - label:
-            id: crt_body
-            align: TOP_LEFT
-            x: 14
-            y: 44
-            # Explicit width: without one the label auto-sizes, so every text
-            # change re-runs a full layout pass instead of just redrawing.
-            width: 292
-            text: ""
-            recolor: true
-            text_font: font_crt
-            text_line_space: ${crt_line_space}
-            text_color: ${crt_head_color}
-            pad_all: 0
-
 
         # Same contract as every other character screen: a tap silences a
         # ringing timer, or swaps idle screens when the config defines two.

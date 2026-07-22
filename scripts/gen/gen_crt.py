@@ -258,6 +258,12 @@ lvgl:
   pages:
     - id: page_face
       bg_color: ${crt_bg_color}
+      # No scrollbar. These pages are drawn to fill the screen and there is
+      # nothing to scroll to, but content sized to exactly 240 px renders a hair
+      # taller than the arithmetic says and LVGL then draws a bar down the right
+      # hand side. Seen on `rain` on hardware 2026-07-22; every page here is the
+      # same shape of risk, and turning it off costs nothing.
+      scrollbar_mode: "OFF"
       widgets:
         - label:
             id: crt_header_label
@@ -280,13 +286,6 @@ lvgl:
             bg_opa: COVER
             border_width: 0
             pad_all: 0
-__SCANLINES__
-        # BELOW THE TEXT, deliberately - the marker above puts the scanlines here
-        # rather than after this label. LVGL draws widgets in list order, so they
-        # used to sit ON TOP of the body: the label spans y 44..182 and seventeen
-        # of the thirty lines cross it, which meant every text change repainted
-        # all seventeen over the top of it. They are barely above the background
-        # colour, so underneath looks the same and costs nothing.
         - label:
             id: crt_body
             align: TOP_LEFT
@@ -343,8 +342,6 @@ TAIL = """
                           - script.execute: toggle_idle_screen
 """
 
-body = (HEAD.replace("__SCAN_N__", str(SCAN_N))
-            .replace("__SCANLINES__", "\n".join(scan))
-        + TAIL)
+body = HEAD.replace("__SCAN_N__", str(SCAN_N)) + "\n".join(scan) + "\n" + TAIL
 io.open(OUT, "w", encoding="utf-8", newline="\n").write(body)
 print(f"{OUT}: {len(body.splitlines())} linii, {SCAN_N} linii skanowania")
