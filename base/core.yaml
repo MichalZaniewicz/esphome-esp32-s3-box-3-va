@@ -100,6 +100,18 @@ substitutions:
   # why this exists and why it is not 1.
   mww_gain_factor: '4'
 
+  # HARDWARE mic gain on the ES7210 ADC, in dB. Unlike `mww_gain_factor` this
+  # sits before the split: it raises or lowers the RAW stream that feeds BOTH the
+  # wake word and the Home Assistant speech-to-text, so it is the real "how
+  # sensitive is the microphone" knob. The chip's default is 24 dB and that is
+  # what this board ran on until now. Lower it if the mic picks up too much;
+  # if the wake word then needs shouting at, raise `mww_gain_factor` to give it
+  # back its headroom without making HA hear more. Exposed as a live `number`
+  # further down, which restores across reboots and overrides this at boot - this
+  # value is only the starting point and the pre-restore default.
+  # Valid ES7210 steps: 0,3,6,9,12,15,18,21,24,27,30,33,34.5,36,37.5.
+  mic_gain_default: '24'
+
   # Wake word tuning. The cutoff is compared against the average probability over
   # the sliding window, NOT the peak - which is why the window size matters more
   # than it looks. Measured on an S3-Box-3: the peak hits 1.00 on every single
@@ -303,6 +315,16 @@ esphome:
               lv_indev_set_gesture_min_velocity(indev, ${swipe_min_velocity});
               indev = lv_indev_get_next(indev);
             }
+    # Apply the restored mic gain to the ES7210. The template number restores its
+    # value and publishes it, but its setup() does not fire the set_action, so the
+    # ADC would otherwise sit on the static `mic_gain_default` while HA showed the
+    # saved figure. Negative priority so this runs after the ADC and the number
+    # have both finished setting up.
+    - priority: -100
+      then:
+        - audio_adc.set_mic_gain:
+            id: es7210_adc
+            mic_gain: !lambda return id(mic_gain_number).state;
     - priority: 600
       then:
         - script.execute: draw_display
@@ -447,6 +469,10 @@ audio_adc:
     id: es7210_adc
     bits_per_sample: 16bit
     sample_rate: 16000
+    # Starting point only; the `mic_gain_number` below restores its own value and
+    # re-applies it at boot (the template number's setup() publishes state but
+    # does not fire its set_action, so the on_boot handler does the applying).
+    mic_gain: ${mic_gain_default}dB
 
 audio_dac:
   - platform: es8311
@@ -2141,6 +2167,30 @@ button:
   - platform: factory_reset
     id: factory_reset_btn
     internal: true
+
+number:
+  # Live mic sensitivity, in dB, on the ES7210 ADC. See `mic_gain_default` up top
+  # for what this actually moves and its effect on the wake word. Range stops at
+  # 36 rather than the chip's 37.5 so the step stays a clean 3 dB; the top step is
+  # not worth breaking the grid for. `set_mic_gain` quantises to the nearest
+  # supported step anyway, so an off-grid value would just snap.
+  - platform: template
+    id: mic_gain_number
+    name: Mic gain
+    icon: mdi:microphone-settings
+    entity_category: config
+    unit_of_measurement: dB
+    mode: slider
+    min_value: 0
+    max_value: 36
+    step: 3
+    initial_value: ${mic_gain_default}
+    restore_value: true
+    optimistic: true
+    set_action:
+      - audio_adc.set_mic_gain:
+          id: es7210_adc
+          mic_gain: !lambda return x;
 
 switch:
   - platform: gpio
