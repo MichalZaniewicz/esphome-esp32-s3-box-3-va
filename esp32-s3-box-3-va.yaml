@@ -35,6 +35,11 @@ substitutions:
   idle_page: page_home       # clock, date, climate   (needs screens/home.yaml)
   idle_page_alt: page_face   # the character, idling  (every character uses this
                              # same id, so a swap does not touch this line)
+  # Settings sits one swipe DOWN from home (it is the screen "above", which drops
+  # into view on a downward swipe). Needs screens/settings.yaml below. The other
+  # swipe directions are left at their page_status default, so up and sideways do
+  # nothing - there are no other screens wired here on purpose.
+  idle_page_above: page_settings
 
   # Home screen entities. Wrong or missing ones are not an error - the label just
   # stays "--" until something answers.
@@ -49,6 +54,7 @@ packages:
     files:
       - base/core.yaml
       - base/screens/home.yaml        # optional: clock, date, climate
+      - base/screens/settings.yaml    # optional: settings, one swipe down from home
       - base/faces/${assistant}.yaml  # the assistant; it pulls in what it needs
       - base/lang/${language}.yaml    # keep the language last
     refresh: 0s
