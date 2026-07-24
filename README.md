@@ -369,7 +369,15 @@ palettes, vertical and horizontal gradient backgrounds, and light themes:
 <sub>Previews rendered at 320x240 with the device's own fonts; the panel itself
 looks the same bar minor anti-aliasing.</sub>
 
-`home.yaml` is parameterised, so the Default look is unchanged and any single
+Set the look the device **boots** with in your thin config - `home_style: CRT`
+(any option name). The HA select restores its own saved value once you change it
+there, so this is only the out-of-the-box default:
+
+```yaml
+  home_style: CRT   # boot into CRT; the select still lets you switch live
+```
+
+`home.yaml` is parameterised too, so the Default look is unchanged and any single
 value - a colour, the clock font - can also be pinned at compile time by setting
 its `home_*` substitution. Each style's clock font is a Google Font compiled in as
 digits and a colon only, so the whole set adds a few KB. To add your own: a font,
