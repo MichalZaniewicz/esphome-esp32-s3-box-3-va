@@ -27,8 +27,10 @@ one thin config file you actually edit.
   (which is not a GPIO - it is GT911 touch button 0) starts the assistant, and
   silences a ringing timer instead if one is going. **Tapping the screen while
   idle swaps between the clock and the character**, and back; the choice survives
-  a reboot. Starting the assistant is left to the button so that screen taps
-  belong to the UI rather than fighting a full-screen tap-to-talk target.
+  a reboot. **Swiping the idle screen** moves to a neighbouring screen - a
+  settings page one swipe down, by default. Starting the assistant is left to the
+  button so that screen taps belong to the UI rather than fighting a full-screen
+  tap-to-talk target.
 - **Timers**: set by voice, with a countdown and a progress strip on LVGL's top
   layer that stays visible across page changes (green while running, blue while
   paused).
@@ -224,8 +226,11 @@ skill/
 ## Configuration
 
 Day-to-day settings are Home Assistant entities, not config edits: microphone
-mute, wake sound, screen brightness, TTS output, wake word engine location, the
-wake word itself and the timer switch.
+mute, mic gain, wake sound, screen brightness, TTS output, wake word engine
+location, the wake word itself and the timer switch. **`Mic gain`** is the
+ES7210's hardware gain in dB: it sits before the split that feeds the wake word
+and the speech-to-text both, so it is the real microphone-sensitivity knob, and
+it is restored across reboots.
 
 Three substitutions are worth deciding before the first flash. The clock is not
 among them: Home Assistant supplies the time zone along with the time.
@@ -254,16 +259,37 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 |---|---|
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
 | `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
+| `settings.yaml` | The device's own switches as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output` toggle and a volume slider. Reached one swipe down from home (`idle_page_above: page_settings`). The on and off states differ in shape, not only colour, so the screen reads at a glance; the icons are the handful of Material Design glyphs actually used, downloaded at compile time. |
 
-Install both and the idle screen has two faces: the clock, and the character
-idling. **Tap the screen to swap between them** - `idle_page` is what you see
-after a reboot, `idle_page_alt` is what a tap switches to, and the last choice is
-remembered. Set them to the same page to turn the tap off.
+Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
+clock, and the character idling. **Tap the screen to swap between them** -
+`idle_page` is what you see after a reboot, `idle_page_alt` is what a tap
+switches to, and the last choice is remembered. Set them to the same page to turn
+the tap off.
 
 ```yaml
   idle_page: page_home      # clock, date, temperatures
   idle_page_alt: page_face  # the character, blinking and looking around
 ```
+
+### Swipe navigation
+
+Home sits in the middle of a cross, and three more substitutions name the screens
+a swipe reveals. Left at their `page_status` default a swipe does nothing, so
+navigation is opt-in one direction at a time:
+
+```yaml
+  idle_page_above: page_settings  # swipe DOWN to bring it in from the top
+  idle_page_below: page_status    # swipe UP; unset here, so up does nothing
+  idle_page_side:  page_status    # swipe LEFT or RIGHT; wraps like a carousel
+```
+
+Vertical is one level deep and does not loop; horizontal wraps. A conversation
+takes the screen as it always has and hands it back to whichever one you were
+reading when it finishes. Swipe sensitivity is a substitution (`swipe_min_px`),
+tuned down from LVGL's default because a sixth of the screen was dropping
+deliberate swipes. `base/screens/swipe.yaml` ships placeholder screens for the
+remaining directions if you want to feel the movement before wiring real ones.
 
 ## Claude Code skill
 

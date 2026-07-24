@@ -248,3 +248,28 @@ their alarm, the touchscreen, the home screen and the animated character.
 - **`scripts/validate.py` now rejects a `wait_until` with no `timeout`.** This
   is the most expensive mistake made here: such a wait does not fail and does
   not warn, it stops that automation forever, and everything after it.
+- **Swipe navigation around the idle screen.** Home sits in the middle of a
+  cross; `idle_page_above` / `idle_page_below` / `idle_page_side` name the screens
+  a swipe reveals, and left at their `page_status` default a swipe does nothing,
+  so it is opt-in one direction at a time. Vertical is one level deep, horizontal
+  wraps. A conversation still takes the screen and hands it back to whichever one
+  you were reading. `swipe_min_px` is tuned to 28 px because LVGL's 50 px default
+  - a sixth of the screen - dropped deliberate swipes on hardware. The gesture
+  reaches the page through a full-screen button carrying `gesture_bubble`; without
+  it LVGL delivers the swipe to the button that was pressed and the page never
+  sees it.
+- **A settings screen** (`base/screens/settings.yaml`), the device's own switches
+  as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output`
+  toggle and a volume slider. Wired one swipe down from home in the example config
+  (`idle_page_above: page_settings`). On and off differ in shape rather than only
+  colour, so it reads at a glance; only the six Material Design glyphs it uses are
+  compiled in. Deliberately not on it: `Speaker enable` (hardware, and the
+  External-player mute already drives the amplifier), the list choices and the
+  diagnostics.
+- **A live `Mic gain` control.** The ES7210's hardware gain in dB, as a Home
+  Assistant `number` restored across reboots and re-applied at boot. It sits
+  before the split that feeds the wake word and the speech-to-text both, so it is
+  the real microphone-sensitivity knob where `mww_gain_factor` only touches the
+  wake word. Defaults to the chip's 24 dB, so nothing changes until you move it;
+  drop it if the mic is too hot, and raise `mww_gain_factor` afterwards if the
+  wake word then wants shouting at.
