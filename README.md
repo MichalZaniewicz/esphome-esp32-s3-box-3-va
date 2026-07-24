@@ -260,7 +260,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
 | `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
 | `settings.yaml` | The device's own switches as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output` toggle and a volume slider. Reached one swipe down from home (`idle_page_above: page_settings`). The on and off states differ in shape, not only colour, so the screen reads at a glance; the icons are the handful of Material Design glyphs actually used, downloaded at compile time. |
-| `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 19 looks for the home screen (fonts, colours, gradient backgrounds and layouts) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
+| `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 20 looks for the home screen (fonts, colours, gradient backgrounds, layouts and a temperature/humidity dashboard) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 
 Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
 clock, and the character idling. **Tap the screen to swap between them** -
@@ -311,15 +311,45 @@ reboot. Only the home screen is restyled; nothing else moves.
     - base/screens/home-styles.yaml   # the selector
 ```
 
-The 19 styles:
+The 20 styles, at the device's native 320x240 - layouts (Default, Big, Terminal,
+Stack, **Dashboard** with temperature/humidity icons), fonts and palettes, gradient
+backgrounds, and a light theme:
 
-| Group | Styles |
-|---|---|
-| Default | the clean clock + climate look |
-| Fonts & palettes | **CRT** (green phosphor), **Neon**, **Minecraft** (8-bit), **Vaporwave**, **Amber**, **Minimal**, **Bold** |
-| Layouts | **Big** (just the clock), **Terminal** (left-aligned console), **Stack** (centred column) |
-| Gradient backgrounds | **Sunset**, **Ocean**, **Aurora**, **Synthwave**, **Forest**, **Fire**, **Ice** |
-| Light theme | **Paper** (dark text on cream) |
+<table>
+<tr>
+<td align="center"><img src="base/assets/home-styles/default.png" width="210"><br><sub><b>Default</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/big.png" width="210"><br><sub><b>Big</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/terminal.png" width="210"><br><sub><b>Terminal</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/stack.png" width="210"><br><sub><b>Stack</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="base/assets/home-styles/dashboard.png" width="210"><br><sub><b>Dashboard</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/crt.png" width="210"><br><sub><b>CRT</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/neon.png" width="210"><br><sub><b>Neon</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/minecraft.png" width="210"><br><sub><b>Minecraft</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="base/assets/home-styles/vaporwave.png" width="210"><br><sub><b>Vaporwave</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/amber.png" width="210"><br><sub><b>Amber</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/minimal.png" width="210"><br><sub><b>Minimal</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/bold.png" width="210"><br><sub><b>Bold</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="base/assets/home-styles/sunset.png" width="210"><br><sub><b>Sunset</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/ocean.png" width="210"><br><sub><b>Ocean</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/aurora.png" width="210"><br><sub><b>Aurora</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/synthwave.png" width="210"><br><sub><b>Synthwave</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="base/assets/home-styles/forest.png" width="210"><br><sub><b>Forest</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/fire.png" width="210"><br><sub><b>Fire</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/ice.png" width="210"><br><sub><b>Ice</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/paper.png" width="210"><br><sub><b>Paper</b></sub></td>
+</tr>
+</table>
+
+<sub>Previews rendered at 320x240 with the device's own fonts; the panel itself
+looks the same bar minor anti-aliasing.</sub>
 
 `home.yaml` is parameterised, so the Default look is unchanged and any single
 value - a colour, the clock font - can also be pinned at compile time by setting
