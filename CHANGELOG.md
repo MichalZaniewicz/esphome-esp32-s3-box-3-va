@@ -43,6 +43,12 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **Mute now only mutes the microphone.** It used to drive the screen too: the
+  muted phase pinned you to the character's muted face, and the tap-to-swap was
+  gated to the idle phase, so while muted you could not tap back to the clock. Now
+  the switch does one thing - mute the mic, which also stops the wake word from
+  hearing - and leaves the screen alone. The only "it is muted" indicator is the
+  switch itself and its settings tile.
 - **The face engine wrote a width nobody had changed, every tick, for the whole
   of every answer.** `face_eyes`, `face_pupils` and `face_mouth` tested width and
   height together and then set both. The phases that actually run per tick move

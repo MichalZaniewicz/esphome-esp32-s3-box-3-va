@@ -1927,13 +1927,10 @@ script:
 
   - id: set_idle_or_mute_phase
     then:
-      - if:
-          condition:
-            switch.is_off: mute
-          then:
-            - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
-          else:
-            - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
+      # Resting phase is always idle now. Mute no longer has a screen of its own
+      # (see the Mute switch), so there is no muted phase to fall back into. The
+      # name is kept because every "back to rest" caller in this file goes here.
+      - lambda: id(voice_assistant_phase) = ${voice_assist_idle_phase_id};
 
   # Tap-to-talk: same entry point as a wake word, minus the wake word. Ignored
   # while muted or while a pipeline is already running.
@@ -2281,18 +2278,15 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
     entity_category: config
+    # Mute does ONE thing: it mutes the microphone. It deliberately does not
+    # touch the screen or the assistant phase - no muted face, no page change.
+    # The only "it is muted" indicator is this switch's own state (and its tile
+    # on the settings screen). Muting the mic also stops the wake word from
+    # hearing anything, which is the point.
     on_turn_on:
       - microphone.mute:
-      - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
-      - script.execute: draw_display
     on_turn_off:
       - microphone.unmute:
-      # The script, not an inline copy of what it does. The result is the same
-      # here - mute has just gone off, so the script picks the idle phase - but
-      # every other caller in this file goes through it, and the last inline
-      # copy in this file drifted from its original and cost us a bug.
-      - script.execute: set_idle_or_mute_phase
-      - script.execute: draw_display
 
   # Exposed (not `internal:`) so an HA automation can silence a timer that is
   # ringing in an empty kitchen.
