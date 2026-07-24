@@ -57,6 +57,38 @@ font:
     file: { type: gfonts, family: "${font_family}", weight: 400 }
     size: 48
     glyphs: "0123456789:-"
+  - id: font_clock_glitch
+    file: { type: gfonts, family: "Rubik Glitch", weight: 400 }
+    size: 54
+    glyphs: "0123456789:-"
+  - id: font_clock_pixel
+    file: { type: gfonts, family: "Silkscreen", weight: 400 }
+    size: 44
+    glyphs: "0123456789:-"
+  - id: font_clock_stencil
+    file: { type: gfonts, family: "Wallpoet", weight: 400 }
+    size: 62
+    glyphs: "0123456789:-"
+  - id: font_clock_racer
+    file: { type: gfonts, family: "Faster One", weight: 400 }
+    size: 60
+    glyphs: "0123456789:-"
+  - id: font_clock_zen
+    file: { type: gfonts, family: "Zen Dots", weight: 400 }
+    size: 50
+    glyphs: "0123456789:-"
+  - id: font_clock_cyber
+    file: { type: gfonts, family: "Chakra Petch", weight: 700 }
+    size: 62
+    glyphs: "0123456789:-"
+  - id: font_clock_mono
+    file: { type: gfonts, family: "Major Mono Display", weight: 400 }
+    size: 52
+    glyphs: "0123456789:-"
+  - id: font_clock_blueprint
+    file: { type: gfonts, family: "Share Tech Mono", weight: 400 }
+    size: 62
+    glyphs: "0123456789:-"
   # Material Design Icons for the Dashboard style. Just the three glyphs it uses -
   # thermometer, water-percent and a cloud - verified against the v7.4.47 webfont.
   - id: font_home_mdi
@@ -130,6 +162,18 @@ select:
       - Fire
       - Ice
       - Paper
+      - Glitch
+      - Pixel
+      - Stencil
+      - Racer
+      - Zen
+      - Cyber
+      - Mono
+      - Sunrise
+      - Tide
+      - Blueprint
+      - RightCol
+      - Corner
     initial_option: Default
     on_value:
       - script.execute: apply_home_style
@@ -186,11 +230,25 @@ script:
           else if (s == "Fire")      { f = id(font_clock_bold);    bg = 0x1A0603; g2 = 0x7A1A08; grad = 1; ck = 0xFFD24D; dt = 0xFF8A3D; hn = 0xC7663A; cl = 0xFFB86A; }
           else if (s == "Ice")       { f = id(font_clock);         bg = 0x0A1A2E; g2 = 0x2A5A8A; grad = 1; ck = 0xF2FAFF; dt = 0xAFD6F0; hn = 0x6A93B8; cl = 0xD6ECFA; }
           else if (s == "Paper")     { f = id(font_clock);         bg = 0xEDEAE2; ck = 0x1A1A1A; dt = 0x555555; hn = 0x8A8A8A; cl = 0x333333; }
+          else if (s == "Glitch")    { f = id(font_clock_glitch);   bg = 0x0A0014; ck = 0xFF2E88; dt = 0x2EE6FF; hn = 0x7A2E6E; cl = 0xFF2E88; }
+          else if (s == "Pixel")     { f = id(font_clock_pixel);    bg = 0x001818; ck = 0x35F0C0; dt = 0x1E9E86; hn = 0x155E52; cl = 0x35F0C0; }
+          else if (s == "Stencil")   { f = id(font_clock_stencil);  bg = 0x141410; ck = 0xE8C848; dt = 0x9A8636; hn = 0x6E5E24; cl = 0xD8BC58; }
+          else if (s == "Racer")     { f = id(font_clock_racer);    bg = 0x120303; ck = 0xFF3B3B; dt = 0xFFB03B; hn = 0x8A2E2E; cl = 0xFF7A5A; }
+          else if (s == "Zen")       { f = id(font_clock_zen);      bg = 0x0E1420; ck = 0xE6EEF7; dt = 0x8FA6C7; hn = 0x4A5A75; cl = 0xC7D6EC; }
+          else if (s == "Cyber")     { f = id(font_clock_cyber);    bg = 0x0A0E06; ck = 0xE6FF3B; dt = 0x3BE6FF; hn = 0x6E7A3B; cl = 0xB6E63B; }
+          else if (s == "Mono")      { f = id(font_clock_mono);     bg = 0x0D0D0D; ck = 0xEDEDED; dt = 0x8A8A8A; hn = 0x555555; cl = 0xC0C0C0; }
+          else if (s == "Sunrise")   { f = id(font_clock);          bg = 0x2A0A2E; g2 = 0xFFB24D; grad = 2; ck = 0xFFF0E0; dt = 0xFFCF9A; hn = 0xC77A5A; cl = 0xFFE0B8; }
+          else if (s == "Tide")      { f = id(font_clock);          bg = 0x02121F; g2 = 0x0A6E7A; grad = 2; ck = 0xEAFBFF; dt = 0x7FD4E0; hn = 0x3F7A86; cl = 0xBFEFF6; }
+          else if (s == "Blueprint") { f = id(font_clock_blueprint); bg = 0xD8E6F2; ck = 0x113A66; dt = 0x3A6A96; hn = 0x6A8AAE; cl = 0x224A76; }
+          else if (s == "RightCol")  { f = id(font_clock);          bg = 0x0A0700; ck = 0xFFB021; dt = 0xB3760F; hn = 0x7A5008; cl = 0xFFA833; layout = 5; }
+          else if (s == "Corner")    { f = id(font_clock_dash);     bg = 0x0B0B0B; ck = 0xF4F4F4; dt = 0x6E6E6E; hn = 0x454545; cl = 0x9C9C9C; layout = 6; }
 
           lv_obj_t *p = id(page_home)->obj;
           lv_obj_set_style_bg_color(p, lv_color_hex(bg), LV_PART_MAIN);
           lv_obj_set_style_bg_grad_color(p, lv_color_hex(g2), LV_PART_MAIN);
-          lv_obj_set_style_bg_grad_dir(p, grad ? LV_GRAD_DIR_VER : LV_GRAD_DIR_NONE, LV_PART_MAIN);
+          lv_grad_dir_t gdir = grad == 2 ? LV_GRAD_DIR_HOR
+                             : grad == 1 ? LV_GRAD_DIR_VER : LV_GRAD_DIR_NONE;
+          lv_obj_set_style_bg_grad_dir(p, gdir, LV_PART_MAIN);
 
           lv_obj_set_style_text_font(id(home_clock), f->get_lv_font(), LV_PART_MAIN);
           lv_obj_set_style_text_color(id(home_clock),   lv_color_hex(ck), LV_PART_MAIN);
@@ -244,6 +302,22 @@ script:
               lv_obj_set_style_text_align(vl[i], LV_TEXT_ALIGN_CENTER, 0);
               lv_obj_set_style_text_color(vl[i], lv_color_hex(cl), 0);
             }
+          } else if (layout == 5) {          // RIGHTCOL: right-aligned column
+            show(clock); show(date); hide(hint); show(ind); show(out);
+            talign(clock, LV_TEXT_ALIGN_RIGHT); talign(date, LV_TEXT_ALIGN_RIGHT);
+            talign(ind, LV_TEXT_ALIGN_RIGHT); talign(out, LV_TEXT_ALIGN_RIGHT);
+            lv_obj_align(date,  LV_ALIGN_TOP_RIGHT, -14, 18);
+            lv_obj_align(clock, LV_ALIGN_TOP_RIGHT, -12, 58);
+            lv_obj_align(ind,   LV_ALIGN_TOP_RIGHT, -14, 150);
+            lv_obj_align(out,   LV_ALIGN_TOP_RIGHT, -14, 178);
+          } else if (layout == 6) {          // CORNER: small clock in the top-left
+            show(clock); show(date); hide(hint); show(ind); show(out);
+            talign(clock, LV_TEXT_ALIGN_LEFT); talign(date, LV_TEXT_ALIGN_LEFT);
+            talign(ind, LV_TEXT_ALIGN_LEFT); talign(out, LV_TEXT_ALIGN_LEFT);
+            lv_obj_align(clock, LV_ALIGN_TOP_LEFT, 14, 10);
+            lv_obj_align(date,  LV_ALIGN_TOP_LEFT, 16, 64);
+            lv_obj_align(ind,   LV_ALIGN_BOTTOM_LEFT, 14, -46);
+            lv_obj_align(out,   LV_ALIGN_BOTTOM_LEFT, 14, -22);
           } else {                           // DEFAULT: the home.yaml layout
             show(clock); show(date); show(hint); show(ind); show(out);
             talign(clock, LV_TEXT_ALIGN_CENTER); talign(date, LV_TEXT_ALIGN_LEFT);

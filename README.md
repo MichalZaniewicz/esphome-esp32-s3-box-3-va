@@ -260,7 +260,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
 | `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
 | `settings.yaml` | The device's own switches as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output` toggle and a volume slider. Reached one swipe down from home (`idle_page_above: page_settings`). The on and off states differ in shape, not only colour, so the screen reads at a glance; the icons are the handful of Material Design glyphs actually used, downloaded at compile time. |
-| `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 20 looks for the home screen (fonts, colours, gradient backgrounds, layouts and a temperature/humidity dashboard) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
+| `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 32 looks for the home screen (fonts, colours, gradient backgrounds, layouts and a temperature/humidity dashboard) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 
 Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
 clock, and the character idling. **Tap the screen to swap between them** -
@@ -311,40 +311,58 @@ reboot. Only the home screen is restyled; nothing else moves.
     - base/screens/home-styles.yaml   # the selector
 ```
 
-The 20 styles, at the device's native 320x240 - layouts (Default, Big, Terminal,
-Stack, **Dashboard** with temperature/humidity icons), fonts and palettes, gradient
-backgrounds, and a light theme:
+The 32 styles, at the device's native 320x240 - layouts (Default, Big, Terminal,
+Stack, **Dashboard** with temperature/humidity icons, RightCol, Corner), fonts and
+palettes, vertical and horizontal gradient backgrounds, and light themes:
 
 <table>
 <tr>
-<td align="center"><img src="base/assets/home-styles/default.png" width="210"><br><sub><b>Default</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/big.png" width="210"><br><sub><b>Big</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/terminal.png" width="210"><br><sub><b>Terminal</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/stack.png" width="210"><br><sub><b>Stack</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/default.png" width="200"><br><sub><b>Default</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/big.png" width="200"><br><sub><b>Big</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/terminal.png" width="200"><br><sub><b>Terminal</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/stack.png" width="200"><br><sub><b>Stack</b></sub></td>
 </tr>
 <tr>
-<td align="center"><img src="base/assets/home-styles/dashboard.png" width="210"><br><sub><b>Dashboard</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/crt.png" width="210"><br><sub><b>CRT</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/neon.png" width="210"><br><sub><b>Neon</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/minecraft.png" width="210"><br><sub><b>Minecraft</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/dashboard.png" width="200"><br><sub><b>Dashboard</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/rightcol.png" width="200"><br><sub><b>RightCol</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/corner.png" width="200"><br><sub><b>Corner</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/crt.png" width="200"><br><sub><b>CRT</b></sub></td>
 </tr>
 <tr>
-<td align="center"><img src="base/assets/home-styles/vaporwave.png" width="210"><br><sub><b>Vaporwave</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/amber.png" width="210"><br><sub><b>Amber</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/minimal.png" width="210"><br><sub><b>Minimal</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/bold.png" width="210"><br><sub><b>Bold</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/neon.png" width="200"><br><sub><b>Neon</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/minecraft.png" width="200"><br><sub><b>Minecraft</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/vaporwave.png" width="200"><br><sub><b>Vaporwave</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/amber.png" width="200"><br><sub><b>Amber</b></sub></td>
 </tr>
 <tr>
-<td align="center"><img src="base/assets/home-styles/sunset.png" width="210"><br><sub><b>Sunset</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/ocean.png" width="210"><br><sub><b>Ocean</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/aurora.png" width="210"><br><sub><b>Aurora</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/synthwave.png" width="210"><br><sub><b>Synthwave</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/minimal.png" width="200"><br><sub><b>Minimal</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/bold.png" width="200"><br><sub><b>Bold</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/glitch.png" width="200"><br><sub><b>Glitch</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/pixel.png" width="200"><br><sub><b>Pixel</b></sub></td>
 </tr>
 <tr>
-<td align="center"><img src="base/assets/home-styles/forest.png" width="210"><br><sub><b>Forest</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/fire.png" width="210"><br><sub><b>Fire</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/ice.png" width="210"><br><sub><b>Ice</b></sub></td>
-<td align="center"><img src="base/assets/home-styles/paper.png" width="210"><br><sub><b>Paper</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/stencil.png" width="200"><br><sub><b>Stencil</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/racer.png" width="200"><br><sub><b>Racer</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/zen.png" width="200"><br><sub><b>Zen</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/cyber.png" width="200"><br><sub><b>Cyber</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="base/assets/home-styles/mono.png" width="200"><br><sub><b>Mono</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/sunset.png" width="200"><br><sub><b>Sunset</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/ocean.png" width="200"><br><sub><b>Ocean</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/aurora.png" width="200"><br><sub><b>Aurora</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="base/assets/home-styles/synthwave.png" width="200"><br><sub><b>Synthwave</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/forest.png" width="200"><br><sub><b>Forest</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/fire.png" width="200"><br><sub><b>Fire</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/ice.png" width="200"><br><sub><b>Ice</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="base/assets/home-styles/sunrise.png" width="200"><br><sub><b>Sunrise</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/tide.png" width="200"><br><sub><b>Tide</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/blueprint.png" width="200"><br><sub><b>Blueprint</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/paper.png" width="200"><br><sub><b>Paper</b></sub></td>
 </tr>
 </table>
 

@@ -222,13 +222,15 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 - **A live "Home style" selector** (`base/screens/home-styles.yaml`) - a Home
   Assistant `select` that restyles the home screen at runtime, no rebuild, choice
-  restored across a reboot. 20 looks: palettes and fonts (CRT, Neon, Minecraft,
-  Vaporwave, Amber, Minimal, Bold), layouts (Big, Terminal, Stack), a temperature
-  / humidity **Dashboard** with icons, gradient backgrounds (Sunset, Ocean,
-  Aurora, Synthwave, Forest, Fire, Ice) and a Paper light theme. `home.yaml` is
-  parameterised so the Default look is unchanged and any value can also be pinned
-  at compile time; each clock font is a Google Font compiled as digits and a colon
-  only, so the whole set is a few KB. Only the home screen is touched.
+  restored across a reboot. 32 looks: palettes and fonts (CRT, Neon, Minecraft,
+  Vaporwave, Amber, Minimal, Bold, Glitch, Pixel, Stencil, Racer, Zen, Cyber,
+  Mono), layouts (Big, Terminal, Stack, RightCol, Corner), a temperature /
+  humidity **Dashboard** with icons, vertical and horizontal gradients (Sunset,
+  Ocean, Aurora, Synthwave, Forest, Fire, Ice, Sunrise, Tide) and light themes
+  (Paper, Blueprint). `home.yaml` is parameterised so the Default look is unchanged
+  and any value can also be pinned at compile time; each clock font is a Google
+  Font compiled as digits and a colon only, so the whole set is a few KB. Only the
+  home screen is touched.
 - **Performance instrumentation**, all `disabled_by_default` so it costs nothing
   until you switch it on in Home Assistant: `loop_time`, free heap, largest free
   block and free PSRAM. The reason it exists: the only signal this project had
