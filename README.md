@@ -274,22 +274,27 @@ the tap off.
 
 ### Swipe navigation
 
-Home sits in the middle of a cross, and three more substitutions name the screens
-a swipe reveals. Left at their `page_status` default a swipe does nothing, so
-navigation is opt-in one direction at a time:
+Home has two vertical neighbours and a horizontal carousel. The **vertical** ones
+are named by substitution and are opt-in - left at their default a swipe does
+nothing:
 
 ```yaml
-  idle_page_above: page_settings  # swipe DOWN to bring it in from the top
+  idle_page_above: page_settings  # swipe DOWN brings it in from the top
   idle_page_below: page_status    # swipe UP; unset here, so up does nothing
-  idle_page_side:  page_status    # swipe LEFT or RIGHT; wraps like a carousel
 ```
 
-Vertical is one level deep and does not loop; horizontal wraps. A conversation
-takes the screen as it always has and hands it back to whichever one you were
-reading when it finishes. Swipe sensitivity is a substitution (`swipe_min_px`),
-tuned down from LVGL's default because a sixth of the screen was dropping
-deliberate swipes. `base/screens/swipe.yaml` ships placeholder screens for the
-remaining directions if you want to feel the movement before wiring real ones.
+The **horizontal** axis is a carousel: home plus any extra idle screen packages
+you install, stepped through with a left or right swipe and wrapping at the ends.
+There is no substitution for it - a screen joins the ring by being installed, in
+the order you list it under `files:`, and home is always first. Adding one is a
+copy-paste: see [base/screens/CAROUSEL.md](base/screens/CAROUSEL.md) and the
+[carousel-example.yaml](base/screens/carousel-example.yaml) beside it.
+
+Vertical is one level deep, does not loop, and belongs to home; horizontal wraps.
+A conversation takes the screen as it always has and hands it back to whichever
+one you were reading when it finishes. Swipe sensitivity is a substitution
+(`swipe_min_px`), tuned down from LVGL's default because a sixth of the screen was
+dropping deliberate swipes.
 
 ## Claude Code skill
 

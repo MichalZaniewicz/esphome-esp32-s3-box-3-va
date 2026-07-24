@@ -1,0 +1,60 @@
+###############################################################################
+# Carousel screen template: one extra idle screen you swipe to.
+#
+# COPY THIS FILE, rename the page id, and put whatever you like in `widgets`.
+# Add it to your thin config's `files:` list AFTER base/screens/home.yaml. Its
+# position in that list is its position in the carousel: home is always the
+# first stop, and each extra screen is one more left/right stop. The ring wraps.
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/screens/carousel-example.yaml   # <- a stop on the ring
+#         - base/faces/${assistant}.yaml
+#
+# There is no substitution to point at anything: carousel membership is the
+# `skip: false` flag below, not a name the core has to know. That is the whole
+# design - a screen joins the ring by existing, and the core navigates it by
+# index with `lvgl.page.next` / `previous`. See CAROUSEL.md for the reasoning.
+###############################################################################
+
+substitutions:
+  carousel_example_bg_color: '0x000000'
+
+lvgl:
+  pages:
+    - id: page_carousel_example      # rename me - must be unique across the config
+      skip: false                    # THIS is what puts the screen on the ring
+      bg_color: ${carousel_example_bg_color}
+      scrollbar_mode: "OFF"
+      # Horizontal swipes step the carousel. The triggers live on the PAGE, and
+      # the full-screen button at the end of `widgets` carries `gesture_bubble`
+      # so a swipe reaches the page at all: LVGL delivers a gesture to the object
+      # that was pressed, and that button covers the whole screen. Without it the
+      # page never sees a swipe. This is the same wiring base/screens/home.yaml
+      # uses. Vertical is deliberately NOT wired here: the settings screen and any
+      # other vertical neighbours belong to home, not to the extra carousel stops.
+      on_swipe_left:
+        - script.execute: idle_swipe_left
+      on_swipe_right:
+        - script.execute: idle_swipe_right
+      widgets:
+        # Replace everything from here down with your own content.
+        - label:
+            align: CENTER
+            text: "Ekran karuzeli"
+            text_font: font_body
+            text_color: 0xFFFFFF
+
+        # Full-screen, transparent, gestures pass through. Keep it LAST so it sits
+        # above the content. Add an `on_click` if you want a tap action; it is not
+        # required for swiping to work.
+        - button:
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true

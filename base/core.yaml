@@ -214,22 +214,40 @@ substitutions:
   # character and the tap becomes "show me the robot" / "show me the time".
   # Leave them equal and tapping does nothing.
   idle_page_alt: page_status
-  # SWIPE NEIGHBOURS of the idle screen. Home sits in the middle of a cross:
+  # WHERE THE IDLE SCREEN CAN GO. Home sits on a horizontal carousel with two
+  # vertical neighbours hanging off it:
   #
-  #                    ${idle_page_above}
+  #                    ${idle_page_above}         (swipe DOWN brings it in)
   #                          |
-  #   ${idle_page_side} -- home -- ${idle_page_side}      (carousel, wraps)
+  #   ...  <- carousel of the installed idle screens ->  ...   (swipe L/R, wraps)
   #                          |
-  #                   ${idle_page_below}
+  #                   ${idle_page_below}          (swipe UP brings it in)
   #
-  # Vertical is one level deep and not a loop: swiping up from home brings the
-  # screen in from the bottom, and swiping down takes you back. Horizontal wraps
-  # like a carousel. Left at `page_status` these all collapse onto the same page,
-  # so swiping does nothing and nothing breaks - which is what a config without
-  # `base/screens/swipe.yaml` gets.
-  idle_page_above: page_status
-  idle_page_below: page_status
-  idle_page_side: page_status
+  # The two VERTICAL neighbours are named here by substitution. Vertical is one
+  # level deep, not a loop, and belongs to home only - it is reachable from the
+  # home screen, not from the other carousel screens. A neighbour left at
+  # `${idle_page}` means "nothing that way": the swipe script sees the target IS
+  # home and does nothing at all - no page change, no animation, no position
+  # bookkeeping. That is what an unmapped direction gets. The default follows
+  # `idle_page`, so it collapses onto whatever the home screen actually is - NOT
+  # onto `page_status`, which would show the bare status screen through any
+  # direction the config forgot to map.
+  idle_page_above: ${idle_page}
+  idle_page_below: ${idle_page}
+  #
+  # The HORIZONTAL axis is a carousel, not a substitution. Every installed idle
+  # screen package is a stop, in package order, and a left/right swipe steps
+  # through them and wraps. Membership is the LVGL `skip` flag: a carousel screen
+  # is `skip: false`, everything else (status, boot, the phase pages, settings)
+  # is `skip: true`, so a swipe never lands on them. To add a screen, drop a
+  # package that declares one `skip: false` page - see base/screens/CAROUSEL.md.
+  #
+  # `page_status` is the bare fallback the phases fall back to. It is a carousel
+  # stop ONLY when it is also the home screen - i.e. when no home package is
+  # installed. base/screens/home.yaml sets this to `true`, taking the status page
+  # off the ring so a swipe never shows it; bare core leaves it `false`, which
+  # keeps at least one carousel member alive.
+  status_page_skip: 'false'
   # HOW HARD YOU HAVE TO SWIPE. LVGL wants 50 px of travel and 3 px of velocity
   # at release before it calls something a gesture. On a 320 px screen 50 px is a
   # sixth of the width, which is enough that deliberate swipes get dropped -
@@ -325,6 +343,10 @@ esphome:
         - audio_adc.set_mic_gain:
             id: es7210_adc
             mic_gain: !lambda return id(mic_gain_number).state;
+        # Seed the carousel position with the home screen's page index. This is
+        # not restored across reboots (see the global), so the device always
+        # comes back on home; within a session the swipe scripts move it.
+        - lambda: id(idle_page_idx) = (int) id(${idle_page})->index;
     - priority: 600
       then:
         - script.execute: draw_display
@@ -1054,16 +1076,28 @@ globals:
     type: bool
     restore_value: true
     initial_value: "false"
-  # WHERE ON THE CROSS the idle screen currently sits. 0 is home, and `idle_alt`
-  # above only means anything there - it is home's own tap toggle, not a
-  # position. Survives reboots for the same reason `idle_alt` does.
-  #   0 = home     1 = the screen above     2 = below     3 = the side screen
-  # It is deliberately a position rather than "whatever page is loaded": after a
-  # conversation the phase pages have been and gone, and `draw_display` needs to
-  # know where to put you back without asking LVGL what it happens to be showing.
+  # WHERE ON THE VERTICAL AXIS the idle screen currently sits:
+  #   0 = on the carousel row     1 = the screen above     2 = the screen below
+  # The HORIZONTAL position (which carousel screen) is `idle_page_idx` below, not
+  # this. `idle_alt` is home's own tap toggle and only means anything at pos 0 on
+  # the home screen. This is a position rather than "whatever page is loaded":
+  # after a conversation the phase pages have been and gone, and `draw_display`
+  # needs to know where to put you back without asking LVGL what it is showing.
   - id: idle_pos
     type: int
     restore_value: true
+    initial_value: "0"
+  # WHICH CAROUSEL SCREEN is selected on the row, as an LVGL page index. Written
+  # from `get_current_page()` after every horizontal swipe, and read back by
+  # `draw_display` to restore the screen after a conversation - the core cannot
+  # name a page that lives in a user's package, so it restores by index. NOT
+  # restored across reboots: a saved index could point past the end of the page
+  # list if the config's screen set changed, and `show_page` does not bounds
+  # check. The boot handler seeds it with the home index instead, so a reboot
+  # always lands on home.
+  - id: idle_page_idx
+    type: int
+    restore_value: false
     initial_value: "0"
   # WHEN THE LAST SWIPE HAPPENED, in millis(). A swipe that starts on a button
   # still makes that button report a click when the finger lifts - LVGL treats
@@ -1278,7 +1312,17 @@ script:
       - if:
           condition:
             and:
-              - lambda: return id(idle_pos) == 0 || id(idle_pos) == 1;
+              # pos 1 (the screen above) always swipes back to home. From home
+              # (pos 0) only move if there is a real screen below AND you are on
+              # the home carousel stop - the vertical neighbours belong to home,
+              # not to the other carousel screens. An unmapped direction points at
+              # home itself, so leave it alone: no page change, no animation, no
+              # position bookkeeping.
+              - lambda: |-
+                  return id(idle_pos) == 1 ||
+                         (id(idle_pos) == 0 &&
+                          id(idle_page_idx) == (int) id(${idle_page})->index &&
+                          (lv_obj_t *) id(${idle_page_below}) != (lv_obj_t *) id(${idle_page}));
               # Idle OR muted. Muting is a resting state, not something
               # happening, and refusing to navigate while muted meant the
               # one screen you reach for to unmute was the one you could
@@ -1312,7 +1356,16 @@ script:
       - if:
           condition:
             and:
-              - lambda: return id(idle_pos) == 0 || id(idle_pos) == 2;
+              # pos 2 (the screen below) always swipes back to home. From home
+              # (pos 0) only move if there is a real screen above AND you are on
+              # the home carousel stop - the vertical neighbours belong to home,
+              # not to the other carousel screens. An unmapped direction points at
+              # home itself, so leave it alone.
+              - lambda: |-
+                  return id(idle_pos) == 2 ||
+                         (id(idle_pos) == 0 &&
+                          id(idle_page_idx) == (int) id(${idle_page})->index &&
+                          (lv_obj_t *) id(${idle_page_above}) != (lv_obj_t *) id(${idle_page}));
               # Idle OR muted. Muting is a resting state, not something
               # happening, and refusing to navigate while muted meant the
               # one screen you reach for to unmute was the one you could
@@ -1340,16 +1393,29 @@ script:
                       animation: ${swipe_anim_BOTTOM}
                       time: ${swipe_anim_ms}ms
 
-  # LEFT and RIGHT are the carousel and it wraps. Only home and the side screen
-  # are on it today, so it is a two-stop loop; adding more side screens means
-  # extending this the same way, not rewriting it.
+  # LEFT and RIGHT are the carousel. They step through every idle screen the
+  # config installed - home plus any extra `skip: false` pages - in LVGL page
+  # order, and wrap. The core never names those pages: `show_next_page` /
+  # `show_prev_page` walk the page ring on the component and skip everything
+  # flagged `skip: true` (status, boot, the phase pages, settings), so a swipe
+  # only ever lands on a real carousel screen. `idle_page_idx` is then read back
+  # from the component so a conversation can put you back where you were - the
+  # core cannot reference a user's page by name, only by index.
+  #
+  # Both are guarded on being idle (or muted) and on `idle_pos == 0`: the carousel
+  # lives on the row only, so a horizontal swipe while up on a vertical neighbour
+  # does nothing. If the character (home's tap-toggle alt) is showing, one swipe
+  # returns home rather than stepping the ring - the alt is off the ring, and
+  # "swipe off the robot to get home, swipe again to move" is the predictable read.
+  # When only home is on the ring, `show_next/prev_page` wraps straight back to it
+  # and, finding no other stop, leaves the screen where it is: a swipe does nothing.
   - id: idle_swipe_left
     then:
       - lambda: id(last_swipe_ms) = millis();
       - if:
           condition:
             and:
-              - lambda: return id(idle_pos) == 0 || id(idle_pos) == 3;
+              - lambda: return id(idle_pos) == 0;
               # Idle OR muted. Muting is a resting state, not something
               # happening, and refusing to navigate while muted meant the
               # one screen you reach for to unmute was the one you could
@@ -1359,23 +1425,22 @@ script:
                   return p == ${voice_assist_idle_phase_id}
                       || p == ${voice_assist_muted_phase_id};
           then:
-            - lambda: |-
-                const bool home = (id(idle_pos) == 3);
-                id(idle_pos) = home ? 0 : 3;
-                if (home) id(idle_alt) = false;
             - if:
                 condition:
-                  lambda: return id(idle_pos) == 0;
+                  lambda: return id(idle_alt);
                 then:
+                  # On the character: the swipe brings home back and clears the toggle.
+                  - lambda: id(idle_alt) = false;
                   - lvgl.page.show:
                       id: ${idle_page}
                       animation: ${swipe_anim_LEFT}
                       time: ${swipe_anim_ms}ms
+                  - lambda: id(idle_page_idx) = (int) id(${idle_page})->index;
                 else:
-                  - lvgl.page.show:
-                      id: ${idle_page_side}
-                      animation: ${swipe_anim_LEFT}
-                      time: ${swipe_anim_ms}ms
+                  # On the row: step the ring forward and remember where we landed.
+                  - lambda: |-
+                      id(lvgl_ui)->show_next_page(LV_SCR_LOAD_ANIM_${swipe_anim_LEFT}, ${swipe_anim_ms});
+                      id(idle_page_idx) = (int) id(lvgl_ui)->get_current_page();
 
   - id: idle_swipe_right
     then:
@@ -1383,33 +1448,27 @@ script:
       - if:
           condition:
             and:
-              - lambda: return id(idle_pos) == 0 || id(idle_pos) == 3;
-              # Idle OR muted. Muting is a resting state, not something
-              # happening, and refusing to navigate while muted meant the
-              # one screen you reach for to unmute was the one you could
-              # not swipe away from.
+              - lambda: return id(idle_pos) == 0;
+              # Idle OR muted, as above.
               - lambda: |-
                   const int p = id(voice_assistant_phase);
                   return p == ${voice_assist_idle_phase_id}
                       || p == ${voice_assist_muted_phase_id};
           then:
-            - lambda: |-
-                const bool home = (id(idle_pos) == 3);
-                id(idle_pos) = home ? 0 : 3;
-                if (home) id(idle_alt) = false;
             - if:
                 condition:
-                  lambda: return id(idle_pos) == 0;
+                  lambda: return id(idle_alt);
                 then:
+                  - lambda: id(idle_alt) = false;
                   - lvgl.page.show:
                       id: ${idle_page}
                       animation: ${swipe_anim_RIGHT}
                       time: ${swipe_anim_ms}ms
+                  - lambda: id(idle_page_idx) = (int) id(${idle_page})->index;
                 else:
-                  - lvgl.page.show:
-                      id: ${idle_page_side}
-                      animation: ${swipe_anim_RIGHT}
-                      time: ${swipe_anim_ms}ms
+                  - lambda: |-
+                      id(lvgl_ui)->show_prev_page(LV_SCR_LOAD_ANIM_${swipe_anim_RIGHT}, ${swipe_anim_ms});
+                      id(idle_page_idx) = (int) id(lvgl_ui)->get_current_page();
 
   # Single entry point for "put the right thing on screen". Every state change
   # calls this rather than switching pages itself, so there is one place where
@@ -1584,39 +1643,43 @@ script:
                           lvgl.page.is_showing: ${idle_page_below}
                       then:
                         - lvgl.page.show: ${idle_page_below}
-            - if:
-                condition:
-                  lambda: return id(idle_pos) == 3;
-                then:
-                  - if:
-                      condition:
-                        not:
-                          lvgl.page.is_showing: ${idle_page_side}
-                      then:
-                        - lvgl.page.show: ${idle_page_side}
-            # Position 0 is home, and only there does the tap toggle mean
-            # anything - it picks which of home's two faces you get.
+            # Position 0 is on the carousel row. On the home stop the tap toggle
+            # picks which of home's two faces you get; on any other carousel stop
+            # there is no toggle, and the screen is restored by index because the
+            # core cannot name a page that lives in a user's package.
             - if:
                 condition:
                   lambda: return id(idle_pos) == 0;
                 then:
                   - if:
                       condition:
-                        lambda: return id(idle_alt);
+                        lambda: return id(idle_page_idx) == (int) id(${idle_page})->index;
                       then:
+                        # Home stop: honour the tap toggle between the two faces.
                         - if:
                             condition:
-                              not:
-                                lvgl.page.is_showing: ${idle_page_alt}
+                              lambda: return id(idle_alt);
                             then:
-                              - lvgl.page.show: ${idle_page_alt}
+                              - if:
+                                  condition:
+                                    not:
+                                      lvgl.page.is_showing: ${idle_page_alt}
+                                  then:
+                                    - lvgl.page.show: ${idle_page_alt}
+                            else:
+                              - if:
+                                  condition:
+                                    not:
+                                      lvgl.page.is_showing: ${idle_page}
+                                  then:
+                                    - lvgl.page.show: ${idle_page}
                       else:
-                        - if:
-                            condition:
-                              not:
-                                lvgl.page.is_showing: ${idle_page}
-                            then:
-                              - lvgl.page.show: ${idle_page}
+                        # Another carousel screen: restore it by index, no
+                        # animation - this is the assistant getting out of the
+                        # way, not a gesture.
+                        - lambda: |-
+                            if (id(lvgl_ui)->get_current_page() != (size_t) id(idle_page_idx))
+                              id(lvgl_ui)->show_page((size_t) id(idle_page_idx), LV_SCR_LOAD_ANIM_NONE, 0);
 
   # Push what was said / what was answered onto the labels. The text sensors are
   # the source of truth; LVGL labels do not follow them on their own.
@@ -2624,6 +2687,7 @@ lvgl:
     # - or without - any optional screen: three system pages and one status page
     # the phases fall back to.
     - id: page_boot
+      skip: true          # not a carousel stop; shown by the boot sequence only
       bg_color: 0x000000
       widgets:
         - label:
@@ -2674,6 +2738,7 @@ lvgl:
             pad_all: 0
 
     - id: page_no_wifi
+      skip: true          # system page, never a carousel stop
       bg_color: 0x000000
       widgets:
         - label:
@@ -2683,6 +2748,7 @@ lvgl:
             text_color: 0xFF4D4D
 
     - id: page_no_ha
+      skip: true          # system page, never a carousel stop
       bg_color: 0x000000
       widgets:
         - label:
@@ -2691,8 +2757,12 @@ lvgl:
             text_font: font_body
             text_color: 0xFF4D4D
 
-    # Every assistant phase lands here unless a package claims it.
+    # Every assistant phase lands here unless a package claims it. It is a
+    # carousel stop only when it is also the home screen (bare core, no home
+    # package); base/screens/home.yaml flips `status_page_skip` to true to take
+    # it off the ring. See the substitution up top.
     - id: page_status
+      skip: ${status_page_skip}
       bg_color: 0x000000
       widgets:
         - label:

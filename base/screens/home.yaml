@@ -22,6 +22,12 @@
 ###############################################################################
 
 substitutions:
+  # Installing a home screen takes the bare status page off the carousel: with a
+  # real screen to land on, a swipe should never surface `page_status`. The core
+  # defaults this to false, where bare core keeps the status page as its single
+  # carousel member; installing this package flips it to true.
+  status_page_skip: 'true'
+
   # Home Assistant entities. Wrong or missing ones are not an error - ESPHome
   # subscribes anyway and the label stays "--" until something answers.
   room_temp_entity: sensor.room_temperature
@@ -237,6 +243,7 @@ font:
 lvgl:
   pages:
     - id: page_home
+      skip: false         # a carousel stop: home is the first screen on the ring
       bg_color: 0x000000
       # No scrollbar. This page is drawn to fill the screen and there is nothing
       # to scroll to, but content sized to exactly 240 px renders a hair taller
@@ -244,10 +251,11 @@ lvgl:
       # side. Seen on `rain` on hardware 2026-07-22; every page is the same shape
       # of risk, and turning it off costs nothing.
       scrollbar_mode: "OFF"
-      # SWIPE OFF HOME. Home sits in the middle of a cross - see the swipe
-      # scripts in the core, and base/screens/swipe.yaml for the pages. Without
-      # that package these scripts find every direction pointing back at home and
-      # do nothing, which is why this is safe to wire unconditionally.
+      # SWIPE OFF HOME. Home is the first stop on the horizontal carousel and has
+      # two vertical neighbours - see the swipe scripts in the core, and
+      # base/screens/CAROUSEL.md for how extra screens join the ring. With nothing
+      # else installed every direction points back at home and these scripts do
+      # nothing, which is why they are safe to wire unconditionally.
       #
       # The triggers are here on the PAGE, and the full-screen tap button below
       # carries `gesture_bubble` so they can be reached at all: LVGL delivers a

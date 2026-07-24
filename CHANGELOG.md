@@ -248,16 +248,20 @@ their alarm, the touchscreen, the home screen and the animated character.
 - **`scripts/validate.py` now rejects a `wait_until` with no `timeout`.** This
   is the most expensive mistake made here: such a wait does not fail and does
   not warn, it stops that automation forever, and everything after it.
-- **Swipe navigation around the idle screen.** Home sits in the middle of a
-  cross; `idle_page_above` / `idle_page_below` / `idle_page_side` name the screens
-  a swipe reveals, and left at their `page_status` default a swipe does nothing,
-  so it is opt-in one direction at a time. Vertical is one level deep, horizontal
-  wraps. A conversation still takes the screen and hands it back to whichever one
-  you were reading. `swipe_min_px` is tuned to 28 px because LVGL's 50 px default
+- **Swipe navigation around the idle screen.** Home has two vertical neighbours
+  named by `idle_page_above` / `idle_page_below` - left at their default a swipe
+  does nothing, so vertical is opt-in - and a **horizontal carousel** of home
+  plus any extra idle screen packages, stepped through with a left/right swipe and
+  wrapping at the ends. The carousel takes no substitution: a screen joins the
+  ring by being a `skip: false` page, in `files:` order, and the core walks it
+  with `lvgl.page.next` / `previous`, putting you back where you were after a
+  conversation by page index. Vertical is one level deep and belongs to home;
+  horizontal wraps. `swipe_min_px` is tuned to 28 px because LVGL's 50 px default
   - a sixth of the screen - dropped deliberate swipes on hardware. The gesture
   reaches the page through a full-screen button carrying `gesture_bubble`; without
   it LVGL delivers the swipe to the button that was pressed and the page never
-  sees it.
+  sees it. Adding a screen is a copy-paste: `base/screens/CAROUSEL.md` and the
+  `carousel-example.yaml` beside it.
 - **A settings screen** (`base/screens/settings.yaml`), the device's own switches
   as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output`
   toggle and a volume slider. Wired one swipe down from home in the example config

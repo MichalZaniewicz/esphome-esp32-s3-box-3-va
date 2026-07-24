@@ -275,6 +275,7 @@ interval:
 lvgl:
   pages:
     - id: page_face
+      skip: true          # phase page / home's tap-toggle alt, never a carousel stop
       bg_color: 0x000000
       # No scrollbar. These pages are drawn to fill the screen and there is
       # nothing to scroll to, but content sized to exactly 240 px renders a hair

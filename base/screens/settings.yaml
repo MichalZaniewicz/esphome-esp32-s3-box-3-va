@@ -179,6 +179,7 @@ interval:
 lvgl:
   pages:
     - id: page_settings
+      skip: true          # a vertical neighbour of home, not a carousel stop
       bg_color: ${settings_bg_color}
       scrollbar_mode: "OFF"
       # The same four gestures as every other idle screen, so the cross works
