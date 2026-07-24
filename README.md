@@ -260,6 +260,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
 | `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
 | `settings.yaml` | The device's own switches as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output` toggle and a volume slider. Reached one swipe down from home (`idle_page_above: page_settings`). The on and off states differ in shape, not only colour, so the screen reads at a glance; the icons are the handful of Material Design glyphs actually used, downloaded at compile time. |
+| `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 19 looks for the home screen (fonts, colours, gradient backgrounds and layouts) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 
 Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
 clock, and the character idling. **Tap the screen to swap between them** -
@@ -295,6 +296,36 @@ A conversation takes the screen as it always has and hands it back to whichever
 one you were reading when it finishes. Swipe sensitivity is a substitution
 (`swipe_min_px`), tuned down from LVGL's default because a sixth of the screen was
 dropping deliberate swipes.
+
+### Home styles
+
+Add `base/screens/home-styles.yaml` after `home.yaml` and a **"Home style"**
+select appears in Home Assistant. Pick a look and the clock font, the colours, the
+background and the layout change live - no rebuild - and the choice survives a
+reboot. Only the home screen is restyled; nothing else moves.
+
+```yaml
+  files:
+    - base/core.yaml
+    - base/screens/home.yaml
+    - base/screens/home-styles.yaml   # the selector
+```
+
+The 19 styles:
+
+| Group | Styles |
+|---|---|
+| Default | the clean clock + climate look |
+| Fonts & palettes | **CRT** (green phosphor), **Neon**, **Minecraft** (8-bit), **Vaporwave**, **Amber**, **Minimal**, **Bold** |
+| Layouts | **Big** (just the clock), **Terminal** (left-aligned console), **Stack** (centred column) |
+| Gradient backgrounds | **Sunset**, **Ocean**, **Aurora**, **Synthwave**, **Forest**, **Fire**, **Ice** |
+| Light theme | **Paper** (dark text on cream) |
+
+`home.yaml` is parameterised, so the Default look is unchanged and any single
+value - a colour, the clock font - can also be pinned at compile time by setting
+its `home_*` substitution. Each style's clock font is a Google Font compiled in as
+digits and a colon only, so the whole set adds a few KB. To add your own: a font,
+a select option, and a branch in `apply_home_style`.
 
 ## Claude Code skill
 
