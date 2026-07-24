@@ -1,0 +1,191 @@
+###############################################################################
+# Home styles: a live "Home style" selector for the home screen.
+#
+# An OPTIONAL package that rides on base/screens/home.yaml. Add it AFTER home:
+#
+#   files:
+#     - base/core.yaml
+#     - base/screens/home.yaml
+#     - base/screens/home-styles.yaml   # <- adds the selector
+#
+# It adds a Home Assistant `select` called "Home style". Pick a look and the
+# clock font, the colours, the background (solid OR gradient) AND the layout
+# change live - no rebuild - and the choice survives a reboot. Only the home
+# screen is touched; nothing here changes settings or any other page.
+#
+# A style is: PALETTE + FONT + BACKGROUND (solid or a vertical gradient) +
+# LAYOUT (where the clock sits and which small labels show). Most styles keep the
+# default layout and differ by paint; Big / Terminal / Stack rearrange it. The
+# small text keeps the main UI font so Central European accents still render.
+###############################################################################
+
+# One clock font per style. Digits and a colon only. `font_clock` (the Default
+# look) lives in home.yaml; these are the alternates.
+font:
+  - id: font_clock_crt
+    file: { type: gfonts, family: "VT323", weight: 400 }
+    size: 76
+    glyphs: "0123456789:-"
+  - id: font_clock_neon
+    file: { type: gfonts, family: "Orbitron", weight: 700 }
+    size: 60
+    glyphs: "0123456789:-"
+  - id: font_clock_mc
+    file: { type: gfonts, family: "Press Start 2P", weight: 400 }
+    size: 30
+    glyphs: "0123456789:-"
+  - id: font_clock_vapor
+    file: { type: gfonts, family: "Monoton", weight: 400 }
+    size: 52
+    glyphs: "0123456789:-"
+  - id: font_clock_amber
+    file: { type: gfonts, family: "Audiowide", weight: 400 }
+    size: 58
+    glyphs: "0123456789:-"
+  - id: font_clock_minimal
+    file: { type: gfonts, family: "Space Mono", weight: 700 }
+    size: 60
+    glyphs: "0123456789:-"
+  - id: font_clock_bold
+    file: { type: gfonts, family: "Bungee", weight: 400 }
+    size: 46
+    glyphs: "0123456789:-"
+  - id: font_clock_big
+    file: { type: gfonts, family: "${font_family}", weight: 600 }
+    size: 96
+    glyphs: "0123456789:-"
+
+select:
+  - platform: template
+    id: home_style_select
+    name: Home style
+    icon: "mdi:palette"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    options:
+      - Default
+      - CRT
+      - Neon
+      - Minecraft
+      - Vaporwave
+      - Amber
+      - Minimal
+      - Bold
+      - Big
+      - Terminal
+      - Stack
+      - Sunset
+      - Ocean
+      - Aurora
+      - Synthwave
+      - Forest
+      - Fire
+      - Ice
+      - Paper
+    initial_option: Default
+    on_value:
+      - script.execute: apply_home_style
+
+script:
+  - id: apply_home_style
+    then:
+      - lambda: |-
+          const std::string s = id(home_style_select).current_option();
+
+          // ---- PALETTE + FONT + BACKGROUND -----------------------------------
+          // Default falls through with home.yaml's own substitution values.
+          const font::Font *f = id(font_clock);
+          uint32_t bg = ${home_bg_color},   ck = ${home_clock_color},
+                   dt = ${home_date_color}, hn = ${home_hint_color},
+                   cl = ${home_climate_color};
+          uint32_t g2 = bg;   // gradient bottom colour; == bg means "solid"
+          int grad = 0;       // 0 = solid, 1 = vertical gradient
+          int layout = 0;     // 0 = default, 1 = big, 2 = terminal, 3 = stack
+
+          if (s == "CRT")            { f = id(font_clock_crt);     bg = 0x040A04; ck = 0x4DFF7A; dt = 0x2AAE4C; hn = 0x1C8038; cl = 0x38D661; }
+          else if (s == "Neon")      { f = id(font_clock_neon);    bg = 0x050014; ck = 0x00E5FF; dt = 0xFF3DDA; hn = 0x6E33FF; cl = 0x00E5FF; }
+          else if (s == "Minecraft") { f = id(font_clock_mc);      bg = 0x1E1508; ck = 0x7FD34F; dt = 0xC7A15A; hn = 0x6B5836; cl = 0x7FD34F; }
+          else if (s == "Vaporwave") { f = id(font_clock_vapor);   bg = 0x1B0A33; ck = 0xFF71CE; dt = 0x8A7CFF; hn = 0x5A4E9E; cl = 0x71F7FF; }
+          else if (s == "Amber")     { f = id(font_clock_amber);   bg = 0x0A0500; ck = 0xFFB021; dt = 0xB3760F; hn = 0x7A5008; cl = 0xFFA833; }
+          else if (s == "Minimal")   { f = id(font_clock_minimal); bg = 0x0B0B0B; ck = 0xF4F4F4; dt = 0x6E6E6E; hn = 0x454545; cl = 0x9C9C9C; }
+          else if (s == "Bold")      { f = id(font_clock_bold);    bg = 0x0E0E12; ck = 0xFFD400; dt = 0xFF5252; hn = 0x7A7A7A; cl = 0x2FE08A; }
+          else if (s == "Big")       { f = id(font_clock_big);     bg = 0x000000; ck = 0xFFFFFF; dt = 0x8A8A8A; hn = 0x5A5A5A; cl = 0xC8C8C8; layout = 1; }
+          else if (s == "Terminal")  { f = id(font_clock_crt);     bg = 0x030803; ck = 0x54FF7E; dt = 0x2AAE4C; hn = 0x1C8038; cl = 0x3ED869; layout = 2; }
+          else if (s == "Stack")     { f = id(font_clock);         bg = 0x0A0E14; ck = 0xEAF2FF; dt = 0x6FA8DC; hn = 0x3D5A80; cl = 0x9FC0E8; layout = 3; }
+          else if (s == "Sunset")    { f = id(font_clock);         bg = 0x2A0A2E; g2 = 0xFF7A3D; grad = 1; ck = 0xFFE0B0; dt = 0xFFB07A; hn = 0xC77A5A; cl = 0xFFCF9A; }
+          else if (s == "Ocean")     { f = id(font_clock);         bg = 0x02121F; g2 = 0x0A6E7A; grad = 1; ck = 0xEAFBFF; dt = 0x7FD4E0; hn = 0x3F7A86; cl = 0xBFEFF6; }
+          else if (s == "Aurora")    { f = id(font_clock);         bg = 0x08202A; g2 = 0x2E1A4A; grad = 1; ck = 0x8FFFD0; dt = 0x6FE0C0; hn = 0x4A8A8A; cl = 0xB0FFE6; }
+          else if (s == "Synthwave") { f = id(font_clock_neon);    bg = 0x160A2E; g2 = 0x3A0A4A; grad = 1; ck = 0xFF3DDA; dt = 0x00E5FF; hn = 0x6E33FF; cl = 0x00E5FF; }
+          else if (s == "Forest")    { f = id(font_clock);         bg = 0x03140A; g2 = 0x0A3A1E; grad = 1; ck = 0xB8F0A8; dt = 0x7FC77A; hn = 0x4A7A44; cl = 0xCDEFC0; }
+          else if (s == "Fire")      { f = id(font_clock_bold);    bg = 0x1A0603; g2 = 0x7A1A08; grad = 1; ck = 0xFFD24D; dt = 0xFF8A3D; hn = 0xC7663A; cl = 0xFFB86A; }
+          else if (s == "Ice")       { f = id(font_clock);         bg = 0x0A1A2E; g2 = 0x2A5A8A; grad = 1; ck = 0xF2FAFF; dt = 0xAFD6F0; hn = 0x6A93B8; cl = 0xD6ECFA; }
+          else if (s == "Paper")     { f = id(font_clock);         bg = 0xEDEAE2; ck = 0x1A1A1A; dt = 0x555555; hn = 0x8A8A8A; cl = 0x333333; }
+
+          lv_obj_t *p = id(page_home)->obj;
+          lv_obj_set_style_bg_color(p, lv_color_hex(bg), LV_PART_MAIN);
+          lv_obj_set_style_bg_grad_color(p, lv_color_hex(g2), LV_PART_MAIN);
+          lv_obj_set_style_bg_grad_dir(p, grad ? LV_GRAD_DIR_VER : LV_GRAD_DIR_NONE, LV_PART_MAIN);
+
+          lv_obj_set_style_text_font(id(home_clock), f->get_lv_font(), LV_PART_MAIN);
+          lv_obj_set_style_text_color(id(home_clock),   lv_color_hex(ck), LV_PART_MAIN);
+          lv_obj_set_style_text_color(id(home_date),    lv_color_hex(dt), LV_PART_MAIN);
+          lv_obj_set_style_text_color(id(home_hint),    lv_color_hex(hn), LV_PART_MAIN);
+          lv_obj_set_style_text_color(id(home_indoor),  lv_color_hex(cl), LV_PART_MAIN);
+          lv_obj_set_style_text_color(id(home_outdoor), lv_color_hex(cl), LV_PART_MAIN);
+
+          // ---- LAYOUT --------------------------------------------------------
+          // Position, visibility and text alignment are set on every pass, so
+          // switching away from a layout always restores the others.
+          lv_obj_t *clock = id(home_clock), *date = id(home_date), *hint = id(home_hint),
+                   *ind = id(home_indoor), *out = id(home_outdoor);
+          auto show = [](lv_obj_t *o){ lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN); };
+          auto hide = [](lv_obj_t *o){ lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); };
+          auto talign = [](lv_obj_t *o, lv_text_align_t a){ lv_obj_set_style_text_align(o, a, 0); };
+
+          if (layout == 1) {                 // BIG: just the clock, centred
+            show(clock); hide(date); hide(hint); hide(ind); hide(out);
+            lv_obj_align(clock, LV_ALIGN_CENTER, 0, 0);
+          } else if (layout == 2) {          // TERMINAL: left column, console
+            show(clock); show(date); hide(hint); show(ind); show(out);
+            talign(clock, LV_TEXT_ALIGN_LEFT); talign(date, LV_TEXT_ALIGN_LEFT);
+            talign(ind, LV_TEXT_ALIGN_LEFT);   talign(out, LV_TEXT_ALIGN_LEFT);
+            lv_obj_align(date,  LV_ALIGN_TOP_LEFT, 14, 18);
+            lv_obj_align(clock, LV_ALIGN_TOP_LEFT, 12, 58);
+            lv_obj_align(ind,   LV_ALIGN_TOP_LEFT, 14, 150);
+            lv_obj_align(out,   LV_ALIGN_TOP_LEFT, 14, 178);
+          } else if (layout == 3) {          // STACK: everything centred, vertical
+            show(clock); show(date); hide(hint); show(ind); show(out);
+            talign(date, LV_TEXT_ALIGN_CENTER);
+            talign(ind, LV_TEXT_ALIGN_CENTER); talign(out, LV_TEXT_ALIGN_CENTER);
+            lv_obj_align(clock, LV_ALIGN_CENTER, 0, -40);
+            lv_obj_align(date,  LV_ALIGN_CENTER, 0, 24);
+            lv_obj_align(ind,   LV_ALIGN_CENTER, 0, 58);
+            lv_obj_align(out,   LV_ALIGN_CENTER, 0, 84);
+          } else {                           // DEFAULT: the home.yaml layout
+            show(clock); show(date); show(hint); show(ind); show(out);
+            talign(clock, LV_TEXT_ALIGN_CENTER); talign(date, LV_TEXT_ALIGN_LEFT);
+            talign(ind, LV_TEXT_ALIGN_LEFT); talign(out, LV_TEXT_ALIGN_RIGHT);
+            lv_obj_align(clock, LV_ALIGN_CENTER, 0, -14);
+            lv_obj_align(date,  LV_ALIGN_TOP_LEFT, 12, 10);
+            lv_obj_align(hint,  LV_ALIGN_CENTER, 0, 32);
+            lv_obj_align(ind,   LV_ALIGN_BOTTOM_LEFT, 12, -24);
+            lv_obj_align(out,   LV_ALIGN_BOTTOM_RIGHT, -12, -24);
+          }
+
+          lv_obj_invalidate(p);
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/home-styles.yaml (live Home style selector)"
+    # After LVGL is up and home.yaml has painted (priority 500), apply the
+    # restored style. A template select restores its value but does not fire its
+    # on_value at boot, so this does the first paint - same pattern as the mic
+    # gain number in the core.
+    - priority: -200
+      then:
+        - script.execute: apply_home_style

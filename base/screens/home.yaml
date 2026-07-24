@@ -47,6 +47,28 @@ substitutions:
   home_indoor_label: "Inside"
   home_outdoor_label: "Outside"
 
+  # --- VISUAL STYLE ----------------------------------------------------------
+  # The defaults below are the clean look. A style package in
+  # base/screens/styles/ (e.g. home-crt.yaml) is just a bundle of these, added
+  # AFTER this file in `files:` so it wins - the same trick a language pack uses.
+  # Nothing here changes the data or the layout, only the paint.
+  home_bg_color: '0x000000'
+  home_clock_color: '0xFFFFFF'
+  home_date_color: '0x8A8A8A'
+  home_hint_color: '0x5A5A5A'
+  home_climate_color: '0xC8C8C8'
+  # The clock is the hero. Its font is separate so a style can make it a terminal
+  # or an 8-bit face without dragging the small text (which needs accents) along.
+  # Any Google Font family; the glyphset is just digits and a colon.
+  home_clock_font_family: ${font_family}
+  home_clock_font_weight: '300'
+  home_clock_font_size: '64'
+  # Small text (date, climate, hint). Left on the main UI font by default because
+  # it must carry Central European accents; a style may override if its font has
+  # the glyphs.
+  home_small_font_family: ${font_family}
+  home_small_font_weight: '400'
+
 sensor:
   - platform: homeassistant
     id: room_temp
@@ -221,30 +243,30 @@ font:
   - id: font_clock
     file:
       type: gfonts
-      family: ${font_family}
-      weight: 300
-    size: 64
+      family: ${home_clock_font_family}
+      weight: ${home_clock_font_weight}
+    size: ${home_clock_font_size}
     glyphs: "0123456789:-"
   - id: font_home_small
     file:
       type: gfonts
-      family: ${font_family}
-      weight: 400
+      family: ${home_small_font_family}
+      weight: ${home_small_font_weight}
     size: 15
     glyphsets:
       - ${font_glyphsets}
     extras:
       - file:
           type: gfonts
-          family: ${font_family}
-          weight: 400
+          family: ${home_small_font_family}
+          weight: ${home_small_font_weight}
         glyphs: ${extra_glyphs}
 
 lvgl:
   pages:
     - id: page_home
       skip: false         # a carousel stop: home is the first screen on the ring
-      bg_color: 0x000000
+      bg_color: ${home_bg_color}
       # No scrollbar. This page is drawn to fill the screen and there is nothing
       # to scroll to, but content sized to exactly 240 px renders a hair taller
       # than the arithmetic says and LVGL then draws a bar down the right hand
@@ -278,7 +300,7 @@ lvgl:
             y: 10
             text: ""
             text_font: font_home_small
-            text_color: 0x8A8A8A
+            text_color: ${home_date_color}
 
         # The clock, and the reason this screen exists.
         - label:
@@ -287,7 +309,7 @@ lvgl:
             y: -14
             text: "--:--"
             text_font: font_clock
-            text_color: 0xFFFFFF
+            text_color: ${home_clock_color}
 
         - label:
             id: home_hint
@@ -295,7 +317,7 @@ lvgl:
             y: 32
             text: "${home_hint_text}"
             text_font: font_home_small
-            text_color: 0x5A5A5A
+            text_color: ${home_hint_color}
 
         # Climate row, clear of the timer strip that lives on the top layer.
         - label:
@@ -305,7 +327,7 @@ lvgl:
             y: -24
             text: ""
             text_font: font_home_small
-            text_color: 0xC8C8C8
+            text_color: ${home_climate_color}
         - label:
             id: home_outdoor
             align: BOTTOM_RIGHT
@@ -313,7 +335,7 @@ lvgl:
             y: -24
             text: ""
             text_font: font_home_small
-            text_color: 0xC8C8C8
+            text_color: ${home_climate_color}
 
         # Tap anywhere to swap to the other idle screen (the character, if one is
         # installed). This is a UI action, not tap-to-talk - the assistant still
