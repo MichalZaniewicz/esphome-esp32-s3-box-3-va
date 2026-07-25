@@ -25,6 +25,8 @@ import sys
 
 from PIL import Image, ImageDraw, ImageFont
 
+from gen_demos_drawn import DRAWN
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, ".."))
 FACES = os.path.join(REPO, "base", "faces")
@@ -39,6 +41,14 @@ GRID = [("idle", 1), ("listening", 21), ("thinking", 31), ("replying", 41),
         ("timer", 51)]
 SCALE = 0.85          # 272x204, rozmiar klipow w repo
 TICK_MS = 120
+# Podpis fazy: goly tekst z cienkim czarnym obrysem, NIE wypelniony prostokat.
+# Belka jest niewidoczna na czarnym tle i dlatego przetrwala tak dlugo, ale na
+# agnes, genie, wizardzie czy franky'm czytala sie jak pasek wyciety z obrazka.
+# Obrys robi to samo - trzyma napis czytelny nad czymkolwiek - i nic nie zasłania.
+LABEL_STROKE = 1
+# Terminal ma swoj naglowek w lewym gornym rogu, wiec tam podpis wchodzi na
+# niego. U reszty gora jest wolna.
+LABEL_BOTTOM = {"crt"}
 
 SUB = re.compile(r"^  ([a-z_0-9]+):\s*(.+?)\s*$")
 
@@ -74,6 +84,10 @@ def subs(path):
 def load(name):
     s = subs(ENGINE)
     s.update(subs(os.path.join(FACES, name + ".yaml")))
+    # Pakiet jezykowy idzie ostatni w files:, wiec wygrywa - i tylko `crt` ma
+    # cokolwiek do przetlumaczenia. Bez tego klip terminala mowi co innego niz
+    # urzadzenie, na ktorym en.yaml jest domyslny.
+    s.update(subs(os.path.join(REPO, "base", "lang", "en.yaml")))
     return s
 
 
@@ -183,19 +197,33 @@ class Face:
 
 
 def clip(name):
-    face = Face(name)
-    frames, f = [], 0
+    s = load(name)
+    drawn = DRAWN.get(name)
+    face = None if drawn else Face(name)
+    # Kazda postac tyka wlasnym tempem - rysujace sie same chodza na 100 ms,
+    # silnik twarzy na 120. Klip ma trwac tyle, ile trwa naprawde.
+    tick = s.get(f"{name}_tick", "").rstrip("ms")
+    tick = int(tick) if tick.isdigit() else TICK_MS
+
+    frames, f, pf = [], 0, 0
+    prev_phase = None
     for phase, n in CLIP:
         for _ in range(n):
-            im = face.frame(phase, f).resize(
-                (int(320 * SCALE), int(240 * SCALE)), Image.LANCZOS)
-            ImageDraw.Draw(im).text((6, 4), phase, fill=(255, 255, 255), font=FONT)
+            # pf to tiki od zmiany fazy - `crt` odlicza po nim wypisywanie
+            # odpowiedzi, zeby zaczynala sie od pierwszej litery.
+            pf = 0 if phase != prev_phase else pf + 1
+            prev_phase = phase
+            im = (drawn(s, phase, f, pf) if drawn else face.frame(phase, f))
+            im = im.resize((int(320 * SCALE), int(240 * SCALE)), Image.LANCZOS)
+            y = im.height - 18 if name in LABEL_BOTTOM else 4
+            ImageDraw.Draw(im).text((6, y), phase, fill=(255, 255, 255), font=FONT,
+                                    stroke_width=LABEL_STROKE, stroke_fill=(0, 0, 0))
             frames.append(im)
             f += 1
     out = os.path.join(ASSETS, "demo", f"demo-{name}.gif")
     frames[0].save(out, save_all=True, append_images=frames[1:],
-                   duration=TICK_MS, loop=0, optimize=True)
-    print(f"demo-{name}.gif: {len(frames)} klatek")
+                   duration=tick, loop=0, optimize=True)
+    print(f"demo-{name}.gif: {len(frames)} klatek, {tick} ms")
 
 
 def grid():
@@ -206,7 +234,8 @@ def grid():
         for col, (phase, f) in enumerate(GRID):
             im = face.frame(phase, f)
             ImageDraw.Draw(im).text((6, 4), f"{name} - {phase}",
-                                    fill=(255, 255, 255), font=FONT)
+                                    fill=(255, 255, 255), font=FONT,
+                                    stroke_width=LABEL_STROKE, stroke_fill=(0, 0, 0))
             sheet.paste(im, (col * 320, row * 240))
     sheet.save(os.path.join(ASSETS, "characters.png"))
     print(f"characters.png: {len(names)} postaci x {len(GRID)} faz")
@@ -216,7 +245,7 @@ def main(argv):
     if argv == ["--grid"]:
         grid()
         return
-    for name in (argv or artwork_characters()):
+    for name in (argv or artwork_characters() + sorted(DRAWN)):
         clip(name)
     if not argv:
         grid()
