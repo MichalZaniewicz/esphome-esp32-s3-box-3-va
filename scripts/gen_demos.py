@@ -46,9 +46,9 @@ TICK_MS = 120
 # agnes, genie, wizardzie czy franky'm czytala sie jak pasek wyciety z obrazka.
 # Obrys robi to samo - trzyma napis czytelny nad czymkolwiek - i nic nie zasłania.
 LABEL_STROKE = 1
-# Terminal ma swoj naglowek w lewym gornym rogu, wiec tam podpis wchodzi na
-# niego. U reszty gora jest wolna.
-LABEL_BOTTOM = {"crt"}
+# Terminal ma swoj naglowek w lewym gornym rogu, a oscyloskop podpis kanalu -
+# tam podpis fazy wchodzilby na nie. U reszty gora jest wolna.
+LABEL_BOTTOM = {"crt", "scope"}
 
 SUB = re.compile(r"^  ([a-z_0-9]+):\s*(.+?)\s*$")
 
