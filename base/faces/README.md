@@ -40,7 +40,7 @@ The preview image above shows only the characters that use artwork; `aura`, `bit
 | **KacPRO** | Hood, laptop, green glow | White cartoon eyes with dark pupils on skin. The hood leaves 34 px of usable height between the fringe and the chin, so the eyes are wider than they are tall and the mouth opens by 14 rather than 22. |
 | **hacker** | Empty hood, skull badge | The only DARK-eyed character with BRIGHT pupils: black shapes on the blank white face with a green dot inside, which reads as a glow. The face sits 50 px above the frame's centre, so every offset here is a large negative number. |
 | **Mandrake** | Root in a pot, leaves on top | White eyes with green pupils. The artwork arrived asleep - closed-eye arcs and lips painted on the bulb - and those were erased, unlike rhea's, because a drawn eye on top of a painted closed one reads as a bruise. The two dark leaves above were kept and work as eyebrows. The tightest face in the set: 21 px between the leaves and the collar. |
-| **Spike** | Cactus, three arms, orange spines | White eyes with a dark green pupil and mouth. The roomiest artwork face here, so it carries the largest eyes of any character with a picture. The stem leans: its mirror axis is x 157, not 160. |
+| **Spike** | Cactus: a head on a stem, an arm each side, orange spines on top | White eyes with a dark green pupil and mouth. The roomiest artwork face here, so it carries the largest eyes of any character with a picture. The stem leans: its mirror axis is x 157, not 160. |
 
 `face_center_x` shifts the whole face sideways when the artwork is not centred.
 Most of these do not need it - five of the six sit on the frame's axis and only

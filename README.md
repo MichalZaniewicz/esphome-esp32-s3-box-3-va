@@ -165,7 +165,7 @@ being on screen belong to the character. Name any of them in lower case.
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-spike.gif" width="272" alt="Spike"></td>
-    <td><h3>Spike</h3>Three arms, a great many spines and absolutely no hurry. Watches the kitchen the way a houseplant does, which is to say constantly, and says its piece only when asked.</td>
+    <td><h3>Spike</h3>Both arms up, a crown of orange spines and absolutely no hurry. Watches the kitchen the way a houseplant does, which is to say constantly, needs nothing from anybody, and says its piece only when asked.</td>
   </tr>
 </table>
 
