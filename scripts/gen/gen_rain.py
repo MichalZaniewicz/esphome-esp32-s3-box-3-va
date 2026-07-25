@@ -281,6 +281,7 @@ interval:
 lvgl:
   pages:
     - id: page_face
+      skip: true          # phase page / home's tap-toggle alt, never a carousel stop
       bg_color: 0x000000
       # NO SCROLLBAR. The columns are sized to fill the screen exactly - twelve
       # rows of 16 px text plus 4 px spacing is 240 - and "exactly" is the

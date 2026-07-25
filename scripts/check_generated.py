@@ -36,13 +36,21 @@ def generated_files():
         if not (fn.startswith("gen_") and fn.endswith(".py")):
             continue
         text = io.open(os.path.join(GEN, fn), encoding="utf-8").read()
-        # Kazdy literal konczacy sie na .yaml. Szersze niz szukanie konkretnej
-        # zmiennej: gen_scope_vu.py sklada sciezke inaczej niz reszta (pisze dwa
-        # pliki), a wersja tego skryptu pilnujaca tylko jednego wzorca po cichu
-        # pomijala oba - czyli nie sprawdzala akurat tych, ktore najlatwiej
-        # przeoczyc.
-        for m in re.finditer(r'"([A-Za-z0-9_]+\.yaml)"', text):
-            names.add(m.group(1))
+        # Literal .yaml Z LINII, KTORA COS ZAPISUJE - czyli przypisanie do OUT
+        # albo open(..., "w"). Oba ksztalty wystepuja: reszta generatorow ma
+        # `OUT = os.path.join(...)`, gen_scope_vu.py sklada sciezke w wywolaniu
+        # open i pisze dwa pliki, a wersja pilnujaca tylko jednego wzorca po
+        # cichu pomijala oba.
+        #
+        # Sam literal nie wystarcza: gen_picker.py CZYTA base/screens/face.yaml
+        # i pliki postaci, zeby zebrac ich liczby. Wersja bez tego filtra brala
+        # face.yaml za plik generowany i wywracala sie, szukajac go w base/faces.
+        for line in text.splitlines():
+            if not (re.search(r"\bOUT\w*\s*=", line) or
+                    re.search(r'open\(.*"w"', line)):
+                continue
+            for m in re.finditer(r'"([A-Za-z0-9_]+\.yaml)"', line):
+                names.add(m.group(1))
     return sorted(names)
 
 
@@ -69,7 +77,11 @@ def main():
     for name in targets:
         path = os.path.join(FACES, name)
         after = io.open(path, encoding="utf-8", newline="").read()
-        if after != before[name]:
+        # Porownanie po normalizacji koncow linii. Generatory pisza "\n", a na
+        # Windows z core.autocrlf=true kopia robocza ma "\r\n", wiec porownanie
+        # bajt w bajt zglaszalo rozjazd wszystkich siedmiu plikow zawsze i u
+        # kazdego - czyli mowilo "FAIL" tam, gdzie nie bylo zadnej roznicy.
+        if after.replace("\r\n", "\n") != before[name].replace("\r\n", "\n"):
             drifted.append(name)
         # Przywracamy ZAWSZE, takze gdy sie zgadza - ten skrypt niczego nie zmienia.
         io.open(path, "w", encoding="utf-8", newline="").write(before[name])
