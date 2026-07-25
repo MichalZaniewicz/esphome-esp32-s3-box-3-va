@@ -16,8 +16,7 @@ one thin config file you actually edit.
 
 > [!TIP]
 > ⭐ **Enjoying this project?** Every star is real motivation for me to keep
-> developing it :) [**Star this repo**](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va)
-> if it helped you.
+> developing it :)
 
 ## What it does
 
