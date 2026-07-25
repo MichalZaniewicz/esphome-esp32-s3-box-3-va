@@ -172,8 +172,8 @@ being on screen belong to the character. Name any of them in lower case.
     <td><h3>Mandrake</h3>A root that climbed out of the pot and stayed. Sleepy under its leaves, slow to open its eyes, and quietly pleased to be indoors where it is warm.</td>
   </tr>
   <tr>
-    <td width="290"><img src="base/assets/demo/demo-devil.gif" width="272" alt="Devil"></td>
-    <td><h3>Devil</h3>The thermostat answers to her now, and so, increasingly, does everyone else. Grants your timers rather than sets them, and has firm views on how warm a kitchen ought to be kept.</td>
+    <td width="290"><img src="base/assets/demo/demo-vesta.gif" width="272" alt="Vesta"></td>
+    <td><h3>Vesta</h3>Goddess of the hearth, retired into a smart home and quietly pleased with the upgrade. The thermostat answers to her now, she grants your timers rather than setting them, and she has firm views on how warm a kitchen ought to be kept.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-willow.gif" width="272" alt="Willow"></td>
@@ -243,7 +243,7 @@ base/
     rufus, agnes, kacpro,
     hacker, mandrake,
     spike, willow, nyx,
-    devil
+    vesta
     picker.yaml            # optional: an "Assistant" select, four to switch between
     aura, bit, iris,       # these draw themselves, no artwork at all
     crt, kitt, nixie,

@@ -1,4 +1,4 @@
-# Devil - horns, a flame, and no hurry whatsoever.
+# Vesta - horns, a flame, and no hurry whatsoever.
 #
 # The artwork keeps the eyebrows and the nose. It also keeps the eye SHADOW -
 # two soft blocks under the brows at x 146..162 and 165..184, y 80..96 - and
@@ -6,7 +6,7 @@
 # eyes were, so the eyes go in its lower half rather than anywhere the general
 # proportions of a face would suggest.
 #
-# Usage: `assistant: devil` in your thin config. See base/faces/README.md.
+# Usage: `assistant: vesta` in your thin config. See base/faces/README.md.
 
 esphome:
   on_boot:
@@ -14,7 +14,7 @@ esphome:
       then:
         - logger.log:
             level: INFO
-            format: "package: faces/devil.yaml"
+            format: "package: faces/vesta.yaml"
 
 # This character is artwork plus measurements; the drawing and animating is done
 # by base/screens/face.yaml, which it pulls in itself. That is what lets a config
@@ -28,7 +28,7 @@ packages:
     refresh: 0s
 
 substitutions:
-  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/devil.png
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/vesta.png
 
   face_color: '0xFFF3E6'
   face_mouth_color: '0xA83246'

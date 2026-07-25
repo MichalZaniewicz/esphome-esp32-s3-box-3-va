@@ -285,7 +285,7 @@ their alarm, the touchscreen, the home screen and the animated character.
   indistinguishable from a broken screen. Unsupported buttons are painted dim
   and do nothing when tapped. Cost of both: 39 KB of flash, to 32.9%.
 
-- **`devil`**, taking the cast to 28. Her artwork kept the eye SHADOW as well
+- **`vesta`**, taking the cast to 28. Her artwork kept the eye SHADOW as well
   as the brows and the nose, and that shadow is what places the eyes: it is
   where they were, so it beats any proportion of a face in general. Her face
   also sits right of frame centre, which is what `face_center_x` is for.
