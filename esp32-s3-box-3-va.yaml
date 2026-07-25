@@ -19,6 +19,14 @@ substitutions:
   assistant: pip
   language: en
 
+  # To switch character from Home Assistant instead of rebuilding, name three
+  # more here and add base/faces/picker.yaml to `files:` below. Each one costs
+  # 150 KB of flash for its artwork, which is why it is four and not all of them.
+  # Artwork characters only - the self-drawing ones cannot be picked.
+  # pick_2: rufus
+  # pick_3: mandrake
+  # pick_4: hacker
+
   # Changing `name` re-creates every entity in Home Assistant.
   name: esp32-s3-box-3-va
   friendly_name: "S3 Box 3 Voice"
@@ -57,6 +65,7 @@ packages:
       - base/screens/home.yaml        # optional: clock, date, climate
       - base/screens/settings.yaml    # optional: settings, one swipe down from home
       - base/faces/${assistant}.yaml  # the assistant; it pulls in what it needs
+    # - base/faces/picker.yaml        # optional: switch character from HA, see above
       - base/lang/${language}.yaml    # keep the language last
     refresh: 0s
 

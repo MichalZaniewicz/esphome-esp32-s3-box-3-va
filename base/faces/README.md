@@ -82,6 +82,47 @@ having to know which of them needs what.
 Order still matters between siblings: the language package goes last, since
 later-listed files win substitution conflicts.
 
+## Switching one while it runs
+
+`picker.yaml` adds an **Assistant** select to Home Assistant. Pick a name and the
+artwork, the geometry and the colours change on the spot - no rebuild - and the
+choice survives a reboot.
+
+```yaml
+substitutions:
+  assistant: pip          # compiled in, and the first option
+  pick_2: rufus           # three more, compiled in alongside it
+  pick_3: mandrake
+  pick_4: hacker
+
+packages:
+  core:
+    files:
+      - base/core.yaml
+      - base/faces/${assistant}.yaml
+      - base/faces/picker.yaml
+```
+
+**Four, and not all of them, because the artwork is the cost.** A character's PNG
+is 320x240 RGB565 = 150 KB of flash whether or not it is ever shown; four is
+450 KB on top of the one you already had. Which four is a compile-time decision.
+Switching between them is not. The four names have to differ - a select cannot
+carry the same option twice.
+
+Only characters with artwork can be picked. The self-drawing ones are whole pages
+of their own rather than numbers on top of a picture, so there is nothing to swap.
+
+`picker.yaml` is **generated** by [`scripts/gen/gen_picker.py`](../../scripts/gen/gen_picker.py)
+from the character files in this directory, which stay the source of truth: it
+carries a table of every artwork character's numbers, and a table copied by hand
+would drift from the character the first time somebody nudged an eye.
+
+What made this possible is that the engine's geometry moved from compile-time
+substitutions into runtime globals (`fg_*` in `base/screens/face.yaml`). A
+character package still just sets substitutions; they are now the *initial
+values* of those globals rather than constants pasted into every lambda. A config
+that names one assistant and never installs the picker behaves exactly as before.
+
 ## Adding one
 
 1. **Draw the character with no face.** 320x240 PNG. The eyes and mouth are

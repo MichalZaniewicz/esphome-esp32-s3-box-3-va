@@ -64,6 +64,14 @@ packages:
 Whichever one you name, it exposes the same page id, `page_face`, so
 `idle_page_alt: page_face` keeps working across a swap.
 
+**Or switch without a rebuild.** Add `base/faces/picker.yaml` and name three more
+characters; an **Assistant** select appears in Home Assistant and changes the
+artwork, the geometry and the colours on the spot, choice restored after a
+reboot. Four rather than all of them because each character's PNG is 150 KB of
+flash compiled in whether or not it is ever shown - which four is a compile-time
+decision, switching between them is not. Artwork characters only. Details:
+[`base/faces/README.md`](base/faces/README.md#switching-one-while-it-runs).
+
 ### The cast
 
 Twenty-five of them, and they are not one face on twenty-five bodies: the eyes,
@@ -221,6 +229,7 @@ base/
     rufus, agnes, kacpro,
     hacker, mandrake,
     spike
+    picker.yaml            # optional: an "Assistant" select, four to switch between
     aura, bit, iris,       # these draw themselves, no artwork at all
     crt, kitt, nixie,
     pixel, rain,

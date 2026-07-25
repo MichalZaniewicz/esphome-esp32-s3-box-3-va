@@ -155,6 +155,66 @@ globals:
     restore_value: false
     initial_value: "0"
 
+  # ---------------------------------------------------------------------------
+  # The character's numbers, as RUNTIME values.
+  #
+  # Each one starts as the substitution of whichever character was compiled in,
+  # so a config that names one assistant behaves exactly as it did when these
+  # were literals. They are globals rather than constants for one reason: a
+  # character can then be swapped while the device runs - see
+  # base/screens/face-picker.yaml, which writes this block and calls
+  # `face_geometry_changed`. Nothing else here needs to know that happened.
+  #
+  # Only the values the TICK reads live here. Everything a character sets once
+  # and never animates - the vertical positions, the corner radii, the pupil
+  # colour - is written straight to the widget by whoever changes it.
+  # ---------------------------------------------------------------------------
+  - { id: fg_center_x,     type: int, restore_value: false, initial_value: "${face_center_x}" }
+  - { id: fg_eye_offset,   type: int, restore_value: false, initial_value: "${face_eye_offset}" }
+  - { id: fg_eye_w,        type: int, restore_value: false, initial_value: "${face_eye_w}" }
+  - { id: fg_eye_h,        type: int, restore_value: false, initial_value: "${face_eye_h}" }
+  - { id: fg_eye_h_wide,   type: int, restore_value: false, initial_value: "${face_eye_h_wide}" }
+  - { id: fg_eye_h_think,  type: int, restore_value: false, initial_value: "${face_eye_h_think}" }
+  - { id: fg_eye_h_narrow, type: int, restore_value: false, initial_value: "${face_eye_h_narrow}" }
+  - { id: fg_eye_h_shut,   type: int, restore_value: false, initial_value: "${face_eye_h_shut}" }
+  - { id: fg_pupil_w,      type: int, restore_value: false, initial_value: "${face_pupil_w}" }
+  - { id: fg_pupil_h,      type: int, restore_value: false, initial_value: "${face_pupil_h}" }
+  - { id: fg_pupil_dilate, type: int, restore_value: false, initial_value: "${face_pupil_dilate}" }
+  - { id: fg_pupil_shrink, type: int, restore_value: false, initial_value: "${face_pupil_shrink}" }
+  - { id: fg_gaze_dx,      type: int, restore_value: false, initial_value: "${face_gaze_dx}" }
+  - { id: fg_mouth_w,      type: int, restore_value: false, initial_value: "${face_mouth_w}" }
+  - { id: fg_mouth_h,      type: int, restore_value: false, initial_value: "${face_mouth_h}" }
+  - { id: fg_mouth_open_h, type: int, restore_value: false, initial_value: "${face_mouth_open_h}" }
+  - { id: fg_mouth_small_w, type: int, restore_value: false, initial_value: "${face_mouth_small_w}" }
+  - { id: fg_mouth_think_w, type: int, restore_value: false, initial_value: "${face_mouth_think_w}" }
+  - { id: fg_mouth_o_w,    type: int, restore_value: false, initial_value: "${face_mouth_o_w}" }
+  - { id: fg_mouth_o_h,    type: int, restore_value: false, initial_value: "${face_mouth_o_h}" }
+  - { id: fg_mouth_alarm_w, type: int, restore_value: false, initial_value: "${face_mouth_alarm_w}" }
+  - { id: fg_mouth_alarm_h, type: int, restore_value: false, initial_value: "${face_mouth_alarm_h}" }
+  - { id: fg_mouth_error_w, type: int, restore_value: false, initial_value: "${face_mouth_error_w}" }
+  - { id: fg_listen_pulse, type: int, restore_value: false, initial_value: "${face_listen_pulse}" }
+  - { id: fg_shake_dx,     type: int, restore_value: false, initial_value: "${face_shake_dx}" }
+  - { id: fg_idle_cycle,   type: int, restore_value: false, initial_value: "${face_idle_cycle}" }
+  # Colours the tint scripts repaint. The pupil's is not here: nothing animates it.
+  - { id: fg_color,        type: uint32_t, restore_value: false, initial_value: "${face_color}" }
+  - { id: fg_mouth_color,  type: uint32_t, restore_value: false, initial_value: "${face_mouth_color}" }
+  - { id: fg_alarm_color,  type: uint32_t, restore_value: false, initial_value: "${face_alarm_color}" }
+
+  # What the primitives last wrote. These used to be function-local statics; they
+  # are globals now because a character swap has to be able to INVALIDATE them.
+  # Without that, the first tick after a swap compares the new character's
+  # numbers against the old one's, decides nothing moved, and leaves the face
+  # wearing the previous geometry until something happens to differ.
+  - { id: fg_p_eye_w,    type: int, restore_value: false, initial_value: "-1" }
+  - { id: fg_p_eye_h,    type: int, restore_value: false, initial_value: "-1" }
+  - { id: fg_p_eye_dx,   type: int, restore_value: false, initial_value: "0x7FFFFFFF" }
+  - { id: fg_p_pupil_w,  type: int, restore_value: false, initial_value: "-1" }
+  - { id: fg_p_pupil_h,  type: int, restore_value: false, initial_value: "-1" }
+  - { id: fg_p_pupil_gx, type: int, restore_value: false, initial_value: "0x7FFFFFFF" }
+  - { id: fg_p_mouth_w,  type: int, restore_value: false, initial_value: "-1" }
+  - { id: fg_p_mouth_h,  type: int, restore_value: false, initial_value: "-1" }
+  - { id: fg_p_mouth_dx, type: int, restore_value: false, initial_value: "0x7FFFFFFF" }
+
 script:
   # --- primitives ----------------------------------------------------------
   - id: face_eyes
@@ -170,7 +230,7 @@ script:
       # sideways. Each lv_obj_set_* marks the object dirty and invalidates both
       # the old and the new area, so writing an unchanged value is not free.
       - lambda: |-
-          static int p_w = -1, p_h = -1, p_dx = 0x7FFFFFFF;
+          int &p_w = id(fg_p_eye_w), &p_h = id(fg_p_eye_h), &p_dx = id(fg_p_eye_dx);
           // Width and height are tested SEPARATELY, because in the phases that
           // run every tick only one of them moves. Listening pulses the height
           // against a width that is a compile-time constant; testing them
@@ -186,8 +246,8 @@ script:
             lv_obj_set_height(id(face_eye_r), h);
           }
           if (dx != p_dx) {
-            lv_obj_set_x(id(face_eye_l), ${face_center_x} + dx - ${face_eye_offset});
-            lv_obj_set_x(id(face_eye_r), ${face_center_x} + dx + ${face_eye_offset});
+            lv_obj_set_x(id(face_eye_l), id(fg_center_x) + dx - id(fg_eye_offset));
+            lv_obj_set_x(id(face_eye_r), id(fg_center_x) + dx + id(fg_eye_offset));
           }
           p_w = w; p_h = h; p_dx = dx;
 
@@ -200,7 +260,7 @@ script:
       gx: int
     then:
       - lambda: |-
-          static int p_w = -1, p_h = -1, p_gx = 0x7FFFFFFF;
+          int &p_w = id(fg_p_pupil_w), &p_h = id(fg_p_pupil_h), &p_gx = id(fg_p_pupil_gx);
           // Showing was unconditional: lv_obj_clear_flag invalidates whether or
           // not the flag actually changed, so this was two extra full-object
           // invalidations per tick in thinking and in the timer alarm.
@@ -220,8 +280,8 @@ script:
             lv_obj_set_height(id(face_pupil_r), h);
           }
           if (gx != p_gx) {
-            lv_obj_set_x(id(face_pupil_l), ${face_center_x} + gx - ${face_eye_offset});
-            lv_obj_set_x(id(face_pupil_r), ${face_center_x} + gx + ${face_eye_offset});
+            lv_obj_set_x(id(face_pupil_l), id(fg_center_x) + gx - id(fg_eye_offset));
+            lv_obj_set_x(id(face_pupil_r), id(fg_center_x) + gx + id(fg_eye_offset));
           }
           p_w = w; p_h = h; p_gx = gx;
 
@@ -241,7 +301,7 @@ script:
       dx: int
     then:
       - lambda: |-
-          static int p_w = -1, p_h = -1, p_dx = 0x7FFFFFFF;
+          int &p_w = id(fg_p_mouth_w), &p_h = id(fg_p_mouth_h), &p_dx = id(fg_p_mouth_dx);
           // Separately, and this is the one that matters most. Replying is the
           // longest animated phase and it changes the mouth HEIGHT every tick
           // against a fixed width, so testing the pair together wrote a width
@@ -253,53 +313,58 @@ script:
             lv_obj_set_height(id(face_mouth_obj), h);
           }
           if (dx != p_dx) {
-            lv_obj_set_x(id(face_mouth_obj), ${face_center_x} + dx);
+            lv_obj_set_x(id(face_mouth_obj), id(fg_center_x) + dx);
           }
           p_w = w; p_h = h; p_dx = dx;
 
-  # Colours are literal rather than templated: three tiny actions beat trusting
-  # a lambda to produce an lv_color_t.
+  # Colours go through the LVGL C API rather than `lvgl.widget.update`, for the
+  # same reason the rest of this file does: `update` never compares, it sets the
+  # style property, refreshes the style and invalidates the object, three times
+  # over. It also cannot take a colour that is only known at runtime, which a
+  # swappable character's is.
   #
   # BOTH ARE GUARDED, because the colour almost never actually changes. It goes
   # red for the alarm and for an error, and back afterwards - that is all. Every
-  # other call repaints the same colour it already had, and lvgl.widget.update
-  # never compares: it sets the style property, refreshes the style and
-  # invalidates the object, three times over. Those calls sit on the expression
-  # changes, which is exactly when the audio pipeline is busiest and LVGL is
-  # already being warned about for taking too long. The rest of this file makes
-  # a point of skipping unchanged writes; this was the piece that did not.
+  # other call would repaint the same colour it already had, and those calls sit
+  # on the expression changes, which is exactly when the audio pipeline is
+  # busiest and LVGL is already being warned about for taking too long.
   - id: face_tint_normal
     then:
-      - if:
-          condition:
-            lambda: return id(face_alarm_tint);
-          then:
-            - lambda: id(face_alarm_tint) = false;
-            - lvgl.widget.update:
-                id: face_eye_l
-                bg_color: ${face_color}
-            - lvgl.widget.update:
-                id: face_eye_r
-                bg_color: ${face_color}
-            - lvgl.widget.update:
-                id: face_mouth_obj
-                bg_color: ${face_mouth_color}
+      - lambda: |-
+          if (!id(face_alarm_tint)) return;
+          id(face_alarm_tint) = false;
+          lv_obj_set_style_bg_color(id(face_eye_l), lv_color_hex(id(fg_color)), LV_PART_MAIN);
+          lv_obj_set_style_bg_color(id(face_eye_r), lv_color_hex(id(fg_color)), LV_PART_MAIN);
+          lv_obj_set_style_bg_color(id(face_mouth_obj), lv_color_hex(id(fg_mouth_color)), LV_PART_MAIN);
   - id: face_tint_alarm
     then:
-      - if:
-          condition:
-            lambda: return !id(face_alarm_tint);
-          then:
-            - lambda: id(face_alarm_tint) = true;
-            - lvgl.widget.update:
-                id: face_eye_l
-                bg_color: ${face_alarm_color}
-            - lvgl.widget.update:
-                id: face_eye_r
-                bg_color: ${face_alarm_color}
-            - lvgl.widget.update:
-                id: face_mouth_obj
-                bg_color: ${face_alarm_color}
+      - lambda: |-
+          if (id(face_alarm_tint)) return;
+          id(face_alarm_tint) = true;
+          const lv_color_t a = lv_color_hex(id(fg_alarm_color));
+          lv_obj_set_style_bg_color(id(face_eye_l), a, LV_PART_MAIN);
+          lv_obj_set_style_bg_color(id(face_eye_r), a, LV_PART_MAIN);
+          lv_obj_set_style_bg_color(id(face_mouth_obj), a, LV_PART_MAIN);
+
+  # Call this after writing the fg_* globals - the character just changed.
+  #
+  # Two things have to happen, and skipping either leaves the face half swapped
+  # until something else happens to move it:
+  #   * the caches go stale, or the next tick compares the new character's
+  #     numbers against the old one's and decides nothing moved (see fg_p_*);
+  #   * the expression is forced to "none", so the next tick re-applies the
+  #     current phase's resting shape from the new numbers.
+  # What is NOT here: vertical positions, corner radii and colours. The tick
+  # never reads those - they are per-character constants - so they are written
+  # straight to the widgets by whoever swapped the character.
+  - id: face_geometry_changed
+    then:
+      - lambda: |-
+          id(fg_p_eye_w) = id(fg_p_eye_h) = -1;
+          id(fg_p_pupil_w) = id(fg_p_pupil_h) = -1;
+          id(fg_p_mouth_w) = id(fg_p_mouth_h) = -1;
+          id(fg_p_eye_dx) = id(fg_p_pupil_gx) = id(fg_p_mouth_dx) = 0x7FFFFFFF;
+          id(face_expr) = 0;
 
   # A blink is a squash and a restore. `mode: single` so overlapping ticks
   # cannot leave the eyes shut.
@@ -309,8 +374,8 @@ script:
       - script.execute: face_pupils_hide
       - script.execute:
           id: face_eyes
-          w: ${face_eye_w}
-          h: ${face_eye_h_shut}
+          w: !lambda return id(fg_eye_w);
+          h: !lambda return id(fg_eye_h_shut);
           dx: 0
       - delay: 120ms
       # ONLY re-open if we are still idle. `mode: single` stops this script
@@ -327,13 +392,13 @@ script:
           then:
             - script.execute:
                 id: face_eyes
-                w: ${face_eye_w}
-                h: ${face_eye_h}
+                w: !lambda return id(fg_eye_w);
+                h: !lambda return id(fg_eye_h);
                 dx: 0
             - script.execute:
                 id: face_pupils
-                w: ${face_pupil_w}
-                h: ${face_pupil_h}
+                w: !lambda return id(fg_pupil_w);
+                h: !lambda return id(fg_pupil_h);
                 gx: 0
 
   # --- the driver ----------------------------------------------------------
@@ -344,7 +409,7 @@ script:
     then:
       # Wrapped at a multiple of the idle cycle: left free-running it would
       # eventually cost the animation its float precision.
-      - lambda: id(face_frame) = (id(face_frame) + 1) % (${face_idle_cycle} * 360);
+      - lambda: id(face_frame) = (id(face_frame) + 1) % (id(fg_idle_cycle) * 360);
 
       # IDLE - open eyes, pupils centred, an occasional blink.
       - if:
@@ -359,18 +424,18 @@ script:
                   - script.execute: face_tint_normal
                   - script.execute:
                       id: face_eyes
-                      w: ${face_eye_w}
-                      h: ${face_eye_h}
+                      w: !lambda return id(fg_eye_w);
+                      h: !lambda return id(fg_eye_h);
                       dx: 0
                   - script.execute:
                       id: face_pupils
-                      w: ${face_pupil_w}
-                      h: ${face_pupil_h}
+                      w: !lambda return id(fg_pupil_w);
+                      h: !lambda return id(fg_pupil_h);
                       gx: 0
                   - script.execute:
                       id: face_mouth
-                      w: ${face_mouth_w}
-                      h: ${face_mouth_h}
+                      w: !lambda return id(fg_mouth_w);
+                      h: !lambda return id(fg_mouth_h);
                       dx: 0
             # Two blinks close together, a pause, then the eyes wander right and
             # left and settle. The pupils do the wandering; the blink script
@@ -378,7 +443,7 @@ script:
             - if:
                 condition:
                   lambda: |-
-                    const int t = id(face_frame) % ${face_idle_cycle};
+                    const int t = id(face_frame) % id(fg_idle_cycle);
                     return t == 0 || t == 5;
                 then:
                   - script.execute: face_blink
@@ -405,11 +470,11 @@ script:
                 then:
                   - script.execute:
                       id: face_pupils
-                      w: ${face_pupil_w}
-                      h: ${face_pupil_h}
+                      w: !lambda return id(fg_pupil_w);
+                      h: !lambda return id(fg_pupil_h);
                       gx: !lambda |-
-                        const int t = id(face_frame) % ${face_idle_cycle};
-                        const int g = (${face_gaze_dx} * 2) / 3;
+                        const int t = id(face_frame) % id(fg_idle_cycle);
+                        const int g = (id(fg_gaze_dx) * 2) / 3;
                         if (t >= 30 && t < 40) return g;
                         if (t >= 50 && t < 60) return -g;
                         return 0;
@@ -428,20 +493,24 @@ script:
                   - script.execute: face_tint_normal
                   - script.execute:
                       id: face_pupils
-                      w: !lambda return ${face_pupil_w} + ${face_pupil_dilate};
-                      h: !lambda return ${face_pupil_h} + ${face_pupil_dilate};
+                      w: !lambda return id(fg_pupil_w) + id(fg_pupil_dilate);
+                      h: !lambda return id(fg_pupil_h) + id(fg_pupil_dilate);
                       gx: 0
                   - script.execute:
                       id: face_mouth
-                      w: ${face_mouth_o_w}
-                      h: ${face_mouth_o_h}
+                      w: !lambda return id(fg_mouth_o_w);
+                      h: !lambda return id(fg_mouth_o_h);
                       dx: 0
             - script.execute:
                 id: face_eyes
-                w: ${face_eye_w}
+                w: !lambda return id(fg_eye_w);
                 h: !lambda |-
-                  static const int PULSE[] = {0, ${face_listen_pulse} / 2, ${face_listen_pulse}, ${face_listen_pulse} / 2};
-                  return ${face_eye_h_wide} + PULSE[(id(face_frame) / 2) % 4];
+                  // NOT `static`: the pulse is a character's number now, and a
+                  // static local would freeze the first character's value into
+                  // the table for the life of the boot.
+                  const int p = id(fg_listen_pulse);
+                  const int PULSE[] = {0, p / 2, p, p / 2};
+                  return id(fg_eye_h_wide) + PULSE[(id(face_frame) / 2) % 4];
                 dx: 0
 
       # THINKING - the PUPILS look around; the eyes stay at their resting size.
@@ -460,20 +529,20 @@ script:
                   - script.execute: face_tint_normal
                   - script.execute:
                       id: face_eyes
-                      w: ${face_eye_w}
-                      h: ${face_eye_h_think}
+                      w: !lambda return id(fg_eye_w);
+                      h: !lambda return id(fg_eye_h_think);
                       dx: 0
                   - script.execute:
                       id: face_mouth
-                      w: ${face_mouth_think_w}
-                      h: ${face_mouth_h}
+                      w: !lambda return id(fg_mouth_think_w);
+                      h: !lambda return id(fg_mouth_h);
                       dx: 0
             - script.execute:
                 id: face_pupils
-                w: ${face_pupil_w}
-                h: ${face_pupil_h}
+                w: !lambda return id(fg_pupil_w);
+                h: !lambda return id(fg_pupil_h);
                 gx: !lambda |-
-                  return ((id(face_frame) / 3) % 2) ? ${face_gaze_dx} : -${face_gaze_dx};
+                  return ((id(face_frame) / 3) % 2) ? id(fg_gaze_dx) : -id(fg_gaze_dx);
 
       # REPLYING - the mouth does the talking.
       - if:
@@ -489,19 +558,19 @@ script:
                   - script.execute: face_tint_normal
                   - script.execute:
                       id: face_eyes
-                      w: ${face_eye_w}
-                      h: ${face_eye_h}
+                      w: !lambda return id(fg_eye_w);
+                      h: !lambda return id(fg_eye_h);
                       dx: 0
                   - script.execute:
                       id: face_pupils
-                      w: ${face_pupil_w}
-                      h: ${face_pupil_h}
+                      w: !lambda return id(fg_pupil_w);
+                      h: !lambda return id(fg_pupil_h);
                       gx: 0
             - script.execute:
                 id: face_mouth
-                w: ${face_mouth_w}
+                w: !lambda return id(fg_mouth_w);
                 h: !lambda |-
-                  return (id(face_frame) % 2) ? ${face_mouth_open_h} : ${face_mouth_h};
+                  return (id(face_frame) % 2) ? id(fg_mouth_open_h) : id(fg_mouth_h);
                 dx: 0
 
       # TIMER RINGING - alarm colour, wide eyes, pinprick pupils, shaking.
@@ -518,21 +587,21 @@ script:
                   - script.execute: face_tint_alarm
                   - script.execute:
                       id: face_mouth
-                      w: ${face_mouth_alarm_w}
-                      h: ${face_mouth_alarm_h}
+                      w: !lambda return id(fg_mouth_alarm_w);
+                      h: !lambda return id(fg_mouth_alarm_h);
                       dx: 0
             - script.execute:
                 id: face_eyes
-                w: ${face_eye_w}
-                h: ${face_eye_h_wide}
+                w: !lambda return id(fg_eye_w);
+                h: !lambda return id(fg_eye_h_wide);
                 dx: !lambda |-
-                  return (id(face_frame) % 2) ? ${face_shake_dx} : -${face_shake_dx};
+                  return (id(face_frame) % 2) ? id(fg_shake_dx) : -id(fg_shake_dx);
             - script.execute:
                 id: face_pupils
-                w: !lambda return ${face_pupil_w} - ${face_pupil_shrink};
-                h: !lambda return ${face_pupil_h} - ${face_pupil_shrink};
+                w: !lambda return id(fg_pupil_w) - id(fg_pupil_shrink);
+                h: !lambda return id(fg_pupil_h) - id(fg_pupil_shrink);
                 gx: !lambda |-
-                  return (id(face_frame) % 2) ? ${face_shake_dx} : -${face_shake_dx};
+                  return (id(face_frame) % 2) ? id(fg_shake_dx) : -id(fg_shake_dx);
 
       # MUTED - eyes shut. A slit has no room for a pupil.
       - if:
@@ -549,13 +618,13 @@ script:
                   - script.execute: face_pupils_hide
                   - script.execute:
                       id: face_eyes
-                      w: ${face_eye_w}
-                      h: ${face_eye_h_shut}
+                      w: !lambda return id(fg_eye_w);
+                      h: !lambda return id(fg_eye_h_shut);
                       dx: 0
                   - script.execute:
                       id: face_mouth
-                      w: ${face_mouth_small_w}
-                      h: ${face_mouth_h}
+                      w: !lambda return id(fg_mouth_small_w);
+                      h: !lambda return id(fg_mouth_h);
                       dx: 0
 
       # ERROR - narrowed eyes, shrunken pupils, alarm colour.
@@ -572,18 +641,18 @@ script:
                   - script.execute: face_tint_alarm
                   - script.execute:
                       id: face_eyes
-                      w: ${face_eye_w}
-                      h: ${face_eye_h_narrow}
+                      w: !lambda return id(fg_eye_w);
+                      h: !lambda return id(fg_eye_h_narrow);
                       dx: 0
                   - script.execute:
                       id: face_pupils
-                      w: !lambda return ${face_pupil_w} - ${face_pupil_shrink};
-                      h: !lambda return ${face_pupil_h} - ${face_pupil_shrink};
+                      w: !lambda return id(fg_pupil_w) - id(fg_pupil_shrink);
+                      h: !lambda return id(fg_pupil_h) - id(fg_pupil_shrink);
                       gx: 0
                   - script.execute:
                       id: face_mouth
-                      w: ${face_mouth_error_w}
-                      h: ${face_mouth_h}
+                      w: !lambda return id(fg_mouth_error_w);
+                      h: !lambda return id(fg_mouth_h);
                       dx: 0
 
 # Only animate while the face is actually on screen - on the home screen this
@@ -626,6 +695,7 @@ lvgl:
       scrollbar_mode: "OFF"
       widgets:
         - image:
+            id: face_bg_obj      # named so a character swap can repoint it
             src: face_bg
             align: CENTER
 
