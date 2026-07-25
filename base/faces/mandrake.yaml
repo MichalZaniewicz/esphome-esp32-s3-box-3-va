@@ -1,0 +1,77 @@
+# Mandrake - the root that pulled itself out of the pot.
+#
+# The artwork came asleep: closed-eye arcs and a pair of lips were painted on
+# the bulb. They were erased rather than kept - a drawn eye on top of a painted
+# closed one reads as a bruise - and the two dark leaves above them were left
+# alone, because with real eyes below they work as eyebrows, exactly like
+# rhea's fringe arcs.
+#
+# The tightest face in the set: 21 px of clean bulb between the leaves at y 130
+# and the collar at y 153. Every vertical dimension here is smaller than any
+# other character's, and the mouth opens by 9 px - one more and it clips the
+# collar.
+#
+# Usage: `assistant: mandrake` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/mandrake.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/mandrake.png
+
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0x9E3B22'
+  face_pupil_color: '0x27551F'
+  face_alarm_color: '0xFF4D4D'
+
+  # Clean bulb: x 124..196, y 130..152, mirror axis x 160. The leaf brows end at
+  # y 129 and the collar arc begins at y 153.
+  face_center_x: '0'
+  face_eye_offset: '20'
+  face_eye_y: '17'
+  face_eye_w: '20'
+  face_eye_h: '12'
+  face_mouth_y: '28'
+  face_mouth_w: '26'
+  face_mouth_h: '4'
+
+  face_pupil_w: '9'
+  face_pupil_h: '9'
+  face_pupil_radius: '4'
+  face_pupil_dilate: '2'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '5'
+
+  face_eye_h_wide: '15'
+  face_eye_h_think: '12'
+  face_eye_h_narrow: '5'
+  face_eye_h_shut: '3'
+  face_mouth_open_h: '9'
+  face_mouth_small_w: '16'
+  face_mouth_think_w: '10'
+  face_mouth_o_w: '12'
+  face_mouth_o_h: '9'
+  face_mouth_alarm_w: '26'
+  face_mouth_alarm_h: '10'
+  face_mouth_error_w: '14'
+  face_listen_pulse: '3'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '6'
+  face_mouth_radius: '2'

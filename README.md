@@ -66,8 +66,8 @@ Whichever one you name, it exposes the same page id, `page_face`, so
 
 ### The cast
 
-Twenty-one of them, and they are not one face on twenty-one bodies: the eyes, the
-colours, the range of every expression and in ten cases the entire way of
+Twenty-five of them, and they are not one face on twenty-five bodies: the eyes,
+the colours, the range of every expression and in ten cases the entire way of
 being on screen belong to the character. Name any of them in lower case.
 
 <table>
@@ -151,6 +151,22 @@ being on screen belong to the character. Name any of them in lower case.
     <td width="290"><img src="base/assets/demo/demo-flare.gif" width="272" alt="Flare"></td>
     <td><h3>Flare</h3>A fireball with a face cut into it, lit from the inside like a lantern. Burns bright, burns constantly, and has never in its life been described as restful.</td>
   </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-kacpro.gif" width="272" alt="KacPRO"></td>
+    <td><h3>KacPRO</h3>Hood up, laptop open, halfway through something he would rather not explain. Answers without looking up, as though your timer is one more window he has open.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-hacker.gif" width="272" alt="hacker"></td>
+    <td><h3>hacker</h3>There is nobody in the hood, only a blank white face and two green points where the eyes should be. Perfectly helpful, perfectly polite, and you will still check behind you the first evening.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-mandrake.gif" width="272" alt="Mandrake"></td>
+    <td><h3>Mandrake</h3>A root that climbed out of the pot and stayed. Sleepy under its leaves, slow to open its eyes, and quietly pleased to be indoors where it is warm.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-spike.gif" width="272" alt="Spike"></td>
+    <td><h3>Spike</h3>Three arms, a great many spines and absolutely no hurry. Watches the kitchen the way a houseplant does, which is to say constantly, and says its piece only when asked.</td>
+  </tr>
 </table>
 
 Every clip above runs idle → thinking → replying, with listening added where a
@@ -202,7 +218,9 @@ base/
     pip, astro, momo,      # characters; pick one with `assistant:`
     franky, wizard,        #   artwork ones pull the face engine themselves
     genie, flare, rhea,
-    rufus, agnes
+    rufus, agnes, kacpro,
+    hacker, mandrake,
+    spike
     aura, bit, iris,       # these draw themselves, no artwork at all
     crt, kitt, nixie,
     pixel, rain,

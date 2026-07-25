@@ -1,0 +1,74 @@
+# hacker - the hood with nobody in it.
+#
+# The blank white oval came with the artwork, so this is the one character that
+# needed no preparation at all. It is also the only one whose eyes are DARK and
+# whose pupils are BRIGHT: black shapes on white with a green dot inside read as
+# a glow, and the artwork's own palette has nothing else to offer.
+#
+# The face sits high in the frame - the oval's centre is 50 px above the screen
+# centre - so every offset here is a large negative number. That is measurement,
+# not a mistake.
+#
+# Usage: `assistant: hacker` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/hacker.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/hacker.png
+
+  face_color: '0x1B1533'
+  face_mouth_color: '0x1B1533'
+  face_pupil_color: '0x3BE86B'
+  face_alarm_color: '0xE02020'
+
+  # The white oval: x 129..193, y 36..103, mirror axis x 161.
+  face_center_x: '1'
+  face_eye_offset: '17'
+  face_eye_y: '-56'
+  face_eye_w: '16'
+  face_eye_h: '20'
+  face_mouth_y: '-32'
+  face_mouth_w: '20'
+  face_mouth_h: '5'
+
+  face_pupil_w: '8'
+  face_pupil_h: '11'
+  face_pupil_radius: '4'
+  face_pupil_dilate: '3'
+  face_pupil_shrink: '3'
+  face_gaze_dx: '5'
+
+  face_eye_h_wide: '26'
+  face_eye_h_think: '20'
+  face_eye_h_narrow: '7'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '16'
+  face_mouth_small_w: '14'
+  face_mouth_think_w: '10'
+  face_mouth_o_w: '14'
+  face_mouth_o_h: '14'
+  face_mouth_alarm_w: '24'
+  face_mouth_alarm_h: '18'
+  face_mouth_error_w: '14'
+  face_listen_pulse: '4'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '8'
+  face_mouth_radius: '3'

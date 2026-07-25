@@ -220,6 +220,21 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Added
 
+- **Four more characters** - `kacpro`, `hacker`, `mandrake` and `spike` - taking
+  the cast to 25. Two of them cost nothing but measurement: KacPRO's hood and
+  hacker's blank oval arrived with the face area already empty. Mandrake did not.
+  It came asleep, with closed-eye arcs and lips painted straight onto an orange
+  gradient, and rhea's trick of keeping them as eyebrows does not work when the
+  arcs sit where the eyes go. They were grown back over from the surrounding
+  pixels instead of filled flat, which on a gradient would have read as a patch;
+  the two leaves above them were kept and do the eyebrow job. Spike had two dark
+  specks exactly where its mouth belongs, painted out the same way. Mandrake is
+  also the tightest face in the set at 21 px of clean bulb, so its mouth opens by
+  9 px where pip's opens by 22 - every expression dimension being a substitution
+  is what makes that possible without touching the engine.
+- **`base/assets/characters.png` regenerated**, and it is no longer three
+  characters out of date: one row per character with artwork, fourteen of them
+  now, across the same five phases.
 - **A live "Home style" selector** (`base/screens/home-styles.yaml`) - a Home
   Assistant `select` that restyles the home screen at runtime, no rebuild, choice
   restored across a reboot. 32 looks: palettes and fonts (CRT, Neon, Minecraft,

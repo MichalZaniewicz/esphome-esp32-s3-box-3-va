@@ -1,0 +1,73 @@
+# Spike - the cactus.
+#
+# No face on the artwork, but two dark specks sat where the mouth belongs and
+# were painted out; the stem is one flat gradient, so the repair does not show.
+#
+# The roomiest artwork face here: a stem 70 px wide and most of the frame tall,
+# which is why the eyes are the largest of any character with artwork. The stem
+# leans, so its mirror axis is at x 157 rather than 160 - hence face_center_x.
+#
+# Usage: `assistant: spike` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/spike.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/spike.png
+
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0x15451B'
+  face_pupil_color: '0x15451B'
+  face_alarm_color: '0xFF4D4D'
+
+  # Stem: x 122..194, mirror axis x 157. Clean from the spines at y 60 down to
+  # the base, so the face sits where a face would - a little above centre.
+  face_center_x: '-3'
+  face_eye_offset: '22'
+  face_eye_y: '-20'
+  face_eye_w: '20'
+  face_eye_h: '22'
+  face_mouth_y: '10'
+  face_mouth_w: '26'
+  face_mouth_h: '6'
+
+  face_pupil_w: '9'
+  face_pupil_h: '12'
+  face_pupil_radius: '4'
+  face_pupil_dilate: '3'
+  face_pupil_shrink: '3'
+  face_gaze_dx: '5'
+
+  face_eye_h_wide: '28'
+  face_eye_h_think: '22'
+  face_eye_h_narrow: '8'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '16'
+  face_mouth_small_w: '18'
+  face_mouth_think_w: '12'
+  face_mouth_o_w: '16'
+  face_mouth_o_h: '16'
+  face_mouth_alarm_w: '28'
+  face_mouth_alarm_h: '20'
+  face_mouth_error_w: '16'
+  face_listen_pulse: '4'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '9'
+  face_mouth_radius: '3'

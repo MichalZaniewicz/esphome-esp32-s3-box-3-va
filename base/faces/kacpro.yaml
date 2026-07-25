@@ -1,0 +1,71 @@
+# KacPRO - the hooded one with the laptop.
+#
+# The artwork arrived with no face at all: the hood throws a shadow and the
+# skin below it is a clean tan shape, so nothing had to be erased. The usable
+# area is short - hair fringe at the top, chin at y 126 - which is why the eyes
+# are wide rather than tall and the mouth opens by 14 px instead of 22.
+#
+# Usage: `assistant: kacpro` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/kacpro.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/kacpro.png
+
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0x8C3B32'
+  face_pupil_color: '0x2B2338'
+  face_alarm_color: '0xFF4D4D'
+
+  # Skin: x 123..198, y 92..126, mirror axis x 160. The fringe dips to y 92 in
+  # the middle, so nothing may sit above it.
+  face_center_x: '0'
+  face_eye_offset: '21'
+  face_eye_y: '-17'
+  face_eye_w: '17'
+  face_eye_h: '16'
+  face_mouth_y: '-3'
+  face_mouth_w: '20'
+  face_mouth_h: '5'
+
+  face_pupil_w: '8'
+  face_pupil_h: '10'
+  face_pupil_radius: '4'
+  face_pupil_dilate: '3'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '5'
+
+  face_eye_h_wide: '20'
+  face_eye_h_think: '16'
+  face_eye_h_narrow: '6'
+  face_eye_h_shut: '4'
+  face_mouth_open_h: '14'
+  face_mouth_small_w: '14'
+  face_mouth_think_w: '10'
+  face_mouth_o_w: '14'
+  face_mouth_o_h: '14'
+  face_mouth_alarm_w: '24'
+  face_mouth_alarm_h: '16'
+  face_mouth_error_w: '14'
+  face_listen_pulse: '4'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '8'
+  face_mouth_radius: '3'

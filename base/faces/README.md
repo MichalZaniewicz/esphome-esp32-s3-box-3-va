@@ -8,9 +8,9 @@ features go. Swapping the assistant is one word: `assistant:`.
 Whichever character is installed, it exposes the same page id, `page_face`, so a
 config can point a phase at it without knowing which one is in use.
 
-![The seven characters across five phases](../assets/characters.png)
+![The fourteen characters with artwork, across five phases](../assets/characters.png)
 
-Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [iris](../assets/demo/demo-iris.gif) · [rain](../assets/demo/demo-rain.gif) · [crt](../assets/demo/demo-crt.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif) · [kitt](../assets/demo/demo-kitt.gif) · [nixie](../assets/demo/demo-nixie.gif) · [scope](../assets/demo/demo-scope.gif) · [vu](../assets/demo/demo-vu.gif) · [rhea](../assets/demo/demo-rhea.gif) · [rufus](../assets/demo/demo-rufus.gif) · [agnes](../assets/demo/demo-agnes.gif)
+Animated, one clip each: [aura](../assets/demo/demo-aura.gif) · [bit](../assets/demo/demo-bit.gif) · [pixel](../assets/demo/demo-pixel.gif) · [iris](../assets/demo/demo-iris.gif) · [rain](../assets/demo/demo-rain.gif) · [crt](../assets/demo/demo-crt.gif) · [pip](../assets/demo/demo-pip.gif) · [astro](../assets/demo/demo-astro.gif) · [momo](../assets/demo/demo-momo.gif) · [franky](../assets/demo/demo-franky.gif) · [wizard](../assets/demo/demo-wizard.gif) · [genie](../assets/demo/demo-genie.gif) · [flare](../assets/demo/demo-flare.gif) · [kitt](../assets/demo/demo-kitt.gif) · [nixie](../assets/demo/demo-nixie.gif) · [scope](../assets/demo/demo-scope.gif) · [vu](../assets/demo/demo-vu.gif) · [rhea](../assets/demo/demo-rhea.gif) · [rufus](../assets/demo/demo-rufus.gif) · [agnes](../assets/demo/demo-agnes.gif) · [kacpro](../assets/demo/demo-kacpro.gif) · [hacker](../assets/demo/demo-hacker.gif) · [mandrake](../assets/demo/demo-mandrake.gif) · [spike](../assets/demo/demo-spike.gif)
 
 The preview image above shows only the characters that use artwork; `aura`, `bit`, `pixel`,
 `iris`, `rain`, `crt`, `kitt`, `nixie`, `scope` and `vu` draw themselves and are in the clips.
@@ -37,6 +37,10 @@ The preview image above shows only the characters that use artwork; `aura`, `bit
 | **CRT** | No artwork at all | A green terminal, drawing itself. Reads `text_request` and `text_response` from the core, so it prints what was said and types out the reply. The only character with words in it, and so the only one `base/lang/*.yaml` has to translate. |
 | **Pixel** | No artwork at all | A 12x8 LED matrix, drawing itself. Dots carry brightness rather than just on and off, and a pupil is an unlit dot inside a lit 3x3 eye, because at that density a separate pupil would not fit. |
 | **Flare** | Burning blob, flames on top | Dark features cut into a bright body, with the pupil lit in the body's own yellow. The only inverted face here, and a useful demonstration that `face_color` need not be the bright one. |
+| **KacPRO** | Hood, laptop, green glow | White cartoon eyes with dark pupils on skin. The hood leaves 34 px of usable height between the fringe and the chin, so the eyes are wider than they are tall and the mouth opens by 14 rather than 22. |
+| **hacker** | Empty hood, skull badge | The only DARK-eyed character with BRIGHT pupils: black shapes on the blank white face with a green dot inside, which reads as a glow. The face sits 50 px above the frame's centre, so every offset here is a large negative number. |
+| **Mandrake** | Root in a pot, leaves on top | White eyes with green pupils. The artwork arrived asleep - closed-eye arcs and lips painted on the bulb - and those were erased, unlike rhea's, because a drawn eye on top of a painted closed one reads as a bruise. The two dark leaves above were kept and work as eyebrows. The tightest face in the set: 21 px between the leaves and the collar. |
+| **Spike** | Cactus, three arms, orange spines | White eyes with a dark green pupil and mouth. The roomiest artwork face here, so it carries the largest eyes of any character with a picture. The stem leans: its mirror axis is x 157, not 160. |
 
 `face_center_x` shifts the whole face sideways when the artwork is not centred.
 Most of these do not need it - five of the six sit on the frame's axis and only
@@ -84,7 +88,9 @@ later-listed files win substitution conflicts.
    drawn on top at runtime, so leave the space where they belong empty. If you
    are adapting existing artwork that already has a face, erase it - the blank
    area needs to match whatever is behind it, or the drawn features will sit on
-   a patch.
+   a patch. `mandrake` is the worked example: closed eyes and lips painted on a
+   gradient, grown back over from the surrounding pixels rather than filled
+   with one flat colour, which would have shown.
 2. `cp pip.yaml mycharacter.yaml`, point `face_background_file` at your image,
    and adjust the geometry.
 3. Measure rather than guess. Open your original artwork, note the pixel
