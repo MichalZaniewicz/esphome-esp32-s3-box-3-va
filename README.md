@@ -14,6 +14,11 @@ one thin config file you actually edit.
 > rest. [CHANGELOG.md](CHANGELOG.md) has the detail, including what turned out to
 > be wrong along the way.
 
+> [!TIP]
+> ⭐ **Enjoying this project?** Every star is real motivation for me to keep
+> developing it :) [**Star this repo**](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va)
+> if it helped you.
+
 ## What it does
 
 - **Voice assistant**: on-device wake word (`alexa`, `okay nabu`, `hey jarvis`,
@@ -262,6 +267,12 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `settings.yaml` | The device's own switches as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output` toggle and a volume slider. Reached one swipe down from home (`idle_page_above: page_settings`). The on and off states differ in shape, not only colour, so the screen reads at a glance; the icons are the handful of Material Design glyphs actually used, downloaded at compile time. |
 | `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 32 looks for the home screen (fonts, colours, gradient backgrounds, layouts and a temperature/humidity dashboard) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 
+The **settings screen** is **one swipe down** from home - the device's own switches
+as tap tiles (microphone, wake sound, and where replies come out) plus a volume
+slider, each state told by shape and colour so it reads at a glance:
+
+<p align="center"><img src="base/assets/settings.png" width="300" alt="Settings screen"></p>
+
 Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
 clock, and the character idling. **Tap the screen to swap between them** -
 `idle_page` is what you see after a reboot, `idle_page_alt` is what a tap
@@ -369,15 +380,7 @@ palettes, vertical and horizontal gradient backgrounds, and light themes:
 <sub>Previews rendered at 320x240 with the device's own fonts; the panel itself
 looks the same bar minor anti-aliasing.</sub>
 
-Set the look the device **boots** with in your thin config - `home_style: CRT`
-(any option name). The HA select restores its own saved value once you change it
-there, so this is only the out-of-the-box default:
-
-```yaml
-  home_style: CRT   # boot into CRT; the select still lets you switch live
-```
-
-`home.yaml` is parameterised too, so the Default look is unchanged and any single
+`home.yaml` is parameterised, so the Default look is unchanged and any single
 value - a colour, the clock font - can also be pinned at compile time by setting
 its `home_*` substitution. Each style's clock font is a Google Font compiled in as
 digits and a colon only, so the whole set adds a few KB. To add your own: a font,

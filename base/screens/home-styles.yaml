@@ -19,14 +19,6 @@
 # main UI font so Central European accents still render.
 ###############################################################################
 
-substitutions:
-  # The look the device boots with - any "Home style" option (Default, CRT, Neon,
-  # Minecraft, Dashboard, ...). Set it in your thin config, e.g. `home_style: CRT`.
-  # The HA select restores its own saved value once you change it there, so this
-  # is only the out-of-the-box default. To tune the Default look's own colours and
-  # clock font at compile time instead, set the `home_*` substitutions in home.yaml.
-  home_style: Default
-
 font:
   # Clock fonts - digits and a colon only. `font_clock` (Default) is in home.yaml.
   - id: font_clock_crt
@@ -182,7 +174,7 @@ select:
       - Blueprint
       - RightCol
       - Corner
-    initial_option: ${home_style}
+    initial_option: Default
     on_value:
       - script.execute: apply_home_style
 
