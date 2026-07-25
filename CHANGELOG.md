@@ -271,6 +271,18 @@ their alarm, the touchscreen, the home screen and the animated character.
   characters' numbers, and a hand-copied table would drift the first time
   somebody nudged an eye.
 
+- **Two more characters** - `willow` and `nyx` - taking the cast to 27. Both are
+  emblem-style vector art with the face taken out, and both were measured rather
+  than guessed, which took three attempts to learn. What settles a placement is
+  never the proportions of a face in general; it is the landmarks the artwork
+  still has. Willow's mask carries a nose and nothing else, so the nose is the
+  scale check: if the measured eye line puts it where it is drawn, the scale is
+  right. Nyx kept her eyebrows, and their centres are what sets the eye spacing.
+
+  Willow's eyes are then deliberately bigger than the measurement says. The
+  numbers off the original produce eyes that read as beady at this size, and the
+  file says so, so that nobody later "fixes" them back to the measured value.
+
 - **Four more characters** - `kacpro`, `hacker`, `mandrake` and `spike` - taking
   the cast to 25. Two of them cost nothing but measurement: KacPRO's hood and
   hacker's blank oval arrived with the face area already empty. Mandrake did not.

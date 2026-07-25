@@ -24,7 +24,7 @@
 # Pick one in Home Assistant and the artwork, the geometry and the colours all
 # change on the spot, no rebuild, and the choice survives a reboot.
 #
-# WHY FOUR AND NOT ALL 14: the artwork is the cost. Each character's PNG is
+# WHY FOUR AND NOT ALL 16: the artwork is the cost. Each character's PNG is
 # 320x240 RGB565 = 150 KB of flash, compiled in whether or not it is ever shown.
 # Four is 450 KB on top of the one you already had, which this board can afford;
 # twenty-five could not. WHICH four is a compile-time decision, switching between
@@ -33,7 +33,7 @@
 # The four names must be DIFFERENT. A select cannot carry the same option twice,
 # and ESPHome will tell you so at build time.
 #
-# Only characters WITH ARTWORK can be picked (agnes, astro, flare, franky, genie, hacker, kacpro, mandrake, momo, pip, rhea, rufus, spike, wizard).
+# Only characters WITH ARTWORK can be picked (agnes, astro, flare, franky, genie, hacker, kacpro, mandrake, momo, nyx, pip, rhea, rufus, spike, willow, wizard).
 # The self-drawing ones - aura, bit, crt, iris, kitt, nixie, pixel, rain, scope,
 # vu - are whole pages of their own rather than numbers on top of a picture, so
 # there is nothing here to swap.
@@ -117,10 +117,12 @@ script:
             {"kacpro",   {   0,   21,   17,   16,   20,   16,    6,    4,    8,   10,    3,    2,    5,   20,    5,   14,   14,   10,   14,   14,   24,   16,   14,    4,    4,  100,  -17,   -3,    8,    3,    4, 0xFFFFFF, 0x8C3B32, 0x2B2338, 0xFF4D4D}},
             {"mandrake", {   0,   20,   20,   12,   15,   12,    5,    3,    9,    9,    2,    2,    5,   26,    4,    9,   16,   10,   12,    9,   26,   10,   14,    3,    4,  100,   17,   28,    6,    2,    4, 0xFFFFFF, 0x9E3B22, 0x27551F, 0xFF4D4D}},
             {"momo",     {   0,   38,   35,   35,   41,   35,   12,    4,   11,   17,    4,    3,    8,   24,    8,   22,   18,   10,   18,   18,   32,   26,   16,    4,    4,  100,   -8,   36,    3,    2,    3, 0xFFC24D, 0xFFC24D, 0x1E1E1E, 0xFF5A5A}},
+            {"nyx",      { -13,   14,   15,   11,   13,   11,    5,    3,    6,    7,    2,    2,    4,   12,    3,    8,    8,    6,    8,    8,   14,   10,    8,    3,    4,  100,  -44,  -19,    5,    2,    3, 0x220C33, 0xC80036, 0xF70047, 0xFF3355}},
             {"pip",      {   0,   42,   27,   38,   44,   38,   14,    4,    9,   19,    4,    3,    6,   26,   10,   22,   20,   12,   20,   20,   30,   24,   18,    4,    4,  100,   36,   61,   10,    8,    5, 0x3AFAE6, 0x3AFAE6, 0x0A1A3C, 0xFF4D4D}},
             {"rhea",     {  -2,   22,   24,   20,   26,   20,    7,    4,   10,   12,    3,    2,    6,   30,    6,   18,   20,   14,   18,   18,   34,   22,   18,    4,    4,  100,  -18,   14,   10,    3,    5, 0xFFFFFF, 0xB5514A, 0x4D352B, 0xFF5A5A}},
             {"rufus",    {   0,   27,   28,   18,   24,   18,    7,    4,   10,   14,    3,    2,    6,   30,    6,   16,   18,   14,   16,   16,   34,   20,   16,    4,    4,  100,  -42,  -12,    8,    3,    4, 0xFFFFFF, 0x4A1F14, 0x2A1008, 0xFF5A5A}},
             {"spike",    {  -3,   22,   20,   22,   28,   22,    8,    4,    9,   12,    3,    3,    5,   26,    6,   16,   18,   12,   16,   16,   28,   20,   16,    4,    4,  100,  -20,   10,    9,    3,    4, 0xFFFFFF, 0x15451B, 0x15451B, 0xFF4D4D}},
+            {"willow",   {   0,   13,   19,   16,   18,   16,    7,    3,    8,   10,    2,    2,    4,   12,    3,    8,    8,    6,    8,    7,   14,    9,    8,    2,    3,  100,  -15,   15,    8,    2,    3, 0x7FBF3F, 0x14261A, 0x102016, 0xC62828}},
             {"wizard",   {   3,   20,   22,   26,   30,   26,    9,    3,    8,   13,    3,    3,    5,   14,    5,   12,   10,    8,   12,   12,   18,   14,   10,    4,    4,  100,   24,   46,    8,    3,    4, 0xFFD84D, 0xFFD84D, 0x0A0A0A, 0xFF5A5A}},
           };
           const std::string s = id(assistant_select).current_option();

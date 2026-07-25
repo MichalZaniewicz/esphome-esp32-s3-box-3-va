@@ -74,8 +74,8 @@ decision, switching between them is not. Artwork characters only. Details:
 
 ### The cast
 
-Twenty-five of them, and they are not one face on twenty-five bodies: the eyes,
-the colours, the range of every expression and in ten cases the entire way of
+Twenty-seven of them, and they are not one face on twenty-seven bodies: the
+eyes, the colours, the range of every expression and in ten cases the entire way of
 being on screen belong to the character. Name any of them in lower case.
 
 <table>
@@ -172,6 +172,14 @@ being on screen belong to the character. Name any of them in lower case.
     <td><h3>Mandrake</h3>A root that climbed out of the pot and stayed. Sleepy under its leaves, slow to open its eyes, and quietly pleased to be indoors where it is warm.</td>
   </tr>
   <tr>
+    <td width="290"><img src="base/assets/demo/demo-willow.gif" width="272" alt="Willow"></td>
+    <td><h3>Willow</h3>Runs the house the way a forest runs itself: slowly, and without being asked twice. Sets your timers, dims your lamps, and gently implies that the plants were managing all of this long before the wifi.</td>
+  </tr>
+  <tr>
+    <td width="290"><img src="base/assets/demo/demo-nyx.gif" width="272" alt="Nyx"></td>
+    <td><h3>Nyx</h3>Nocturnal, unimpressed, and delighted that your lights take orders. Handles the evening routine with the enthusiasm of someone whose day starts at sunset, and treats "good night, turn everything off" as an invitation.</td>
+  </tr>
+  <tr>
     <td width="290"><img src="base/assets/demo/demo-spike.gif" width="272" alt="Spike"></td>
     <td><h3>Spike</h3>Both arms up, a crown of orange spines and absolutely no hurry. Watches the kitchen the way a houseplant does, which is to say constantly, needs nothing from anybody, and says its piece only when asked.</td>
   </tr>
@@ -230,7 +238,7 @@ base/
     genie, flare, rhea,
     rufus, agnes, kacpro,
     hacker, mandrake,
-    spike
+    spike, willow, nyx
     picker.yaml            # optional: an "Assistant" select, four to switch between
     aura, bit, iris,       # these draw themselves, no artwork at all
     crt, kitt, nixie,

@@ -1,0 +1,75 @@
+# Nyx - red pigtails, blue skin, very unimpressed.
+#
+# The artwork keeps two things that do the acting for free: the angry slanted
+# eyebrows, and the little nose. Everything else on the face was taken out.
+#
+# Her head is turned slightly to her right, so the nose sits left of the mask's
+# geometric middle - the eyes want an axis at 148 and the mouth one at 144, and
+# the engine's single axis splits it at 147.
+#
+# Usage: `assistant: nyx` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/nyx.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/nyx.png
+
+  face_color: '0x220C33'
+  face_mouth_color: '0xC80036'
+  face_pupil_color: '0xF70047'
+  face_alarm_color: '0xFF3355'
+
+  # Face: x 122..185, chin at y 112. The brows end at y 68 and the nose runs
+  # x 136..148, y 84..90, so the eyes sit between them at y 76 and the mouth
+  # below the nose at y 101, halfway to the chin. Brow centres are at x 132 and
+  # 165, which is what sets the eye spacing.
+  face_center_x: '-13'
+  face_eye_offset: '14'
+  face_eye_y: '-44'
+  face_eye_w: '15'
+  face_eye_h: '11'
+  face_mouth_y: '-19'
+  face_mouth_w: '12'
+  face_mouth_h: '3'
+
+  face_pupil_w: '6'
+  face_pupil_h: '7'
+  face_pupil_radius: '3'
+  face_pupil_dilate: '2'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '4'
+
+  face_eye_h_wide: '13'
+  face_eye_h_think: '11'
+  face_eye_h_narrow: '5'
+  face_eye_h_shut: '3'
+  face_mouth_open_h: '8'
+  face_mouth_small_w: '8'
+  face_mouth_think_w: '6'
+  face_mouth_o_w: '8'
+  face_mouth_o_h: '8'
+  face_mouth_alarm_w: '14'
+  face_mouth_alarm_h: '10'
+  face_mouth_error_w: '8'
+  face_listen_pulse: '3'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '5'
+  face_mouth_radius: '2'

@@ -1,0 +1,88 @@
+# Willow - the forest spirit, drawn as an emblem.
+#
+# Symmetric artwork: wings, leaf crown, and a pale mask of a face in the middle
+# with nothing on it but a nose. That makes it the easiest face in the set to
+# measure - the mirror axis really is x 160, and the nose is a third landmark
+# that checks the scale rather than a fourth thing to compromise with.
+#
+# Usage: `assistant: willow` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/willow.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/willow.png
+
+  face_color: '0x7FBF3F'
+  face_mouth_color: '0x14261A'
+  face_pupil_color: '0x102016'
+  face_alarm_color: '0xC62828'
+
+  # Mierzone na oryginale w wysokiej rozdzielczosci, w jednostce E = rozstaw
+  # oczu. Stamtad: oko 0.58 E szerokie, a Z KRESKA RZES 0.40 E wysokie - tu
+  # stoi 0.50 E, bo na masce tej wielkosci oko odczytane co do piksela
+  # wychodzilo za drobne -
+  # sama teczowka to polowa tego i wlasnie dlatego pierwsze podejscie
+  # wygladalo na male oczy. Ostatecznie oko jest JESZCZE wieksze niz pomiar,
+  # 19 x 16 zamiast 14 x 10 - na tej masce liczby z oryginalu wychodzily za
+  # drobne i to byla decyzja, nie pomiar. Rozstaw tez poszedl o piksel w gore,
+  # na 13: przy oku tej szerokosci maska ma jeszcze po cztery piksele luzu z
+  # kazdej strony (biel siega x 133..186 na wysokosci oczu), wiec to jest
+  # granica, przy ktorej oko jeszcze nie wchodzi na kontur twarzy. Linia oczu 26% wysokosci twarzy od gory, nos 62%,
+  # usta 78%.
+  #
+  # Maska ma 60 px wysokosci (y 88..148) i 49 px szerokosci na wysokosci oczu,
+  # co daje E = 24. Nos wypada wtedy na y 125 i tam wlasnie jest narysowany -
+  # trzeci, niezalezny pomiar sie zgadza, wiec skala jest dobra.
+  #
+  # Oczy sa ZIELONE, a zrenica ciemna, dokladnie jak w oryginale. Na bialej
+  # masce ciemne oko z jasna zrenica bylo pomyslem, nie pomiarem.
+  face_center_x: '0'
+  face_eye_offset: '13'
+  face_eye_y: '-15'
+  face_eye_w: '19'
+  face_eye_h: '16'
+  face_mouth_y: '15'
+  face_mouth_w: '12'
+  face_mouth_h: '3'
+
+  face_pupil_w: '8'
+  face_pupil_h: '10'
+  face_pupil_radius: '3'
+  face_pupil_dilate: '2'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '4'
+
+  face_eye_h_wide: '18'
+  face_eye_h_think: '16'
+  face_eye_h_narrow: '7'
+  face_eye_h_shut: '3'
+  face_mouth_open_h: '8'
+  face_mouth_small_w: '8'
+  face_mouth_think_w: '6'
+  face_mouth_o_w: '8'
+  face_mouth_o_h: '7'
+  face_mouth_alarm_w: '14'
+  face_mouth_alarm_h: '9'
+  face_mouth_error_w: '8'
+  face_listen_pulse: '2'
+  face_shake_dx: '3'
+  face_tick: 120ms
+  face_eye_radius: '8'
+  face_mouth_radius: '2'
