@@ -271,6 +271,20 @@ their alarm, the touchscreen, the home screen and the animated character.
   characters' numbers, and a hand-copied table would drift the first time
   somebody nudged an eye.
 
+- **Cover art on the media screen, and buttons that admit what they cannot do.**
+  The device downloads the picture from Home Assistant's own image proxy and
+  decodes it on board as JPEG, which needs a new `media_ha_base_url` - the
+  player's `entity_picture` is a path, and the base has to be an address the BOX
+  can reach, not the one your laptop uses. Same URL twice in a row is not
+  fetched twice: Home Assistant republishes the attribute on every state event,
+  and the download is the one genuinely expensive thing this screen does.
+
+  Previous and next now follow the player's `supported_features`. A Chromecast
+  casting from some apps advertises pause and nothing else, and Home Assistant
+  answers the call with `ServiceNotSupported` - which from the sofa is
+  indistinguishable from a broken screen. Unsupported buttons are painted dim
+  and do nothing when tapped. Cost of both: 39 KB of flash, to 32.9%.
+
 - **`devil`**, taking the cast to 28. Her artwork kept the eye SHADOW as well
   as the brows and the nose, and that shadow is what places the eyes: it is
   where they were, so it beats any proportion of a face in general. Her face

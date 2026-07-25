@@ -1,5 +1,5 @@
 ###############################################################################
-# Media screen: what is playing, and three buttons to do something about it.
+# Media screen: what is playing, its cover art, and three buttons.
 #
 # An OPTIONAL carousel screen. Add it to your thin config's `files:` list AFTER
 # base/screens/home.yaml - its position in that list is its position on the
@@ -7,6 +7,7 @@
 #
 #   substitutions:
 #     media_entity: media_player.kitchen
+#     media_ha_base_url: "http://192.168.1.10:8123"   # for the cover art
 #
 #   packages:
 #     core:
@@ -26,6 +27,21 @@
 # takes the position it was given, notes the millisecond it arrived, and adds
 # the elapsed time itself. The tick is gated on the page being visible, so on
 # every other screen it costs nothing at all.
+#
+# THE BUTTONS FOLLOW WHAT THE PLAYER CAN ACTUALLY DO. A Chromecast casting from
+# some apps has no next or previous track at all - Home Assistant answers such a
+# call with `ServiceNotSupported` and nothing happens, which from the sofa looks
+# exactly like a broken screen. So the player's `supported_features` bitmask is
+# read, unsupported buttons are painted dim and their tap does nothing.
+#
+# COVER ART is downloaded by the device from Home Assistant's own image proxy.
+# That needs two things you have to provide: `media_ha_base_url`, because the
+# player's `entity_picture` is a path and not a full URL, and a base URL the
+# BOX can reach - `homeassistant.local` may resolve for your laptop and not for
+# an ESP32. It is fetched fresh on every track change and decoded as JPEG, which
+# is what the proxy serves for practically all album art; anything else fails
+# the decode and the screen falls back to the note icon, which is also what
+# happens when there is no artwork at all.
 ###############################################################################
 
 substitutions:
@@ -33,6 +49,11 @@ substitutions:
   # which is where the assistant's replies come out - though naming the same one
   # is a perfectly good idea.
   media_entity: media_player.living_room
+
+  # Where the device fetches cover art from. Scheme and port included, no
+  # trailing slash. Leave it at the default and the cover simply never arrives:
+  # the box cannot guess your Home Assistant's address.
+  media_ha_base_url: "http://homeassistant.local:8123"
 
   # How often the local clock advances the bar, while the page is showing. One
   # second is the coarsest that still reads as moving; the labels below it are
@@ -52,8 +73,12 @@ substitutions:
   media_bar_bg_color: '0x1A2028'
   media_bar_fg_color: '0x2FA8E0'
   media_icon_color: '0x8FA6C0'
+  media_cover_bg_color: '0x11151C'
   media_button_color: '0x161A22'
+  # An unsupported control. Same shape, no promise.
+  media_button_off_color: '0x0C0F14'
   media_button_icon_color: '0xEAF2FF'
+  media_button_icon_off_color: '0x3A4450'
   media_button_radius: '8'
 
 font:
@@ -71,6 +96,38 @@ font:
       - "\U000F04AE"   # skip-previous
       - "\U000F0387"   # music-note
       - "\U000F0580"   # volume-medium
+
+# Cover art. The URL here is never fetched - `update_interval: never` and the
+# component only downloads when asked - but one has to be given, so it is the
+# base URL you configured.
+http_request:
+  timeout: 5s
+  watchdog_timeout: 15s
+
+image:
+  - platform: online_image
+    id: media_cover
+    url: "${media_ha_base_url}/"
+    format: JPEG
+    type: RGB565
+    resize: 96x96
+    buffer_size: 32768
+    update_interval: never
+    on_download_finished:
+      - lambda: |-
+          id(media_cover_ready) = true;
+      - lvgl.widget.hide: media_note
+      - lvgl.widget.show: media_cover_obj
+      - lvgl.image.update:
+          id: media_cover_obj
+          src: media_cover
+    on_error:
+      # No artwork, a format the decoder does not speak, or Home Assistant not
+      # reachable - all the same thing from here: show the note instead.
+      - lambda: |-
+          id(media_cover_ready) = false;
+      - lvgl.widget.hide: media_cover_obj
+      - lvgl.widget.show: media_note
 
 text_sensor:
   - platform: homeassistant
@@ -93,6 +150,16 @@ text_sensor:
     internal: true
     on_value:
       - script.execute: media_refresh
+  # The cover's address, as a PATH ("/api/media_player_proxy/...?token=..."),
+  # which is why the base URL above has to exist. It carries a token, so no
+  # authentication header is needed.
+  - platform: homeassistant
+    id: media_picture_src
+    entity_id: ${media_entity}
+    attribute: entity_picture
+    internal: true
+    on_value:
+      - script.execute: media_fetch_cover
 
 sensor:
   # The position and the moment it arrived. Everything the bar does between two
@@ -121,6 +188,16 @@ sensor:
     internal: true
     on_value:
       - script.execute: media_refresh
+  # What this player will actually accept. A bitmask: 16 is PREVIOUS_TRACK,
+  # 32 is NEXT_TRACK. It changes with what is casting, not just with the
+  # entity, so it is watched rather than read once.
+  - platform: homeassistant
+    id: media_features
+    entity_id: ${media_entity}
+    attribute: supported_features
+    internal: true
+    on_value:
+      - script.execute: media_refresh
 
 globals:
   - id: media_pos_base
@@ -131,6 +208,13 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: "0"
+  - id: media_cover_ready
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: media_cover_url
+    type: std::string
+    restore_value: false
 
 script:
   # Metadata, colours and the icons. Everything here changes rarely - a track
@@ -177,6 +261,25 @@ script:
             else snprintf(b, sizeof(b), "%d%%", vol);
             lv_label_set_text(id(media_volume), b);
           }
+
+          // Grey out what this player cannot do. Home Assistant rejects a call
+          // to an unadvertised feature with ServiceNotSupported, which is
+          // invisible from the sofa - so the button says so instead.
+          const int sf = std::isnan(id(media_features).state)
+                       ? 0 : (int) id(media_features).state;
+          static int seen_sf = -1;
+          if (seen_sf != sf) {
+            seen_sf = sf;
+            const bool prev_ok = sf & 16, next_ok = sf & 32;
+            lv_obj_set_style_bg_color(id(media_btn_prev),
+                lv_color_hex(prev_ok ? ${media_button_color} : ${media_button_off_color}), LV_PART_MAIN);
+            lv_obj_set_style_bg_color(id(media_btn_next),
+                lv_color_hex(next_ok ? ${media_button_color} : ${media_button_off_color}), LV_PART_MAIN);
+            lv_obj_set_style_text_color(id(media_btn_prev_icon),
+                lv_color_hex(prev_ok ? ${media_button_icon_color} : ${media_button_icon_off_color}), LV_PART_MAIN);
+            lv_obj_set_style_text_color(id(media_btn_next_icon),
+                lv_color_hex(next_ok ? ${media_button_icon_color} : ${media_button_icon_off_color}), LV_PART_MAIN);
+          }
       - script.execute: media_progress
 
   # The bar and the two times. Called by the tick while the page is showing, and
@@ -218,6 +321,28 @@ script:
           if (total > 0) snprintf(b, sizeof(b), "%d:%02d", total / 60, total % 60);
           else b[0] = '\0';
           lv_label_set_text(id(media_total), b);
+
+  # Cover art. Built here rather than in the text sensor's trigger because the
+  # same URL arrives again on every state republish, and re-downloading a
+  # picture we already have is the one expensive thing this screen can do.
+  - id: media_fetch_cover
+    mode: single
+    then:
+      # The guard lives in the condition and remembers in a global, the same
+      # shape home.yaml uses for its clock: Home Assistant republishes the same
+      # entity_picture on every state event, and downloading it again is the one
+      # genuinely expensive thing this screen can do.
+      - if:
+          condition:
+            lambda: |-
+              const std::string pic = id(media_picture_src).state;
+              if (pic.empty() || pic == id(media_cover_url)) return false;
+              id(media_cover_url) = pic;
+              return true;
+          then:
+            - online_image.set_url:
+                id: media_cover
+                url: !lambda return std::string("${media_ha_base_url}") + id(media_cover_url);
 
 interval:
   - interval: ${media_tick}
@@ -267,19 +392,40 @@ lvgl:
             shadow_width: 0
             gesture_bubble: true
 
-        - label:
+        # The cover sits in a tile of its own, so that a missing picture leaves
+        # a deliberate empty square with a note in it rather than a hole.
+        - obj:
             align: TOP_LEFT
-            x: 14
-            y: 16
+            x: 12
+            y: 14
+            width: 96
+            height: 96
+            radius: 6
+            bg_color: ${media_cover_bg_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+        - label:
+            id: media_note
+            align: TOP_LEFT
+            x: 46
+            y: 46
             text: "\U000F0387"
             text_font: font_media_icon
             text_color: ${media_icon_color}
+        - image:
+            id: media_cover_obj
+            align: TOP_LEFT
+            x: 12
+            y: 14
+            src: media_cover
+            hidden: true
 
         - label:
             id: media_volume
             align: TOP_RIGHT
             x: -14
-            y: 24
+            y: 14
             text: ""
             text_font: font_body
             text_color: ${media_time_color}
@@ -290,9 +436,9 @@ lvgl:
         - label:
             id: media_title
             align: TOP_LEFT
-            x: 14
-            y: 62
-            width: 292
+            x: 120
+            y: 40
+            width: 186
             long_mode: DOT
             text: "${media_idle_text}"
             text_font: font_body
@@ -300,9 +446,9 @@ lvgl:
         - label:
             id: media_artist
             align: TOP_LEFT
-            x: 14
-            y: 86
-            width: 292
+            x: 120
+            y: 64
+            width: 186
             long_mode: DOT
             text: ""
             text_font: font_body
@@ -311,7 +457,7 @@ lvgl:
         - bar:
             id: media_bar
             align: TOP_MID
-            y: 120
+            y: 122
             width: 292
             height: 6
             min_value: 0
@@ -326,7 +472,7 @@ lvgl:
             id: media_elapsed
             align: TOP_LEFT
             x: 14
-            y: 132
+            y: 134
             text: ""
             text_font: font_body
             text_color: ${media_time_color}
@@ -334,14 +480,18 @@ lvgl:
             id: media_total
             align: TOP_RIGHT
             x: -14
-            y: 132
+            y: 134
             text: ""
             text_font: font_body
             text_color: ${media_time_color}
 
         # The controls act on the WATCHED PLAYER, through Home Assistant - this
-        # box is not necessarily the thing making the noise.
+        # box is not necessarily the thing making the noise. Previous and next
+        # check `supported_features` first: without that a tap on a Chromecast
+        # casting from an app with no track list produces a Home Assistant error
+        # nobody in the kitchen can see.
         - button:
+            id: media_btn_prev
             align: BOTTOM_MID
             x: -80
             y: -14
@@ -354,12 +504,19 @@ lvgl:
             shadow_width: 0
             gesture_bubble: true
             on_click:
-              - homeassistant.service:
-                  service: media_player.media_previous_track
-                  data:
-                    entity_id: ${media_entity}
+              - if:
+                  condition:
+                    lambda: |-
+                      return !std::isnan(id(media_features).state) &&
+                             ((int) id(media_features).state & 16);
+                  then:
+                    - homeassistant.service:
+                        service: media_player.media_previous_track
+                        data:
+                          entity_id: ${media_entity}
             widgets:
               - label:
+                  id: media_btn_prev_icon
                   align: CENTER
                   text: "\U000F04AE"
                   text_font: font_media_icon
@@ -389,6 +546,7 @@ lvgl:
                   text_font: font_media_icon
                   text_color: ${media_button_icon_color}
         - button:
+            id: media_btn_next
             align: BOTTOM_MID
             x: 80
             y: -14
@@ -401,12 +559,19 @@ lvgl:
             shadow_width: 0
             gesture_bubble: true
             on_click:
-              - homeassistant.service:
-                  service: media_player.media_next_track
-                  data:
-                    entity_id: ${media_entity}
+              - if:
+                  condition:
+                    lambda: |-
+                      return !std::isnan(id(media_features).state) &&
+                             ((int) id(media_features).state & 32);
+                  then:
+                    - homeassistant.service:
+                        service: media_player.media_next_track
+                        data:
+                          entity_id: ${media_entity}
             widgets:
               - label:
+                  id: media_btn_next_icon
                   align: CENTER
                   text: "\U000F04AD"
                   text_font: font_media_icon
