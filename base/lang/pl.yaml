@@ -57,3 +57,8 @@ substitutions:
   settings_tts_this: "Box"
   settings_tts_external: "Głośnik"
   settings_tts_both: "Oba"
+
+  # --- Ekran odtwarzacza (base/screens/media.yaml) ---------------------------
+  # Oba napisy wchodzą w miejsce tytułu utworu, więc szerokość ta sama: 292 px.
+  media_idle_text: "Nic nie gra"
+  media_unknown_title: "Bez tytułu"

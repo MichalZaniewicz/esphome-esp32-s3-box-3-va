@@ -1,0 +1,413 @@
+###############################################################################
+# Media screen: what is playing, and three buttons to do something about it.
+#
+# An OPTIONAL carousel screen. Add it to your thin config's `files:` list AFTER
+# base/screens/home.yaml - its position in that list is its position on the
+# ring - and point it at a media player:
+#
+#   substitutions:
+#     media_entity: media_player.kitchen
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/screens/media.yaml      # <- one swipe left or right from home
+#         - base/faces/${assistant}.yaml
+#
+# It watches ANY Home Assistant media player, not this box: a speaker in the
+# kitchen, the TV, whatever is named above. Wrong or missing entity is not an
+# error - the screen simply says nothing is playing.
+#
+# THE PROGRESS BAR RUNS LOCALLY. Home Assistant sends `media_position` only when
+# it changes - on play, pause and seek - so a bar drawn straight from that
+# attribute would sit still for the length of a song and then jump. This screen
+# takes the position it was given, notes the millisecond it arrived, and adds
+# the elapsed time itself. The tick is gated on the page being visible, so on
+# every other screen it costs nothing at all.
+###############################################################################
+
+substitutions:
+  # The player to watch. It has nothing to do with `external_media_player_id`,
+  # which is where the assistant's replies come out - though naming the same one
+  # is a perfectly good idea.
+  media_entity: media_player.living_room
+
+  # How often the local clock advances the bar, while the page is showing. One
+  # second is the coarsest that still reads as moving; the labels below it are
+  # written in whole seconds anyway, and the guard means a repaint only happens
+  # when the displayed second actually changes.
+  media_tick: 1s
+
+  # English by default; base/lang/*.yaml overrides these and must be listed
+  # AFTER this file in `files:`. Keep them short - the screen is 320 px wide.
+  media_idle_text: "Nothing playing"
+  media_unknown_title: "Unknown"
+
+  media_bg_color: '0x000000'
+  media_title_color: '0xFFFFFF'
+  media_artist_color: '0x8FA6C0'
+  media_time_color: '0x5A6B80'
+  media_bar_bg_color: '0x1A2028'
+  media_bar_fg_color: '0x2FA8E0'
+  media_icon_color: '0x8FA6C0'
+  media_button_color: '0x161A22'
+  media_button_icon_color: '0xEAF2FF'
+  media_button_radius: '8'
+
+font:
+  # Only the six glyphs this screen draws, so the flash cost is a few KB rather
+  # than a webfont. Codepoints checked against the webfont's own _variables.scss
+  # - an unverified one does not fail the build, it just draws nothing.
+  - id: font_media_icon
+    file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    size: 30
+    bpp: 4
+    glyphs:
+      - "\U000F040A"   # play
+      - "\U000F03E4"   # pause
+      - "\U000F04AD"   # skip-next
+      - "\U000F04AE"   # skip-previous
+      - "\U000F0387"   # music-note
+      - "\U000F0580"   # volume-medium
+
+text_sensor:
+  - platform: homeassistant
+    id: media_state
+    entity_id: ${media_entity}
+    internal: true
+    on_value:
+      - script.execute: media_refresh
+  - platform: homeassistant
+    id: media_title_src
+    entity_id: ${media_entity}
+    attribute: media_title
+    internal: true
+    on_value:
+      - script.execute: media_refresh
+  - platform: homeassistant
+    id: media_artist_src
+    entity_id: ${media_entity}
+    attribute: media_artist
+    internal: true
+    on_value:
+      - script.execute: media_refresh
+
+sensor:
+  # The position and the moment it arrived. Everything the bar does between two
+  # of these is arithmetic done here.
+  - platform: homeassistant
+    id: media_position_src
+    entity_id: ${media_entity}
+    attribute: media_position
+    internal: true
+    on_value:
+      - lambda: |-
+          id(media_pos_base) = std::isnan(x) ? 0.0f : x;
+          id(media_pos_at) = millis();
+      - script.execute: media_refresh
+  - platform: homeassistant
+    id: media_duration_src
+    entity_id: ${media_entity}
+    attribute: media_duration
+    internal: true
+    on_value:
+      - script.execute: media_refresh
+  - platform: homeassistant
+    id: media_volume_src
+    entity_id: ${media_entity}
+    attribute: volume_level
+    internal: true
+    on_value:
+      - script.execute: media_refresh
+
+globals:
+  - id: media_pos_base
+    type: float
+    restore_value: false
+    initial_value: "0.0f"
+  - id: media_pos_at
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+
+script:
+  # Metadata, colours and the icons. Everything here changes rarely - a track
+  # lasts minutes - so every write is guarded: lv_label_set_text never compares,
+  # it reallocs, copies and re-lays-out, and Home Assistant republishes a state
+  # on every event whether or not anything about it moved.
+  - id: media_refresh
+    then:
+      - lambda: |-
+          const std::string st = id(media_state).state;
+          const bool playing = st == "playing";
+          const bool active = playing || st == "paused" || st == "buffering";
+
+          std::string title = active ? id(media_title_src).state : "${media_idle_text}";
+          if (active && title.empty()) title = "${media_unknown_title}";
+          std::string artist = active ? id(media_artist_src).state : "";
+
+          static std::string seen_title, seen_artist;
+          if (seen_title != title) {
+            seen_title = title;
+            lv_label_set_text(id(media_title), title.c_str());
+          }
+          if (seen_artist != artist) {
+            seen_artist = artist;
+            lv_label_set_text(id(media_artist), artist.c_str());
+          }
+
+          // The middle button shows what a TAP WILL DO, which is the opposite of
+          // what is happening: a pause icon while it plays.
+          static int seen_icon = -1;
+          const int want = playing ? 1 : 0;
+          if (seen_icon != want) {
+            seen_icon = want;
+            lv_label_set_text(id(media_btn_play_icon), playing ? "\U000F03E4" : "\U000F040A");
+          }
+
+          static int seen_vol = -1;
+          const float v = id(media_volume_src).state;
+          const int vol = (active && !std::isnan(v)) ? (int) (v * 100.0f + 0.5f) : -1;
+          if (seen_vol != vol) {
+            seen_vol = vol;
+            char b[16];
+            if (vol < 0) b[0] = '\0';
+            else snprintf(b, sizeof(b), "%d%%", vol);
+            lv_label_set_text(id(media_volume), b);
+          }
+      - script.execute: media_progress
+
+  # The bar and the two times. Called by the tick while the page is showing, and
+  # once by media_refresh so a change lands immediately rather than up to a
+  # second later.
+  - id: media_progress
+    then:
+      - lambda: |-
+          const std::string st = id(media_state).state;
+          const bool playing = st == "playing";
+          const bool active = playing || st == "paused" || st == "buffering";
+          const float dur = id(media_duration_src).state;
+
+          int pos = 0, total = 0;
+          if (active && !std::isnan(dur) && dur > 0.0f) {
+            total = (int) dur;
+            float p = id(media_pos_base);
+            // Only a PLAYING track moves on its own. Paused, the position is
+            // whatever Home Assistant last said, which is the point of keeping
+            // the base separately instead of trusting a running clock.
+            if (playing && id(media_pos_at) != 0)
+              p += (millis() - id(media_pos_at)) / 1000.0f;
+            pos = (int) p;
+            if (pos < 0) pos = 0;
+            if (pos > total) pos = total;
+          }
+
+          static int seen_pos = -1, seen_total = -1;
+          if (seen_pos == pos && seen_total == total) return;   // same second, nothing to draw
+          seen_pos = pos;
+          seen_total = total;
+
+          lv_bar_set_value(id(media_bar), total > 0 ? (pos * 1000) / total : 0, LV_ANIM_OFF);
+
+          char b[24];
+          if (total > 0) snprintf(b, sizeof(b), "%d:%02d", pos / 60, pos % 60);
+          else b[0] = '\0';
+          lv_label_set_text(id(media_elapsed), b);
+          if (total > 0) snprintf(b, sizeof(b), "%d:%02d", total / 60, total % 60);
+          else b[0] = '\0';
+          lv_label_set_text(id(media_total), b);
+
+interval:
+  - interval: ${media_tick}
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_media
+          then:
+            - script.execute: media_progress
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/media.yaml (media screen for ${media_entity})"
+    # Paint it once, so the screen is not blank until the player next changes
+    # state. Late enough that LVGL is up.
+    - priority: -200
+      then:
+        - script.execute: media_refresh
+
+lvgl:
+  pages:
+    - id: page_media
+      skip: false                  # THIS is what puts the screen on the carousel
+      bg_color: ${media_bg_color}
+      scrollbar_mode: "OFF"
+      on_swipe_left:
+        - script.execute: idle_swipe_left
+      on_swipe_right:
+        - script.execute: idle_swipe_right
+      widgets:
+        # FIRST, not last, unlike carousel-example.yaml. That file has nothing to
+        # tap, so its transparent button sits on top and catches everything. Here
+        # the three controls have to be reachable, and LVGL hit-tests the topmost
+        # object under the finger - so this one goes underneath and picks up
+        # presses on the empty parts of the screen. The controls carry
+        # `gesture_bubble` themselves, so a swipe that begins on a button still
+        # reaches the page.
+        - button:
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+
+        - label:
+            align: TOP_LEFT
+            x: 14
+            y: 16
+            text: "\U000F0387"
+            text_font: font_media_icon
+            text_color: ${media_icon_color}
+
+        - label:
+            id: media_volume
+            align: TOP_RIGHT
+            x: -14
+            y: 24
+            text: ""
+            text_font: font_body
+            text_color: ${media_time_color}
+
+        # Long titles are cut with an ellipsis rather than scrolled. A scrolling
+        # label repaints for as long as it is on screen, which is exactly the
+        # kind of always-on cost this project keeps taking back out.
+        - label:
+            id: media_title
+            align: TOP_LEFT
+            x: 14
+            y: 62
+            width: 292
+            long_mode: DOT
+            text: "${media_idle_text}"
+            text_font: font_body
+            text_color: ${media_title_color}
+        - label:
+            id: media_artist
+            align: TOP_LEFT
+            x: 14
+            y: 86
+            width: 292
+            long_mode: DOT
+            text: ""
+            text_font: font_body
+            text_color: ${media_artist_color}
+
+        - bar:
+            id: media_bar
+            align: TOP_MID
+            y: 120
+            width: 292
+            height: 6
+            min_value: 0
+            max_value: 1000
+            value: 0
+            bg_color: ${media_bar_bg_color}
+            bg_opa: COVER
+            indicator:
+              bg_color: ${media_bar_fg_color}
+              bg_opa: COVER
+        - label:
+            id: media_elapsed
+            align: TOP_LEFT
+            x: 14
+            y: 132
+            text: ""
+            text_font: font_body
+            text_color: ${media_time_color}
+        - label:
+            id: media_total
+            align: TOP_RIGHT
+            x: -14
+            y: 132
+            text: ""
+            text_font: font_body
+            text_color: ${media_time_color}
+
+        # The controls act on the WATCHED PLAYER, through Home Assistant - this
+        # box is not necessarily the thing making the noise.
+        - button:
+            align: BOTTOM_MID
+            x: -80
+            y: -14
+            width: 76
+            height: 56
+            radius: ${media_button_radius}
+            bg_color: ${media_button_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - homeassistant.service:
+                  service: media_player.media_previous_track
+                  data:
+                    entity_id: ${media_entity}
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F04AE"
+                  text_font: font_media_icon
+                  text_color: ${media_button_icon_color}
+        - button:
+            align: BOTTOM_MID
+            x: 0
+            y: -14
+            width: 76
+            height: 56
+            radius: ${media_button_radius}
+            bg_color: ${media_button_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - homeassistant.service:
+                  service: media_player.media_play_pause
+                  data:
+                    entity_id: ${media_entity}
+            widgets:
+              - label:
+                  id: media_btn_play_icon
+                  align: CENTER
+                  text: "\U000F040A"
+                  text_font: font_media_icon
+                  text_color: ${media_button_icon_color}
+        - button:
+            align: BOTTOM_MID
+            x: 80
+            y: -14
+            width: 76
+            height: 56
+            radius: ${media_button_radius}
+            bg_color: ${media_button_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - homeassistant.service:
+                  service: media_player.media_next_track
+                  data:
+                    entity_id: ${media_entity}
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F04AD"
+                  text_font: font_media_icon
+                  text_color: ${media_button_icon_color}

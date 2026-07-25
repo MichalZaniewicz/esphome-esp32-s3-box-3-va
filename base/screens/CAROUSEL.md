@@ -13,6 +13,12 @@ left or right swipe, wrapping at the ends.
                  (nothing here yet)       (swipe UP, belongs to home)
 ```
 
+One is written already: [`media.yaml`](media.yaml), the media screen - what is
+playing on any Home Assistant player, with previous / play-pause / next. It is
+also the worked example of a carousel screen that has something to TAP, which
+changes one thing about the template below: see the note on the transparent
+button in that file.
+
 ## Adding a screen
 
 1. Copy [`carousel-example.yaml`](carousel-example.yaml) to a new file, e.g.
