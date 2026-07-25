@@ -1,0 +1,80 @@
+# Devil - horns, a flame, and no hurry whatsoever.
+#
+# The artwork keeps the eyebrows and the nose. It also keeps the eye SHADOW -
+# two soft blocks under the brows at x 146..162 and 165..184, y 80..96 - and
+# that shadow is the most useful landmark on the face: it is exactly where the
+# eyes were, so the eyes go in its lower half rather than anywhere the general
+# proportions of a face would suggest.
+#
+# Usage: `assistant: devil` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/devil.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/devil.png
+
+  face_color: '0xFFF3E6'
+  face_mouth_color: '0xA83246'
+  face_pupil_color: '0x3D1C31'
+  # The flame on her head, which is the one thing on this artwork that already
+  # means "something is wrong" before anything moves.
+  face_alarm_color: '0xF26B21'
+
+  # Face: x 145..184, chin at y 118. Landmarks: brows at y 78..84, eye shadow
+  # under them at y 80..96, nose at x 161..172, y 99..104. So the eyes sit in
+  # the shadow at y 90 and the mouth below the nose at y 109.
+  #
+  # The axis is 167, not 160: the face sits right of frame centre. The nose and
+  # the gap between the shadow blocks put it at 165, and it is two pixels right
+  # of that because the eyes read better there - the mouth comes along, which is
+  # fine, it still lands under the nose.
+  face_center_x: '7'
+  face_eye_offset: '10'
+  face_eye_y: '-30'
+  face_eye_w: '12'
+  face_eye_h: '9'
+  face_mouth_y: '-8'
+  face_mouth_w: '9'
+  face_mouth_h: '3'
+
+  face_pupil_w: '5'
+  face_pupil_h: '6'
+  face_pupil_radius: '2'
+  face_pupil_dilate: '2'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '3'
+
+  face_eye_h_wide: '11'
+  face_eye_h_think: '9'
+  face_eye_h_narrow: '4'
+  face_eye_h_shut: '2'
+  face_mouth_open_h: '7'
+  face_mouth_small_w: '6'
+  face_mouth_think_w: '5'
+  face_mouth_o_w: '6'
+  face_mouth_o_h: '6'
+  face_mouth_alarm_w: '11'
+  face_mouth_alarm_h: '8'
+  face_mouth_error_w: '6'
+  face_listen_pulse: '2'
+  face_shake_dx: '3'
+  face_tick: 120ms
+  face_eye_radius: '4'
+  face_mouth_radius: '2'

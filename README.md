@@ -74,7 +74,7 @@ decision, switching between them is not. Artwork characters only. Details:
 
 ### The cast
 
-Twenty-seven of them, and they are not one face on twenty-seven bodies: the
+Twenty-eight of them, and they are not one face on twenty-eight bodies: the
 eyes, the colours, the range of every expression and in ten cases the entire way of
 being on screen belong to the character. Name any of them in lower case.
 
@@ -172,6 +172,10 @@ being on screen belong to the character. Name any of them in lower case.
     <td><h3>Mandrake</h3>A root that climbed out of the pot and stayed. Sleepy under its leaves, slow to open its eyes, and quietly pleased to be indoors where it is warm.</td>
   </tr>
   <tr>
+    <td width="290"><img src="base/assets/demo/demo-devil.gif" width="272" alt="Devil"></td>
+    <td><h3>Devil</h3>The thermostat answers to her now, and so, increasingly, does everyone else. Grants your timers rather than sets them, and has firm views on how warm a kitchen ought to be kept.</td>
+  </tr>
+  <tr>
     <td width="290"><img src="base/assets/demo/demo-willow.gif" width="272" alt="Willow"></td>
     <td><h3>Willow</h3>Runs the house the way a forest runs itself: slowly, and without being asked twice. Sets your timers, dims your lamps, and gently implies that the plants were managing all of this long before the wifi.</td>
   </tr>
@@ -238,7 +242,8 @@ base/
     genie, flare, rhea,
     rufus, agnes, kacpro,
     hacker, mandrake,
-    spike, willow, nyx
+    spike, willow, nyx,
+    devil
     picker.yaml            # optional: an "Assistant" select, four to switch between
     aura, bit, iris,       # these draw themselves, no artwork at all
     crt, kitt, nixie,

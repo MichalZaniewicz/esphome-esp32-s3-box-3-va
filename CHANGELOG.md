@@ -271,6 +271,10 @@ their alarm, the touchscreen, the home screen and the animated character.
   characters' numbers, and a hand-copied table would drift the first time
   somebody nudged an eye.
 
+- **`devil`**, taking the cast to 28. Her artwork kept the eye SHADOW as well
+  as the brows and the nose, and that shadow is what places the eyes: it is
+  where they were, so it beats any proportion of a face in general. Her face
+  also sits right of frame centre, which is what `face_center_x` is for.
 - **Two more characters** - `willow` and `nyx` - taking the cast to 27. Both are
   emblem-style vector art with the face taken out, and both were measured rather
   than guessed, which took three attempts to learn. What settles a placement is
