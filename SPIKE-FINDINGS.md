@@ -4,66 +4,88 @@ Branch `audio-stack`, measured on hardware 2026-07-26 against
 [n-IA-hane/esphome-audio-stack](https://github.com/n-IA-hane/esphome-audio-stack)
 `v2026.7.0`, ESPHome 2026.7.1.
 
-**Verdict: not usable yet. The component initialises on this board, and then
-plays nothing.** The half-duplex arrangement in `base/core.yaml` stays.
+**Verdict: it works, and the BOX-3 has the hardware echo reference this needs.**
+Full duplex on the shared bus, audio out of the speaker, and a reference channel
+captured in the same TDM frame as the microphones. Nothing has been migrated
+yet; `base/core.yaml` is untouched.
 
-## What works
+## The answer this spike was built to get
 
-- **Both codecs are found and driven.** `esp_codec_dev backend ready
-  (rx_codec=ES7210, tx_codec=ES8311)`, on the BOX-3's shared I2S bus with our
-  own pinout (MCLK 2, BCLK 17, LRCLK 45, DIN 16, DOUT 15).
-- **The stack reaches `running`** in both topologies: standard I2S, and TDM with
-  a hardware reference (`TX/RX TDM channel initialized`, `TDM mode: 4 slots,
-  mic_slot=0, ref_slot=2, mask=0xf`, `Audio task started (tdm=YES/ref)`).
-- **The TDM slot sensors publish**, so the diagnostic path the component
-  advertises for bring-up does what it says.
+**Yes, and it is slot 1.**
 
-## What does not
+The test that settles it is the amplifier: switch it off, so the room hears
+nothing, and play. Then the only thing that can still move a channel is an
+electrical path.
 
-- **No sound comes out, in either topology.** Tested with the amplifier enable
-  held high, the media player at volume 1.0, and eight bursts of the 180 ms wake
-  sound: nothing audible, twice, once per topology. Everything logs success
-  while the room stays silent.
-- Since nothing plays, **the question this spike existed to answer could not be
-  answered**: which TDM slot carries the DAC feedback. The levels measured
-  (slot 0 and slot 2 identical to within 0.1 dB, slot 1 about 26 dB lower, slot
-  3 at the noise floor around -85 dB) are consistent with microphones picking up
-  room noise and nothing else. With no playback there is no reference to find.
+| slot | quiet | tone, amplifier OFF |
+|---|---|---|
+| 0 | -42.5 dB | -41.7 dB |
+| 1 | -59.3 dB | **-0.9 dB** |
+| 2 | -42.4 dB | -41.1 dB |
+| 3 | -82.5 dB | -82.6 dB |
 
-## The one configuration fact worth keeping
+Slots 0 and 2 are the microphones: with the amplifier off they do not move,
+and with it on they rise together by 8 to 10 dB, which is the room hearing the
+speaker. Slot 3 sits at the noise floor throughout. Slot 1 jumps nearly sixty
+decibels to almost full scale **while the speaker is silent**, which only a DAC
+feedback line can do.
 
-**32 bits at 48 kHz kills it.** The first attempt used
-`bits_per_sample: 32`, `slot_bit_width: 32`, `sample_rate: 48000` with four TDM
-slots, taken from the component's topology 6.3 example. That fails during
-`setup()`: the I2S hardware ends in `ERROR`, and every later start refuses with
-`Cannot enable I2S from error state` / `Failed to start I2S`.
+Set `tdm_ref_slot: 1` and the stack confirms it: `TDM hardware reference -
+slot 1 is echo ref`, `Audio task started (tdm=YES/ref)`, and the runtime state
+alternates `mic` / `duplex` around each playback.
 
-The same topology at **16 bits, 16 kHz, `slot_bit_width: 16`** sets up cleanly.
-So a report of "6.3 does not work" would be wrong; it is that combination.
+## Two configuration facts that cost the evening
 
-## Two things that cost an hour, so they are written down
+Both were mine, not the component's. It reported no error for either.
 
-**Setup-time logs are invisible over the network.** The API server starts after
-`setup()`, so the error that put the audio stack into its error state never
-reaches an API log subscription - the first thing visible is the refusal, long
-after the cause. Reading it needs USB serial.
+**32 bits at 48 kHz kills the I2S init.** The topology 6.3 example uses
+`bits_per_sample: 32` with `slot_bit_width: 32`. On this board that fails inside
+`setup()`, and every later start refuses with `Cannot enable I2S from error
+state` / `Failed to start I2S`. **16 bits in 16-bit slots works.**
 
-**`esphome logs --device COM8` fails on Windows** with `FileNotFoundError`
-raised out of `subprocess`. Reading the port directly with pyserial works and is
-what produced everything above:
+**A 16 kHz bus plays nothing, silently.** With `sample_rate: 16000` the speaker
+platform still declares 48 kHz, the log says `rate_conversion=1x`, and the
+result is a device that logs a healthy playback and makes no sound at all. Set
+the bus to 48 kHz - `rate_conversion=3x` appears, and so does the audio. This
+cost two hours and one wrong conclusion, which is why it is written down.
 
+Working combination, all four values together:
+
+```yaml
+sample_rate: 48000        # the bus, and what the speaker is fed
+output_sample_rate: 16000 # what the microphone hands to the AFE
+bits_per_sample: 16
+slot_bit_width: 16
+use_tdm_reference: true
+tdm_total_slots: 4
+tdm_mic_slot: 0
+tdm_ref_slot: 1           # measured, see above
+tdm_tx_slot: 0
 ```
-python serialread.py COM8 boot.log 35     # then reboot the device
-```
 
-## If this is picked up again
+## Two tooling lessons
 
-1. Ask the component's author whether ES8311 output is expected to work on a
-   shared bus at all, and whether TDM TX to a mono DAC is supported - quoting the
-   log lines above, which show a healthy init and a silent speaker.
-2. If output can be made to work, the rest follows quickly: the slot question is
-   one measurement, and a hardware reference would buy barge-in and echo
-   cancellation, neither of which this project has today.
-3. What full duplex would remove from `base/core.yaml`: stopping the wake word
-   before the beep, the wait for `not speaker.is_playing`, the
-   `wake_start_pending` window, and the amplifier cut for External replies.
+**Setup-time logs never reach the network.** The API server starts after
+`setup()`, so the error that put the audio stack into its error state was
+invisible to every API log subscription - the first thing visible was the
+refusal, long after the cause. USB serial is the only way to read it, and on the
+BOX-3 the data port is the USB-C **on the module**, not the one on the dock.
+
+**`esphome logs --device COM8` is broken on Windows**, raising
+`FileNotFoundError` out of `subprocess`. Reading the port directly with pyserial
+works and produced every boot log quoted here.
+
+## What migrating would buy, and what it would cost
+
+Buy: barge-in and echo cancellation, neither of which this project has today,
+plus the removal of everything `base/core.yaml` does to keep one bus half
+duplex - stopping the wake word before the beep, waiting for `not
+speaker.is_playing`, the `wake_start_pending` window, and cutting the amplifier
+for External replies.
+
+Cost: sixteen references to `box_mic`, `box_speaker` and `speaker_media_player`
+in the core, and they carry the most expensive lessons in the repository. That
+is a branch with a full re-test, not a refactor along the way.
+
+Still unmeasured: whether AEC actually cancels well enough to wake the box while
+it is talking. That needs a voice test, not a tone.

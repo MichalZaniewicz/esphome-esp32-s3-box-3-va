@@ -43,10 +43,11 @@
 #     the 6.3 topology does not apply, and the migration is not worth doing:
 #     stay on the current arrangement.
 #
-# `tdm_ref_slot` below is a GUESS (2). Correct it once the sensors have spoken;
-# the component validates only that it differs from the mic slot and fits inside
-# `tdm_total_slots`, so a wrong guess reads as "that slot never moves" rather
-# than as an error.
+# ODPOWIEDZ, zmierzona 2026-07-26: TAK, referencja jest, i siedzi na SLOCIE 1.
+# Rozstrzyga test z wylaczonym wzmacniaczem: mikrofony (sloty 0 i 2) nie drgaja,
+# bo w pokoju nie ma dzwieku, a slot 1 skacze z -59 dB do -0.9 dB. Sygnal, ktory
+# pojawia sie przy odtwarzaniu i nie potrzebuje powietrza, jest sprzezeniem
+# elektrycznym z DAC. Slot 3 lezy na podlodze szumu, -82 dB, zawsze.
 # =============================================================================
 
 substitutions:
@@ -128,10 +129,13 @@ esp_afe:
 esp_audio_stack:
   id: audio_stack
   processor_id: afe_processor
+  # ZMIERZONE, nie przepisane z przykladu. 32 bity przy 48 kHz wykladaja
+  # inicjalizacje I2S jeszcze w setup(); 16 kHz na szynie daje cisze, bo
+  # material 48 kHz idzie wtedy bez konwersji. Ta para dziala.
   sample_rate: 48000
   output_sample_rate: 16000
-  bits_per_sample: 32
-  slot_bit_width: 32
+  bits_per_sample: 16
+  slot_bit_width: 16
 
   i2s_mclk_pin: ${i2s_mclk}
   i2s_bclk_pin: ${i2s_bclk}
@@ -142,7 +146,7 @@ esp_audio_stack:
   use_tdm_reference: true
   tdm_total_slots: 4
   tdm_mic_slot: 0
-  tdm_ref_slot: 2          # GUESS - this is what the sensors are here to settle
+  tdm_ref_slot: 1          # ZMIERZONE 2026-07-26 na sprzecie
   tdm_tx_slot: 0
 
   codec:
