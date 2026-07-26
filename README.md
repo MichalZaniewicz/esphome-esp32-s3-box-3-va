@@ -262,6 +262,8 @@ scripts/
                            #   their generators? fails if one was hand-edited
   gen/                     # the generators for crt, kitt, nixie, pixel,
                            #   rain, scope, vu - edit these, not the YAML
+  gen_media.py             # redraws base/assets/media.png from the media
+                           #   screen's own coordinates, colours and fonts
   esplog.py                # stream device logs over the native API
   flash.py                 # compile + OTA, but refuses to upload if the SSID
                            #   compiled into main.cpp looks like a placeholder
@@ -314,6 +316,13 @@ as tap tiles (microphone, wake sound, and where replies come out) plus a volume
 slider, each state told by shape and colour so it reads at a glance:
 
 <p align="center"><img src="base/assets/settings.png" width="300" alt="Settings screen"></p>
+
+The **media screen** is **one swipe sideways** from home - cover art fetched and
+decoded on the device, title and artist on one line each, a progress bar that
+advances between Home Assistant's occasional updates, and three controls that dim
+themselves when the player does not support them:
+
+<p align="center"><img src="base/assets/media.png" width="300" alt="Media screen"></p>
 
 Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
 clock, and the character idling. **Tap the screen to swap between them** -
