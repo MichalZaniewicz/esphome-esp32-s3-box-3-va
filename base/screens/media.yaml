@@ -147,6 +147,24 @@ text_sensor:
     entity_id: ${media_entity}
     internal: true
     on_value:
+      # THE LOCAL CLOCK MUST ONLY RUN WHILE THE TRACK DOES. It used to run from
+      # the moment Home Assistant last mentioned a position, whatever happened
+      # afterwards - so the minutes a player spent paused or idle were added to
+      # the position as if it had been playing, and the first track after a gap
+      # opened with the bar hard against the right edge, frozen there by the
+      # clamp. Pausing fixed it only because that made Home Assistant restate
+      # the real position.
+      #
+      # So: entering `playing` starts the clock, leaving it folds however much
+      # ran into the base and stops it.
+      - lambda: |-
+          const bool now_playing = id(media_state).state == "playing";
+          if (now_playing) {
+            if (id(media_pos_at) == 0) id(media_pos_at) = millis();
+          } else if (id(media_pos_at) != 0) {
+            id(media_pos_base) += (millis() - id(media_pos_at)) / 1000.0f;
+            id(media_pos_at) = 0;
+          }
       - script.execute: media_refresh
   - platform: homeassistant
     id: media_title_src
@@ -154,6 +172,12 @@ text_sensor:
     attribute: media_title
     internal: true
     on_value:
+      # A new track starts at zero, and Home Assistant can take a moment to say
+      # so. Count from nothing until it does, rather than from where the last
+      # one finished.
+      - lambda: |-
+          id(media_pos_base) = 0.0f;
+          id(media_pos_at) = id(media_state).state == "playing" ? millis() : 0;
       - script.execute: media_refresh
   - platform: homeassistant
     id: media_artist_src
@@ -184,7 +208,9 @@ sensor:
     on_value:
       - lambda: |-
           id(media_pos_base) = std::isnan(x) ? 0.0f : x;
-          id(media_pos_at) = millis();
+          // Anchored only while playing. Anchoring it paused too would mean the
+          // pause itself gets added to the position the moment playback resumes.
+          id(media_pos_at) = id(media_state).state == "playing" ? millis() : 0;
       - script.execute: media_refresh
   - platform: homeassistant
     id: media_duration_src
@@ -455,12 +481,20 @@ lvgl:
         # Long titles are cut with an ellipsis rather than scrolled. A scrolling
         # label repaints for as long as it is on screen, which is exactly the
         # kind of always-on cost this project keeps taking back out.
+        #
+        # THE HEIGHT IS WHAT MAKES DOT MEAN ONE LINE. Left to grow on its own a
+        # DOT label wraps first and only dots the last line it has room for, so
+        # a two-line title grew downwards into the artist underneath it - the
+        # rows are 24 px apart and a wrapped 16 px title needs about 40. Pinning
+        # the height to a single row moves the ellipsis back onto line one.
+        # 22 px, not 20: the glyphs are 16 px, the line box a little more.
         - label:
             id: media_title
             align: TOP_LEFT
             x: 120
             y: 40
             width: 186
+            height: 22
             long_mode: DOT
             text: "${media_idle_text}"
             text_font: font_body
@@ -471,6 +505,7 @@ lvgl:
             x: 120
             y: 64
             width: 186
+            height: 22
             long_mode: DOT
             text: ""
             text_font: font_body
