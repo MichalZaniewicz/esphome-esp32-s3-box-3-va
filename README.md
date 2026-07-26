@@ -8,11 +8,11 @@ one thin config file you actually edit.
 
 > **Status: running on an ESP32-S3-BOX-3.** Wake word, the full Assist pipeline,
 > voice timers with their alarm, the touchscreen, the animated character, the
-> home, settings, media and weather screens are all confirmed on device with
-> ESPHome 2026.7.1. The shipped thin config - core plus one character - measures
-> **flash 25.3%, RAM 39.9%**; the author's own, with four characters for the
-> picker plus the media, weather and home-style screens, measures 33.5% and
-> 41.7%. Artwork is what costs: 150 KB per character.
+> home, settings, media, weather and thermostat screens are all confirmed on
+> device with ESPHome 2026.7.1. The shipped thin config - core plus one
+> character - measures **flash 25.3%, RAM 39.9%**; the author's own, with four
+> characters for the picker plus every optional screen, measures 33.8% and
+> 42.3%. Artwork is what costs: 150 KB per character.
 > [CHANGELOG.md](CHANGELOG.md) has the detail, including what turned out to be
 > wrong along the way.
 
@@ -167,7 +167,7 @@ being on screen belong to the character. Name any of them in lower case.
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-hacker.gif" width="272" alt="hacker"></td>
-    <td><h3>hacker</h3>Perfectly helpful, perfectly polite, and already inside the network. Knows every device in the house by name, mentions this more often than strictly necessary, and has read your automations.</td>
+    <td><h3>Hacker</h3>Perfectly helpful, perfectly polite, and already inside the network. Knows every device in the house by name, mentions this more often than strictly necessary, and has read your automations.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-mandrake.gif" width="272" alt="Mandrake"></td>
@@ -271,6 +271,7 @@ scripts/
   gen_media.py             # redraws base/assets/media.png from the media
                            #   screen's own coordinates, colours and fonts
   gen_weather.py           # the same for base/assets/weather.png
+  gen_climate.py           # the same for base/assets/climate.png
   esplog.py                # stream device logs over the native API
   flash.py                 # compile + OTA, but refuses to upload if the SSID
                            #   compiled into main.cpp looks like a placeholder
@@ -317,6 +318,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `settings.yaml` | The device's own switches as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output` toggle and a volume slider. Reached one swipe down from home (`idle_page_above: page_settings`). The on and off states differ in shape, not only colour, so the screen reads at a glance; the icons are the handful of Material Design glyphs actually used, downloaded at compile time. |
 | `media.yaml` | What is playing on any Home Assistant media player - title, artist, a progress bar and previous / play-pause / next as tap buttons. A **carousel screen**: one swipe left or right from home. It follows `external_media_player_id` on its own, so a room with one speaker names it once; set `media_entity` only when the screen should watch something else - a TV, another room, or the box's own player, `media_player.<name>_<friendly_name>` slugified. Where Music Assistant and the Cast integration both publish a speaker, pick the Music Assistant one: the raw Cast entity offers no previous/next and no track length. The bar advances locally between Home Assistant's occasional position updates, and only while the page is on screen. |
 | `weather.yaml` | Current conditions big - icon, temperature, humidity and wind - over a forecast row of up to seven days, each with its own icon and high/low. A **carousel screen**: one swipe sideways from home. Current conditions come straight from a `weather` entity; the forecast needs a small helper in Home Assistant, because since 2024.4 a forecast lives only in a service response and a device cannot read one. The screen draws a column per day it is given and centres them, so a five-day integration and a ten-day one both look deliberate. |
+| `climate.yaml` | A thermostat: the target temperature large, the room's own below it, a flame that lights only while the device is actually heating, two arrows and a row of mode buttons. A **carousel screen**: one swipe sideways from home. Needs nothing in Home Assistant - the step, the limits and the list of modes are all attributes, so the row has three buttons on a TRV and six on an air conditioner without being told. Taps move the number at once and call Home Assistant after, because a thermostat is tapped in bursts. |
 | `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 32 looks for the home screen (fonts, colours, gradient backgrounds, layouts and a temperature/humidity dashboard) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 
 The **settings screen** is **one swipe down** from home - the device's own switches
@@ -340,6 +342,12 @@ produces it in a dozen lines - and without one the current conditions work on
 their own:
 
 <p align="center"><img src="base/assets/weather.png" width="300" alt="Weather screen"></p>
+
+The **thermostat screen** is the third of them, and the only one you can argue
+with. Two arrows, a row of modes built from whatever the device says it has, and
+a flame that lights when it is genuinely heating rather than merely willing to:
+
+<p align="center"><img src="base/assets/climate.png" width="300" alt="Thermostat screen"></p>
 
 Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
 clock, and the character idling. **Tap the screen to swap between them** -

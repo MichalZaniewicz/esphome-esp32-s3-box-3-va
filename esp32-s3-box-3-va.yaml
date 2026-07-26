@@ -61,6 +61,29 @@ substitutions:
   room_hum_entity: sensor.room_humidity
   outdoor_temp_entity: sensor.outdoor_temperature
 
+  # --- Carousel screens, all optional ------------------------------------------
+  # Uncomment a package under `files:` below AND its entity here. A screen joins
+  # the sideways carousel by being installed, in the order it appears in that
+  # list; home is always first. Nothing here needs a helper in Home Assistant
+  # except the weather forecast, and that one says so.
+  #
+  # Media: what is playing, with cover art and transport buttons. It follows
+  # `external_media_player_id` on its own, so a room with one speaker needs
+  # nothing here. Name a different player only if the screen should watch
+  # something other than where the replies come out.
+  # media_entity: media_player.living_room
+  # media_ha_base_url: "http://homeassistant.local:8123"   # cover art; the BOX
+  #                                                        # has to reach this
+  #
+  # Weather: current conditions large, over up to seven days.
+  # weather_entity: weather.forecast_home
+  # weather_forecast_entity: sensor.weekly_forecast   # needs a template sensor;
+  #                                                   # see the package header
+  #
+  # Thermostat: target and current temperature, two arrows, three modes. Reads
+  # its step and limits off the entity, so there is nothing else to set.
+  # climate_entity: climate.living_room
+
 packages:
   core:
     url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
@@ -69,6 +92,11 @@ packages:
       - base/core.yaml
       - base/screens/home.yaml        # optional: clock, date, climate
       - base/screens/settings.yaml    # optional: settings, one swipe down from home
+    # - base/screens/media.yaml       # optional: what is playing, one swipe sideways
+    # - base/screens/weather.yaml     # optional: now and the week, next along
+    # - base/screens/climate.yaml     # optional: the thermostat, next along
+    # - base/screens/home-styles.yaml # optional: 32 looks for the home screen,
+    #                                 #   switched live from Home Assistant
       - base/faces/${assistant}.yaml  # the assistant; it pulls in what it needs
     # - base/faces/picker.yaml        # optional: switch character from HA, see above
       - base/lang/${language}.yaml    # keep the language last

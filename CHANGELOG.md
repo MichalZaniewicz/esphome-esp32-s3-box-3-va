@@ -280,6 +280,30 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Added
 
+- **A thermostat screen** (`base/screens/climate.yaml`): the target temperature
+  large, the room's own under it, a flame that lights only while `hvac_action`
+  is actually `heating`, two arrows and a row of mode buttons.
+
+  It needs nothing set up in Home Assistant. The step, the limits and the list
+  of modes are attributes, so `min_temp`, `max_temp`, `target_temp_step` and
+  `hvac_modes` are read rather than configured: the row draws three buttons for
+  a TRV and six for an air conditioner that also offers cool, dry and fan_only,
+  hides the rest and centres what is left. The buttons are slots - which mode
+  each one commands is decided at runtime - and a mode outside Home Assistant's
+  vocabulary still gets one, labelled with its raw name, because a mode we
+  cannot spell is still one the device will accept.
+
+  **Taps are optimistic and that is deliberate.** The number moves immediately
+  and Home Assistant is called afterwards. A round trip takes the better part of
+  a second and a thermostat is tapped in bursts, so a screen that only drew what
+  came back would drop two taps in three. The local value stands for three
+  seconds and is then handed back to whatever Home Assistant reports, which is
+  also what corrects it when a call fails or somebody moves the same dial from
+  their phone. Values are snapped to the device's own step grid, so an odd
+  starting point like 20.3 walks 20.5 and 21.0 rather than 20.8.
+
+  Cost: 23 KB, taking the author's build to 33.8% of flash.
+
 - **A weather screen** (`base/screens/weather.yaml`), another carousel screen:
   current conditions large - icon, temperature, humidity, wind - over a row of up
   to seven days with their own icons and high/low.

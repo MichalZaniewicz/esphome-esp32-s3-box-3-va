@@ -1,0 +1,627 @@
+###############################################################################
+# Thermostat screen: the temperature you asked for, the one you have, and the
+# modes the device says it has.
+#
+# An OPTIONAL carousel screen. Add it to your thin config's `files:` list AFTER
+# base/screens/home.yaml - its position in that list is its position on the
+# ring - and point it at a climate entity:
+#
+#   substitutions:
+#     climate_entity: climate.kitchen
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/screens/climate.yaml   # <- one swipe left or right from home
+#
+# NOTHING HAS TO BE SET UP IN HOME ASSISTANT. Unlike the weather forecast, a
+# climate entity carries everything in plain attributes: the target and current
+# temperatures, the step, the limits, and whether it is heating right now.
+#
+# THE SCREEN IS OPTIMISTIC ON PURPOSE. A tap moves the number immediately and
+# calls Home Assistant afterwards, instead of waiting to be told what happened.
+# Home Assistant takes the better part of a second to answer, and a thermostat
+# is tapped in bursts - three times up, quickly - so a screen that only drew
+# what came back would drop two taps out of three and feel broken. The local
+# value stands for `climate_settle` and is then handed back to whatever Home
+# Assistant reports, which is also what corrects it if the call failed or if
+# somebody moved the same dial from their phone.
+#
+# THE LIMITS, THE STEP AND THE MODES ALL COME FROM THE DEVICE, not from this
+# file. `min_temp`, `max_temp`, `target_temp_step` and `hvac_modes` are
+# attributes, so a TRV that takes whole degrees between 7 and 30 and offers
+# auto/heat/off is respected without configuration, and so is an air
+# conditioner that adds cool, dry and fan_only - it simply gets more buttons.
+###############################################################################
+
+substitutions:
+  # The thermostat to show. Anything in the `climate` domain that reports a
+  # target temperature.
+  climate_entity: climate.home
+
+  # THE MODE BUTTONS ARE NOT CONFIGURED, THEY ARE READ. `hvac_modes` is an
+  # attribute, so the row is built from what the device actually advertises: a
+  # TRV offers auto/heat/off, an air conditioner adds cool, dry and fan_only, a
+  # heat pump adds heat_cool. Whatever arrives gets a button, up to five, and
+  # the row is centred on what is left.
+  #
+  # These are only the labels. Home Assistant's mode names are fixed vocabulary
+  # and are what the service is called with; a language package overrides the
+  # words without touching the names.
+  climate_text_auto: "Auto"
+  climate_text_heat: "Heat"
+  climate_text_cool: "Cool"
+  climate_text_dry: "Dry"
+  climate_text_fan_only: "Fan"
+  climate_text_heat_cool: "Auto"
+  climate_text_off: "Off"
+
+  # Buttons at most. Five 60 px buttons and their gaps fill 320 px exactly; a
+  # device offering more than five modes shows the first five it advertised.
+  climate_modes_max: '5'
+
+  # How long a tapped value stands before Home Assistant's own number wins.
+  # Long enough to cover a slow round trip, short enough that a failed call
+  # does not leave a lie on the screen.
+  climate_settle: '3000'
+
+  climate_bg_color: '0x000000'
+  climate_target_color: '0xFFFFFF'
+  climate_now_color: '0x8FA6C0'
+  climate_action_color: '0xFF8A3D'
+  climate_idle_color: '0x5A6B80'
+  climate_button_color: '0x161A22'
+  climate_button_icon_color: '0xEAF2FF'
+  climate_mode_color: '0x161A22'
+  climate_mode_on_color: '0x2FA8E0'
+  climate_mode_text_color: '0x8FA6C0'
+  climate_mode_text_on_color: '0x08131C'
+  climate_button_radius: '10'
+  climate_temp_suffix: "°"
+  climate_idle_text: "No thermostat"
+
+font:
+  - id: font_climate_icon
+    file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    size: 34
+    bpp: 4
+    glyphs:
+      - "\U000F0374"   # minus
+      - "\U000F0415"   # plus
+      - "\U000F0238"   # fire, shown only while it is actually heating
+  # Digits only, like the weather screen: a glyphset at this size would cost
+  # more than everything else here put together.
+  - id: font_climate_temp
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 500
+    size: 56
+    glyphs: "-.0123456789°"
+  - id: font_climate_small
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 400
+    size: 15
+    glyphsets:
+      - ${font_glyphsets}
+
+globals:
+  # What the screen currently claims the target is, and when it started
+  # claiming it. Zero in `climate_at` means "not claiming anything, show
+  # whatever Home Assistant last said".
+  - id: climate_local
+    type: float
+    restore_value: false
+    initial_value: "0.0f"
+  - id: climate_at
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  # Which mode each button currently commands. Written when the row is built,
+  # read when one is tapped - the buttons are slots, not fixed modes.
+  - id: climate_slot_1
+    type: std::string
+    restore_value: false
+  - id: climate_slot_2
+    type: std::string
+    restore_value: false
+  - id: climate_slot_3
+    type: std::string
+    restore_value: false
+  - id: climate_slot_4
+    type: std::string
+    restore_value: false
+  - id: climate_slot_5
+    type: std::string
+    restore_value: false
+
+text_sensor:
+  - platform: homeassistant
+    id: climate_mode_src
+    entity_id: ${climate_entity}
+    internal: true
+    on_value:
+      - script.execute: climate_refresh
+  # Arrives the way Python prints a list: "['auto', 'heat', 'off']". Parsed
+  # below, quotes, brackets and all.
+  - platform: homeassistant
+    id: climate_modes_src
+    entity_id: ${climate_entity}
+    attribute: hvac_modes
+    internal: true
+    on_value:
+      - script.execute: climate_refresh
+  # `idle`, `heating`, `off` - what the device is DOING, as opposed to what it
+  # was told to do. The only honest source for "is it on right now".
+  - platform: homeassistant
+    id: climate_action_src
+    entity_id: ${climate_entity}
+    attribute: hvac_action
+    internal: true
+    on_value:
+      - script.execute: climate_refresh
+
+sensor:
+  - platform: homeassistant
+    id: climate_target_src
+    entity_id: ${climate_entity}
+    attribute: temperature
+    internal: true
+    on_value:
+      # HOME ASSISTANT HAS THE LAST WORD, but only once the local value has had
+      # its moment. Accepting every update immediately would undo a tap the
+      # instant the previous state was republished.
+      - lambda: |-
+          if (id(climate_at) != 0 &&
+              (millis() - id(climate_at)) > ${climate_settle})
+            id(climate_at) = 0;
+      - script.execute: climate_refresh
+  - platform: homeassistant
+    id: climate_now_src
+    entity_id: ${climate_entity}
+    attribute: current_temperature
+    internal: true
+    on_value:
+      - script.execute: climate_refresh
+  - platform: homeassistant
+    id: climate_step_src
+    entity_id: ${climate_entity}
+    attribute: target_temp_step
+    internal: true
+  - platform: homeassistant
+    id: climate_min_src
+    entity_id: ${climate_entity}
+    attribute: min_temp
+    internal: true
+  - platform: homeassistant
+    id: climate_max_src
+    entity_id: ${climate_entity}
+    attribute: max_temp
+    internal: true
+
+script:
+  # One writer for the whole screen, and every write guarded: a thermostat
+  # republishes its state far more often than it changes.
+  - id: climate_refresh
+    mode: single
+    then:
+      - lambda: |-
+          char b[24];
+
+          // ---- the number ---------------------------------------------------
+          // The local value wins while it is fresh; see the header.
+          const float ha = id(climate_target_src).state;
+          const bool local = id(climate_at) != 0 &&
+                             (millis() - id(climate_at)) <= ${climate_settle};
+          const float target = local ? id(climate_local) : ha;
+
+          static float seen_target = -999.0f;
+          if (seen_target != target) {
+            seen_target = target;
+            if (std::isnan(target)) snprintf(b, sizeof(b), "--");
+            // Half a degree matters on a TRV and a trailing ".0" does not, so
+            // whole numbers are written whole.
+            else if (fabsf(target - roundf(target)) < 0.05f)
+              snprintf(b, sizeof(b), "%d${climate_temp_suffix}", (int) lroundf(target));
+            else
+              snprintf(b, sizeof(b), "%.1f${climate_temp_suffix}", target);
+            lv_label_set_text(id(climate_target), b);
+          }
+
+          // ---- what the room actually is -------------------------------------
+          const float now = id(climate_now_src).state;
+          static float seen_now = -999.0f;
+          if (seen_now != now) {
+            seen_now = now;
+            if (std::isnan(now)) b[0] = '\0';
+            else snprintf(b, sizeof(b), "%.1f${climate_temp_suffix}", now);
+            lv_label_set_text(id(climate_now), b);
+          }
+
+          // ---- heating, or merely willing to ----------------------------------
+          const std::string act = id(climate_action_src).state;
+          static std::string seen_act;
+          if (seen_act != act) {
+            seen_act = act;
+            const bool heating = act == "heating";
+            lv_obj_set_style_text_color(id(climate_flame),
+                lv_color_hex(heating ? ${climate_action_color} : ${climate_idle_color}),
+                LV_PART_MAIN);
+            // Hidden rather than dimmed when there is nothing to say at all.
+            if (act.empty() || act == "unknown" || act == "unavailable")
+              lv_obj_add_flag(id(climate_flame), LV_OBJ_FLAG_HIDDEN);
+            else
+              lv_obj_clear_flag(id(climate_flame), LV_OBJ_FLAG_HIDDEN);
+          }
+
+          // ---- the mode row, built from what the device offers -------------
+          // Not configured, read: `hvac_modes` is an attribute and the row is
+          // made of it. A TRV sends three, an air conditioner six. Slots beyond
+          // what arrived are hidden and the rest is centred, the same way the
+          // weather screen handles a forecast of unknown length.
+          const std::string mode = id(climate_mode_src).state;
+          const std::string modes = id(climate_modes_src).state;
+          static std::string seen_mode, seen_modes;
+          if (seen_mode != mode || seen_modes != modes) {
+            seen_mode = mode;
+            seen_modes = modes;
+
+            lv_obj_t *btns[] = {id(climate_btn_1), id(climate_btn_2), id(climate_btn_3),
+                                id(climate_btn_4), id(climate_btn_5)};
+            lv_obj_t *labels[] = {id(climate_lbl_1), id(climate_lbl_2), id(climate_lbl_3),
+                                  id(climate_lbl_4), id(climate_lbl_5)};
+            std::string *slots[] = {&id(climate_slot_1), &id(climate_slot_2),
+                                    &id(climate_slot_3), &id(climate_slot_4),
+                                    &id(climate_slot_5)};
+
+            // Home Assistant's own vocabulary. A name outside it still gets a
+            // button, labelled raw: a mode we cannot spell is still one the
+            // device will accept.
+            struct ModeText { const char *name; const char *text; };
+            static const ModeText TEXTS[] = {
+              {"auto",      "${climate_text_auto}"},
+              {"heat",      "${climate_text_heat}"},
+              {"cool",      "${climate_text_cool}"},
+              {"dry",       "${climate_text_dry}"},
+              {"fan_only",  "${climate_text_fan_only}"},
+              {"heat_cool", "${climate_text_heat_cool}"},
+              {"off",       "${climate_text_off}"},
+            };
+
+            const int maxn = ${climate_modes_max} > 5 ? 5 : ${climate_modes_max};
+            int n = 0;
+            size_t at = 0;
+            // Walk it quote to quote rather than splitting on commas, which
+            // saves caring about the spaces Python puts between them.
+            while (n < maxn) {
+              const size_t q1 = modes.find_first_of("'\"", at);
+              if (q1 == std::string::npos) break;
+              const size_t q2 = modes.find_first_of("'\"", q1 + 1);
+              if (q2 == std::string::npos) break;
+              const std::string name = modes.substr(q1 + 1, q2 - q1 - 1);
+              at = q2 + 1;
+              if (name.empty()) continue;
+
+              *slots[n] = name;
+              const char *text = name.c_str();
+              for (const auto &e : TEXTS)
+                if (name == e.name) { text = e.text; break; }
+              lv_label_set_text(labels[n], text);
+              n++;
+            }
+
+            const int w = 60, gap = 4;
+            const int start = (320 - (n * w + (n - 1) * gap)) / 2;
+            for (int i = 0; i < 5; i++) {
+              if (i < n) {
+                lv_obj_set_x(btns[i], start + i * (w + gap));
+                lv_obj_clear_flag(btns[i], LV_OBJ_FLAG_HIDDEN);
+                const bool on = mode == *slots[i];
+                lv_obj_set_style_bg_color(btns[i],
+                    lv_color_hex(on ? ${climate_mode_on_color} : ${climate_mode_color}),
+                    LV_PART_MAIN);
+                lv_obj_set_style_text_color(labels[i],
+                    lv_color_hex(on ? ${climate_mode_text_on_color}
+                                    : ${climate_mode_text_color}),
+                    LV_PART_MAIN);
+              } else {
+                lv_obj_add_flag(btns[i], LV_OBJ_FLAG_HIDDEN);
+              }
+            }
+          }
+
+  # Both arrows land here; `x` is +1 or -1. Kept as one script so the clamp and
+  # the optimistic update exist once.
+  - id: climate_nudge
+    mode: single
+    parameters:
+      dir: int
+    then:
+      - lambda: |-
+          const float ha = id(climate_target_src).state;
+          const bool local = id(climate_at) != 0 &&
+                             (millis() - id(climate_at)) <= ${climate_settle};
+          float base = local ? id(climate_local) : ha;
+          if (std::isnan(base)) return;
+
+          // The device's own numbers, with sane fallbacks for an entity that
+          // does not publish them.
+          float step = id(climate_step_src).state;
+          if (std::isnan(step) || step <= 0.0f) step = 0.5f;
+          float lo = id(climate_min_src).state, hi = id(climate_max_src).state;
+          if (std::isnan(lo)) lo = 5.0f;
+          if (std::isnan(hi)) hi = 35.0f;
+
+          float next = base + dir * step;
+          // Snap to the step grid: a target that arrived as 20.3 should walk
+          // 20.5, 21.0, not 20.8, 21.3.
+          next = roundf(next / step) * step;
+          if (next < lo) next = lo;
+          if (next > hi) next = hi;
+          if (fabsf(next - base) < 0.01f) return;   // already at the end stop
+
+          id(climate_local) = next;
+          id(climate_at) = millis();
+      - script.execute: climate_refresh
+      - homeassistant.service:
+          service: climate.set_temperature
+          data:
+            entity_id: ${climate_entity}
+          data_template:
+            temperature: !lambda return to_string(id(climate_local));
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/climate.yaml (thermostat ${climate_entity})"
+    - priority: -200
+      then:
+        - script.execute: climate_refresh
+
+lvgl:
+  pages:
+    - id: page_climate
+      skip: false                  # THIS is what puts the screen on the carousel
+      bg_color: ${climate_bg_color}
+      scrollbar_mode: "OFF"
+      on_swipe_left:
+        - script.execute: idle_swipe_left
+      on_swipe_right:
+        - script.execute: idle_swipe_right
+      widgets:
+        # Underneath the controls, so a swipe that starts on an empty part of
+        # the screen still moves the carousel. The buttons carry
+        # `gesture_bubble` so a swipe starting on one reaches the page too.
+        - button:
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+
+        - label:
+            id: climate_target
+            align: TOP_MID
+            y: 26
+            text: "--"
+            text_font: font_climate_temp
+            text_color: ${climate_target_color}
+        - label:
+            id: climate_now
+            align: TOP_MID
+            y: 96
+            text: ""
+            text_font: font_climate_small
+            text_color: ${climate_now_color}
+        - label:
+            id: climate_flame
+            align: TOP_MID
+            x: 0
+            y: 118
+            text: "\U000F0238"
+            text_font: font_climate_icon
+            text_color: ${climate_idle_color}
+            hidden: true
+
+        - button:
+            id: climate_btn_down
+            align: TOP_LEFT
+            x: 14
+            y: 34
+            width: 68
+            height: 68
+            radius: ${climate_button_radius}
+            bg_color: ${climate_button_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - script.execute:
+                  id: climate_nudge
+                  dir: -1
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0374"
+                  text_font: font_climate_icon
+                  text_color: ${climate_button_icon_color}
+        - button:
+            id: climate_btn_up
+            align: TOP_RIGHT
+            x: -14
+            y: 34
+            width: 68
+            height: 68
+            radius: ${climate_button_radius}
+            bg_color: ${climate_button_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - script.execute:
+                  id: climate_nudge
+                  dir: 1
+            widgets:
+              - label:
+                  align: CENTER
+                  text: "\U000F0415"
+                  text_font: font_climate_icon
+                  text_color: ${climate_button_icon_color}
+
+        # THE MODE BUTTONS ARE SLOTS, not modes. Which mode each one commands is
+        # decided at runtime from `hvac_modes` and kept in a global, so the same
+        # five buttons serve a three-mode TRV and a six-mode air conditioner.
+        # Unused ones are hidden and the row is centred on what is left.
+        #
+        # Positioned rather than aligned to BOTTOM_MID, because the script moves
+        # them sideways and an object cannot be both aligned and placed.
+        - button:
+            id: climate_btn_1
+            align: TOP_LEFT
+            x: 4
+            y: 178
+            width: 60
+            height: 48
+            radius: ${climate_button_radius}
+            bg_color: ${climate_mode_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            hidden: true
+            on_click:
+              - homeassistant.service:
+                  service: climate.set_hvac_mode
+                  data:
+                    entity_id: ${climate_entity}
+                  data_template:
+                    hvac_mode: !lambda return id(climate_slot_1);
+            widgets:
+              - label:
+                  id: climate_lbl_1
+                  align: CENTER
+                  text: ""
+                  text_font: font_climate_small
+                  text_color: ${climate_mode_text_color}
+        - button:
+            id: climate_btn_2
+            align: TOP_LEFT
+            x: 68
+            y: 178
+            width: 60
+            height: 48
+            radius: ${climate_button_radius}
+            bg_color: ${climate_mode_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            hidden: true
+            on_click:
+              - homeassistant.service:
+                  service: climate.set_hvac_mode
+                  data:
+                    entity_id: ${climate_entity}
+                  data_template:
+                    hvac_mode: !lambda return id(climate_slot_2);
+            widgets:
+              - label:
+                  id: climate_lbl_2
+                  align: CENTER
+                  text: ""
+                  text_font: font_climate_small
+                  text_color: ${climate_mode_text_color}
+        - button:
+            id: climate_btn_3
+            align: TOP_LEFT
+            x: 132
+            y: 178
+            width: 60
+            height: 48
+            radius: ${climate_button_radius}
+            bg_color: ${climate_mode_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            hidden: true
+            on_click:
+              - homeassistant.service:
+                  service: climate.set_hvac_mode
+                  data:
+                    entity_id: ${climate_entity}
+                  data_template:
+                    hvac_mode: !lambda return id(climate_slot_3);
+            widgets:
+              - label:
+                  id: climate_lbl_3
+                  align: CENTER
+                  text: ""
+                  text_font: font_climate_small
+                  text_color: ${climate_mode_text_color}
+        - button:
+            id: climate_btn_4
+            align: TOP_LEFT
+            x: 196
+            y: 178
+            width: 60
+            height: 48
+            radius: ${climate_button_radius}
+            bg_color: ${climate_mode_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            hidden: true
+            on_click:
+              - homeassistant.service:
+                  service: climate.set_hvac_mode
+                  data:
+                    entity_id: ${climate_entity}
+                  data_template:
+                    hvac_mode: !lambda return id(climate_slot_4);
+            widgets:
+              - label:
+                  id: climate_lbl_4
+                  align: CENTER
+                  text: ""
+                  text_font: font_climate_small
+                  text_color: ${climate_mode_text_color}
+        - button:
+            id: climate_btn_5
+            align: TOP_LEFT
+            x: 260
+            y: 178
+            width: 60
+            height: 48
+            radius: ${climate_button_radius}
+            bg_color: ${climate_mode_color}
+            bg_opa: COVER
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            hidden: true
+            on_click:
+              - homeassistant.service:
+                  service: climate.set_hvac_mode
+                  data:
+                    entity_id: ${climate_entity}
+                  data_template:
+                    hvac_mode: !lambda return id(climate_slot_5);
+            widgets:
+              - label:
+                  id: climate_lbl_5
+                  align: CENTER
+                  text: ""
+                  text_font: font_climate_small
+                  text_color: ${climate_mode_text_color}
