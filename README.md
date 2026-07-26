@@ -1,3 +1,5 @@
+![ESPHome and Home Assistant voice assistant on the ESP32-S3-BOX-3](docs/hero.jpg)
+
 # ESPHome Voice Assistant for the ESP32-S3-BOX-3
 
 A **Home Assistant voice satellite** for the
