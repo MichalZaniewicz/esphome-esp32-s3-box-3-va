@@ -43,6 +43,29 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **Cover art never arrived from Music Assistant, and the reason was a doubled
+  address.** The screen prefixes `media_ha_base_url` to the player's
+  `entity_picture`, which is what integrations that hand out a path need. Music
+  Assistant hands out a whole URL on its own image proxy port, so the result read
+  `http://host:8123http://host:8095/...` and ESP-IDF answered `Error parse url` -
+  the picture, the format and the network were all fine and none of them were the
+  problem. An absolute URL is now used as it stands.
+
+- **On the media screen the title climbed onto the artist.** `long_mode: DOT` is
+  not "cut at one line": it wraps first and dots whichever line runs out of room,
+  and a label left to size itself grows downwards to fit. The rows are 24 px
+  apart and a wrapped 16 px title wants about 40. Both labels are now pinned to a
+  single row, which puts the ellipsis back on line one.
+
+- **The progress bar opened full and frozen on the first track after a gap.** The
+  position was advanced by a local clock started when Home Assistant last
+  mentioned a position - and that clock kept running through pauses and idle
+  time, so a quiet hour was added to the position as though it had been played,
+  and the clamp pinned the bar to the right edge. Pausing appeared to fix it only
+  because it made Home Assistant restate the true position. The clock now runs
+  only while the state is `playing`, a position update anchors it only when
+  playing, and a change of title resets it for the new track.
+
 - **All seven generated characters had drifted from their generators, and
   `check_generated.py` could not see it.** The checker compared bytes, and the
   generators write `\n` while a Windows checkout with `core.autocrlf=true` holds
@@ -244,6 +267,25 @@ their alarm, the touchscreen, the home screen and the animated character.
   is a second of the user's sentence lost.
 
 ### Added
+
+- **The room's speaker is named once.** `media_entity` used to be a separate
+  setting with an unrelated default, so a box with one external speaker named it
+  twice and a box with none had nowhere to say so. The media screen now follows
+  `external_media_player_id`, whose default becomes `media_player.none` - an
+  entity that exists nowhere, meaning there is no such speaker. Replies stay on
+  the box, the screen reports nothing playing, and the common case needs no
+  configuration at all. Both stay overridable where they genuinely differ, which
+  is what a Music Assistant setup wants: TTS to the Cast entity, the screen to
+  the Music Assistant one.
+
+  The sentinel is spelled like an entity because it has to be - the
+  `homeassistant` text sensor rejects anything without exactly one dot, so a
+  plain `none` fails validation rather than degrading quietly.
+
+- **A rendered screenshot of the media screen** in the README
+  (`base/assets/media.png`), drawn by `scripts/gen_media.py` from the screen's own
+  coordinates, colours and fonts rather than photographed, so it can be redrawn
+  after a layout change instead of going stale.
 
 - **A live "Assistant" selector** (`base/faces/picker.yaml`) - a Home Assistant
   `select` that swaps the character at runtime, artwork, geometry and colours
