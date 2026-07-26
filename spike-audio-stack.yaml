@@ -198,6 +198,22 @@ media_player:
         file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/wake.wav
 
 button:
+  # Reboot from the API. The audio stack logs the reason it refuses to start
+  # during setup, which is BEFORE the API is up, so the only way to read it is
+  # to have a log subscription open across a reboot - and the only way to have
+  # that without a second OTA is this button.
+  - platform: restart
+    name: Restart
+  # Trzyma mikrofon w ruchu. Bez konsumenta stos zatrzymuje sie po chwili
+  # bezczynnosci i sensory slotow milkna, wiec pomiar mowy nie ma jak powstac.
+  - platform: template
+    name: Mic on
+    on_press:
+      - microphone.capture: clean_mic
+  - platform: template
+    name: Mic off
+    on_press:
+      - microphone.stop_capture: clean_mic
   - platform: template
     name: Play test tone
     on_press:
