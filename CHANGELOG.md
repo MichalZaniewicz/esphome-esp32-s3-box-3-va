@@ -280,6 +280,34 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Added
 
+- **A weather screen** (`base/screens/weather.yaml`), another carousel screen:
+  current conditions large - icon, temperature, humidity, wind - over a row of up
+  to seven days with their own icons and high/low.
+
+  Current conditions need nothing but a `weather` entity. The forecast needs a
+  helper in Home Assistant and there is no way around that: since 2024.4 a
+  forecast lives only in the response to `weather.get_forecasts`, and an ESPHome
+  device can call a service but cannot read what it returns. So the screen
+  subscribes to one compact string a template sensor produces -
+  `condition,high,low,Day|...` - which is one subscription rather than the
+  twenty-one an attribute-per-field helper would need, and fits Home Assistant's
+  255-character state limit for seven days with room to spare. The header of the
+  package carries a template that produces it.
+
+  **The day count is read, not configured.** met.no returns six, others five or
+  ten; the screen draws a column per entry it is given, hides the rest and
+  centres what is left, so nothing needs touching when the number changes
+  overnight. Five days left-aligned in a seven-day row read as two columns that
+  failed to draw.
+
+  All fifteen of Home Assistant's conditions are mapped to Material Design
+  icons whose codepoints were checked against the webfont's own table AND
+  rendered before being written down - an unverified glyph does not fail a
+  build, it draws nothing, and that only shows up on the panel. Anything
+  unrecognised falls through to the alert icon rather than to an empty box.
+  Cost: 47 KB of flash for both icon sizes and the large temperature font,
+  taking the author's build to 33.5%.
+
 - **One glyph less in the media screen's font.** `volume-medium` was compiled in
   and never drawn: the volume is written as text. An unused glyph does not fail
   a build, it just quietly costs flash.

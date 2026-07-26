@@ -1,0 +1,724 @@
+###############################################################################
+# Weather screen: what it is doing now, and what it will do for the rest of the
+# week.
+#
+# An OPTIONAL carousel screen. Add it to your thin config's `files:` list AFTER
+# base/screens/home.yaml - its position in that list is its position on the
+# ring - and point it at a weather entity:
+#
+#   substitutions:
+#     weather_entity: weather.forecast_home
+#     weather_forecast_entity: sensor.va_weekly_forecast   # see below
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/screens/weather.yaml    # <- one swipe left or right from home
+#
+# CURRENT CONDITIONS NEED NOTHING BUT THE WEATHER ENTITY. The state is the
+# condition, and the temperature, humidity and wind are plain attributes.
+#
+# THE FORECAST NEEDS A HELPER IN HOME ASSISTANT, and there is no way around it.
+# Since Home Assistant 2024.4 a weather entity does not carry its forecast in
+# attributes; the only way to it is the `weather.get_forecasts` service, which
+# returns a response - and an ESPHome device can call a service but cannot read
+# what it returns. So something in Home Assistant has to call it and park the
+# answer somewhere a device can subscribe to. A trigger-based template sensor
+# does that in a dozen lines, and this screen reads its STATE, which keeps the
+# whole thing under Home Assistant's 255-character limit for states:
+#
+#   template:
+#     - trigger:
+#         - platform: time_pattern
+#           minutes: "/30"
+#         - platform: homeassistant
+#           event: start
+#       action:
+#         - service: weather.get_forecasts
+#           target:
+#             entity_id: weather.forecast_home
+#           data:
+#             type: daily
+#           response_variable: fc
+#       sensor:
+#         - name: VA weekly forecast
+#           state: >-
+#             {%- set days = fc['weather.forecast_home'].forecast[:7] -%}
+#             {%- set out = namespace(s=[]) -%}
+#             {%- for d in days -%}
+#               {%- set out.s = out.s + [ d.condition ~ ',' ~
+#                   (d.temperature | round(0) | int) ~ ',' ~
+#                   (d.templow | round(0) | int) ~ ',' ~
+#                   (d.datetime | as_datetime | as_local).strftime('%a') ] -%}
+#             {%- endfor -%}
+#             {{ out.s | join('|') }}
+#
+# The exact template is yours to write - what matters is the FORMAT it produces,
+# one entry per day, fields comma-separated, days pipe-separated:
+#
+#   condition,high,low,Day|condition,high,low,Day|...
+#   partlycloudy,30,21,Sun|rainy,23,16,Mon|sunny,28,16,Tue
+#
+# `condition` is Home Assistant's own vocabulary (`sunny`, `partlycloudy`,
+# `rainy`, ...), the two temperatures are whole numbers, and `Day` is whatever
+# short label you want under the icon - the device prints it as it arrives, so
+# that is also where the language of the row is decided.
+#
+# HOW MANY DAYS IS NOT YOURS TO CHOOSE. Weather integrations return what they
+# return: met.no gives six, others five or ten. The screen draws a column per
+# entry it is given, up to `weather_days_max`, hides the rest, and centres what
+# is left. Nothing has to be configured when the count changes from one day to
+# the next.
+#
+# WITHOUT the helper, leave `weather_forecast_entity` alone. The default names an
+# entity that exists nowhere, the forecast row stays empty, and the current
+# conditions work exactly as they do with it.
+###############################################################################
+
+substitutions:
+  # Current conditions come from here: the state is the condition, and
+  # temperature, humidity and wind_speed are read as attributes.
+  weather_entity: weather.home
+
+  # The compact forecast string described in the header. The default is not a
+  # real entity: it means "no forecast", and the row simply stays empty.
+  weather_forecast_entity: sensor.none
+
+  # Columns to draw at most. Seven is what fits at 320 px with the icons legible;
+  # a longer forecast is cut rather than squeezed.
+  weather_days_max: '7'
+
+  weather_bg_color: '0x000000'
+  weather_temp_color: '0xFFFFFF'
+  weather_icon_color: '0xEAF2FF'
+  weather_cond_color: '0x8FA6C0'
+  weather_info_color: '0x5A6B80'
+  weather_divider_color: '0x1A2028'
+  weather_day_color: '0x8FA6C0'
+  weather_hi_color: '0xFFFFFF'
+  weather_lo_color: '0x5A6B80'
+
+  # Printed after the temperature and after the wind. The numbers themselves are
+  # whatever Home Assistant reports, so a Fahrenheit setup wants "F" here.
+  weather_temp_suffix: "°"
+  weather_wind_unit: "km/h"
+  weather_idle_text: "No weather"
+
+font:
+  # Only the glyphs this screen can draw: the fifteen conditions Home Assistant
+  # defines, and nothing else. Codepoints checked against the webfont's own
+  # _variables.scss AND rendered before being written down - an unverified one
+  # does not fail the build, it draws nothing at all.
+  - id: font_weather_icon
+    file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    size: 64
+    bpp: 4
+    glyphs: &weather_glyphs
+      - "\U000F0594"   # weather-night          clear-night
+      - "\U000F0590"   # weather-cloudy         cloudy
+      - "\U000F0F2F"   # weather-cloudy-alert   exceptional
+      - "\U000F0591"   # weather-fog            fog
+      - "\U000F0592"   # weather-hail           hail
+      - "\U000F0593"   # weather-lightning      lightning
+      - "\U000F067E"   # weather-lightning-rainy
+      - "\U000F0595"   # weather-partly-cloudy  partlycloudy
+      - "\U000F0596"   # weather-pouring        pouring
+      - "\U000F0597"   # weather-rainy          rainy
+      - "\U000F0598"   # weather-snowy          snowy
+      - "\U000F067F"   # weather-snowy-rainy
+      - "\U000F0599"   # weather-sunny          sunny
+      - "\U000F059D"   # weather-windy          windy
+      - "\U000F059E"   # weather-windy-variant  windy-variant
+  # The same fifteen at column size. Two sizes of one glyph are two bitmaps in
+  # flash, which is why the small one is 24 and not 32: it is drawn seven times
+  # and read from a metre away.
+  - id: font_weather_icon_s
+    file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    size: 24
+    bpp: 4
+    glyphs: *weather_glyphs
+
+  # Digits only. A full glyphset at 44 px would cost more than every icon here
+  # put together, and this label never shows a letter.
+  - id: font_weather_temp
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 500
+    size: 44
+    glyphs: "-0123456789°"
+
+  - id: font_weather_small
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 400
+    size: 14
+    glyphsets:
+      - ${font_glyphsets}
+
+text_sensor:
+  - platform: homeassistant
+    id: weather_cond_src
+    entity_id: ${weather_entity}
+    internal: true
+    on_value:
+      - script.execute: weather_refresh
+  # One string, one subscription, parsed on the device. The alternative - an
+  # attribute per day per field - is twenty-one subscriptions and a helper
+  # nobody wants to maintain.
+  - platform: homeassistant
+    id: weather_fc_src
+    entity_id: ${weather_forecast_entity}
+    internal: true
+    on_value:
+      - script.execute: weather_refresh
+
+sensor:
+  - platform: homeassistant
+    id: weather_temp_src
+    entity_id: ${weather_entity}
+    attribute: temperature
+    internal: true
+    on_value:
+      - script.execute: weather_refresh
+  - platform: homeassistant
+    id: weather_hum_src
+    entity_id: ${weather_entity}
+    attribute: humidity
+    internal: true
+    on_value:
+      - script.execute: weather_refresh
+  - platform: homeassistant
+    id: weather_wind_src
+    entity_id: ${weather_entity}
+    attribute: wind_speed
+    internal: true
+    on_value:
+      - script.execute: weather_refresh
+
+script:
+  # Everything this screen draws, in one place, because the condition-to-icon
+  # table would otherwise have to exist twice: once for the big icon and once
+  # for the row. Every write is guarded - weather changes a few times an hour at
+  # most, and Home Assistant republishes the state far more often than that.
+  - id: weather_refresh
+    mode: single
+    then:
+      - lambda: |-
+          // Home Assistant's fifteen conditions, in its own spelling. Anything
+          // else - a broken integration, a new condition - falls through to the
+          // alert icon rather than drawing an empty box.
+          struct Cond { const char *name; const char *glyph; };
+          static const Cond CONDS[] = {
+            {"clear-night",     "\U000F0594"},
+            {"cloudy",          "\U000F0590"},
+            {"exceptional",     "\U000F0F2F"},
+            {"fog",             "\U000F0591"},
+            {"hail",            "\U000F0592"},
+            {"lightning",       "\U000F0593"},
+            {"lightning-rainy", "\U000F067E"},
+            {"partlycloudy",    "\U000F0595"},
+            {"pouring",         "\U000F0596"},
+            {"rainy",           "\U000F0597"},
+            {"snowy",           "\U000F0598"},
+            {"snowy-rainy",     "\U000F067F"},
+            {"sunny",           "\U000F0599"},
+            {"windy",           "\U000F059D"},
+            {"windy-variant",   "\U000F059E"},
+          };
+          auto glyph_for = [](const std::string &c) -> const char * {
+            for (const auto &e : CONDS)
+              if (c == e.name) return e.glyph;
+            return "\U000F0F2F";
+          };
+
+          // ---- current -----------------------------------------------------
+          const std::string cond = id(weather_cond_src).state;
+          const bool have = !cond.empty() && cond != "unknown" && cond != "unavailable";
+
+          static std::string seen_cond;
+          if (seen_cond != cond) {
+            seen_cond = cond;
+            lv_label_set_text(id(weather_icon), have ? glyph_for(cond) : "");
+            // The condition under the number, with the hyphens taken out and
+            // the first letter raised: "partlycloudy" reads badly at 16 px.
+            std::string pretty;
+            if (have) {
+              pretty = cond;
+              for (auto &ch : pretty) if (ch == '-') ch = ' ';
+              pretty[0] = toupper(pretty[0]);
+            } else {
+              pretty = "${weather_idle_text}";
+            }
+            lv_label_set_text(id(weather_cond), pretty.c_str());
+          }
+
+          char buf[32];
+          const float t = id(weather_temp_src).state;
+          static int seen_t = -1000;
+          const int ti = std::isnan(t) ? -1000 : (int) lroundf(t);
+          if (seen_t != ti) {
+            seen_t = ti;
+            if (ti == -1000) buf[0] = '\0';
+            else snprintf(buf, sizeof(buf), "%d${weather_temp_suffix}", ti);
+            lv_label_set_text(id(weather_temp), buf);
+          }
+
+          const float h = id(weather_hum_src).state, w = id(weather_wind_src).state;
+          static int seen_h = -1, seen_w = -1;
+          const int hi = std::isnan(h) ? -1 : (int) lroundf(h);
+          const int wi = std::isnan(w) ? -1 : (int) lroundf(w);
+          if (seen_h != hi || seen_w != wi) {
+            seen_h = hi;
+            seen_w = wi;
+            if (hi < 0 && wi < 0) buf[0] = '\0';
+            else if (wi < 0) snprintf(buf, sizeof(buf), "%d%%", hi);
+            else if (hi < 0) snprintf(buf, sizeof(buf), "%d ${weather_wind_unit}", wi);
+            else snprintf(buf, sizeof(buf), "%d%%   %d ${weather_wind_unit}", hi, wi);
+            lv_label_set_text(id(weather_info), buf);
+          }
+
+          // ---- forecast ----------------------------------------------------
+          // "condition,high,low,Day|condition,high,low,Day|..." - see the header.
+          static std::string seen_fc;
+          const std::string fc = id(weather_fc_src).state;
+          if (seen_fc == fc) return;
+          seen_fc = fc;
+
+          lv_obj_t *cols[] = {id(weather_col_1), id(weather_col_2), id(weather_col_3),
+                              id(weather_col_4), id(weather_col_5), id(weather_col_6),
+                              id(weather_col_7)};
+          lv_obj_t *days[] = {id(weather_day_1), id(weather_day_2), id(weather_day_3),
+                              id(weather_day_4), id(weather_day_5), id(weather_day_6),
+                              id(weather_day_7)};
+          lv_obj_t *icons[] = {id(weather_ci_1), id(weather_ci_2), id(weather_ci_3),
+                               id(weather_ci_4), id(weather_ci_5), id(weather_ci_6),
+                               id(weather_ci_7)};
+          lv_obj_t *his[] = {id(weather_hi_1), id(weather_hi_2), id(weather_hi_3),
+                             id(weather_hi_4), id(weather_hi_5), id(weather_hi_6),
+                             id(weather_hi_7)};
+          lv_obj_t *los[] = {id(weather_lo_1), id(weather_lo_2), id(weather_lo_3),
+                             id(weather_lo_4), id(weather_lo_5), id(weather_lo_6),
+                             id(weather_lo_7)};
+
+          // The table has seven slots whatever the substitution says, and a
+          // config asking for nine would otherwise write past the end of it.
+          const int maxn = ${weather_days_max} > 7 ? 7 : ${weather_days_max};
+          int n = 0;
+          size_t at = 0;
+          while (at <= fc.size() && n < maxn) {
+            const size_t bar = fc.find('|', at);
+            const std::string day = fc.substr(at, bar == std::string::npos ? std::string::npos
+                                                                           : bar - at);
+            if (day.empty()) break;
+
+            // condition , high , low , label
+            const size_t c1 = day.find(','), c2 = day.find(',', c1 + 1),
+                         c3 = day.find(',', c2 + 1);
+            if (c1 == std::string::npos || c2 == std::string::npos ||
+                c3 == std::string::npos) break;
+
+            lv_label_set_text(days[n], day.substr(c3 + 1).c_str());
+            lv_label_set_text(icons[n], glyph_for(day.substr(0, c1)));
+            lv_label_set_text(his[n], (day.substr(c1 + 1, c2 - c1 - 1) +
+                                       "${weather_temp_suffix}").c_str());
+            lv_label_set_text(los[n], (day.substr(c2 + 1, c3 - c2 - 1) +
+                                       "${weather_temp_suffix}").c_str());
+            n++;
+            if (bar == std::string::npos) break;
+            at = bar + 1;
+          }
+
+          // CENTRE WHAT ARRIVED. Five days left-aligned in a seven-day row look
+          // like two columns failed to draw. Each column is 44 px wide.
+          const int start = (320 - n * 44) / 2;
+          for (int i = 0; i < 7; i++) {
+            if (i < n) {
+              lv_obj_set_x(cols[i], start + i * 44);
+              lv_obj_clear_flag(cols[i], LV_OBJ_FLAG_HIDDEN);
+            } else {
+              lv_obj_add_flag(cols[i], LV_OBJ_FLAG_HIDDEN);
+            }
+          }
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/weather.yaml (weather for ${weather_entity})"
+    # Paint once, so the screen is not blank until the weather next changes -
+    # which, unlike a media player, can be half an hour away.
+    - priority: -200
+      then:
+        - script.execute: weather_refresh
+
+lvgl:
+  pages:
+    - id: page_weather
+      skip: false                  # THIS is what puts the screen on the carousel
+      bg_color: ${weather_bg_color}
+      scrollbar_mode: "OFF"
+      on_swipe_left:
+        - script.execute: idle_swipe_left
+      on_swipe_right:
+        - script.execute: idle_swipe_right
+      widgets:
+        # Underneath everything, so a swipe that starts on a label still reaches
+        # the page. Nothing here is tappable, so it can be plain.
+        - button:
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+
+        - label:
+            id: weather_icon
+            align: TOP_LEFT
+            x: 18
+            y: 16
+            text: ""
+            text_font: font_weather_icon
+            text_color: ${weather_icon_color}
+        - label:
+            id: weather_temp
+            align: TOP_LEFT
+            x: 104
+            y: 14
+            text: ""
+            text_font: font_weather_temp
+            text_color: ${weather_temp_color}
+        - label:
+            id: weather_cond
+            align: TOP_LEFT
+            x: 106
+            y: 66
+            width: 200
+            long_mode: DOT
+            height: 22
+            text: "${weather_idle_text}"
+            text_font: font_body
+            text_color: ${weather_cond_color}
+        - label:
+            id: weather_info
+            align: TOP_LEFT
+            x: 106
+            y: 88
+            text: ""
+            text_font: font_weather_small
+            text_color: ${weather_info_color}
+
+        - obj:
+            align: TOP_LEFT
+            x: 14
+            y: 116
+            width: 292
+            height: 1
+            radius: 0
+            bg_color: ${weather_divider_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+
+        # Seven columns, written out rather than generated: they are static,
+        # identical and never change shape. Only their x moves, and only when
+        # the number of days does. Each is a transparent container, so one write
+        # moves a whole column instead of four.
+        #
+        # Written long-hand on purpose. A YAML anchor plus a merge key would
+        # halve the lines and put `${...}` inside flow mappings, where a brace
+        # is an indicator rather than a character - that parses as something
+        # else entirely, or not at all.
+        - obj:
+            id: weather_col_1
+            align: TOP_LEFT
+            x: 4
+            y: 126
+            width: 44
+            height: 104
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scrollbar_mode: "OFF"
+            hidden: true
+            widgets:
+              - label:
+                  id: weather_day_1
+                  align: TOP_MID
+                  y: 0
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_day_color}
+              - label:
+                  id: weather_ci_1
+                  align: TOP_MID
+                  y: 20
+                  text: ""
+                  text_font: font_weather_icon_s
+                  text_color: ${weather_icon_color}
+              - label:
+                  id: weather_hi_1
+                  align: TOP_MID
+                  y: 52
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_hi_color}
+              - label:
+                  id: weather_lo_1
+                  align: TOP_MID
+                  y: 72
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_lo_color}
+        - obj:
+            id: weather_col_2
+            align: TOP_LEFT
+            x: 48
+            y: 126
+            width: 44
+            height: 104
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scrollbar_mode: "OFF"
+            hidden: true
+            widgets:
+              - label:
+                  id: weather_day_2
+                  align: TOP_MID
+                  y: 0
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_day_color}
+              - label:
+                  id: weather_ci_2
+                  align: TOP_MID
+                  y: 20
+                  text: ""
+                  text_font: font_weather_icon_s
+                  text_color: ${weather_icon_color}
+              - label:
+                  id: weather_hi_2
+                  align: TOP_MID
+                  y: 52
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_hi_color}
+              - label:
+                  id: weather_lo_2
+                  align: TOP_MID
+                  y: 72
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_lo_color}
+        - obj:
+            id: weather_col_3
+            align: TOP_LEFT
+            x: 92
+            y: 126
+            width: 44
+            height: 104
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scrollbar_mode: "OFF"
+            hidden: true
+            widgets:
+              - label:
+                  id: weather_day_3
+                  align: TOP_MID
+                  y: 0
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_day_color}
+              - label:
+                  id: weather_ci_3
+                  align: TOP_MID
+                  y: 20
+                  text: ""
+                  text_font: font_weather_icon_s
+                  text_color: ${weather_icon_color}
+              - label:
+                  id: weather_hi_3
+                  align: TOP_MID
+                  y: 52
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_hi_color}
+              - label:
+                  id: weather_lo_3
+                  align: TOP_MID
+                  y: 72
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_lo_color}
+        - obj:
+            id: weather_col_4
+            align: TOP_LEFT
+            x: 136
+            y: 126
+            width: 44
+            height: 104
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scrollbar_mode: "OFF"
+            hidden: true
+            widgets:
+              - label:
+                  id: weather_day_4
+                  align: TOP_MID
+                  y: 0
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_day_color}
+              - label:
+                  id: weather_ci_4
+                  align: TOP_MID
+                  y: 20
+                  text: ""
+                  text_font: font_weather_icon_s
+                  text_color: ${weather_icon_color}
+              - label:
+                  id: weather_hi_4
+                  align: TOP_MID
+                  y: 52
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_hi_color}
+              - label:
+                  id: weather_lo_4
+                  align: TOP_MID
+                  y: 72
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_lo_color}
+        - obj:
+            id: weather_col_5
+            align: TOP_LEFT
+            x: 180
+            y: 126
+            width: 44
+            height: 104
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scrollbar_mode: "OFF"
+            hidden: true
+            widgets:
+              - label:
+                  id: weather_day_5
+                  align: TOP_MID
+                  y: 0
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_day_color}
+              - label:
+                  id: weather_ci_5
+                  align: TOP_MID
+                  y: 20
+                  text: ""
+                  text_font: font_weather_icon_s
+                  text_color: ${weather_icon_color}
+              - label:
+                  id: weather_hi_5
+                  align: TOP_MID
+                  y: 52
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_hi_color}
+              - label:
+                  id: weather_lo_5
+                  align: TOP_MID
+                  y: 72
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_lo_color}
+        - obj:
+            id: weather_col_6
+            align: TOP_LEFT
+            x: 224
+            y: 126
+            width: 44
+            height: 104
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scrollbar_mode: "OFF"
+            hidden: true
+            widgets:
+              - label:
+                  id: weather_day_6
+                  align: TOP_MID
+                  y: 0
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_day_color}
+              - label:
+                  id: weather_ci_6
+                  align: TOP_MID
+                  y: 20
+                  text: ""
+                  text_font: font_weather_icon_s
+                  text_color: ${weather_icon_color}
+              - label:
+                  id: weather_hi_6
+                  align: TOP_MID
+                  y: 52
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_hi_color}
+              - label:
+                  id: weather_lo_6
+                  align: TOP_MID
+                  y: 72
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_lo_color}
+        - obj:
+            id: weather_col_7
+            align: TOP_LEFT
+            x: 268
+            y: 126
+            width: 44
+            height: 104
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scrollbar_mode: "OFF"
+            hidden: true
+            widgets:
+              - label:
+                  id: weather_day_7
+                  align: TOP_MID
+                  y: 0
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_day_color}
+              - label:
+                  id: weather_ci_7
+                  align: TOP_MID
+                  y: 20
+                  text: ""
+                  text_font: font_weather_icon_s
+                  text_color: ${weather_icon_color}
+              - label:
+                  id: weather_hi_7
+                  align: TOP_MID
+                  y: 52
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_hi_color}
+              - label:
+                  id: weather_lo_7
+                  align: TOP_MID
+                  y: 72
+                  text: ""
+                  text_font: font_weather_small
+                  text_color: ${weather_lo_color}

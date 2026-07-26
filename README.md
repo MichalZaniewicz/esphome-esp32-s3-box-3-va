@@ -8,11 +8,11 @@ one thin config file you actually edit.
 
 > **Status: running on an ESP32-S3-BOX-3.** Wake word, the full Assist pipeline,
 > voice timers with their alarm, the touchscreen, the animated character, the
-> home, settings and media screens are all confirmed on device with ESPHome
-> 2026.7.1. The shipped thin config - core plus one character - measures **flash
-> 25.3%, RAM 39.9%**; the author's own, with four characters for the picker plus
-> the media and home-style screens, measures 32.9% and 41.4%. Artwork is what
-> costs: 150 KB per character.
+> home, settings, media and weather screens are all confirmed on device with
+> ESPHome 2026.7.1. The shipped thin config - core plus one character - measures
+> **flash 25.3%, RAM 39.9%**; the author's own, with four characters for the
+> picker plus the media, weather and home-style screens, measures 33.5% and
+> 41.7%. Artwork is what costs: 150 KB per character.
 > [CHANGELOG.md](CHANGELOG.md) has the detail, including what turned out to be
 > wrong along the way.
 
@@ -270,6 +270,7 @@ scripts/
                            #   rain, scope, vu - edit these, not the YAML
   gen_media.py             # redraws base/assets/media.png from the media
                            #   screen's own coordinates, colours and fonts
+  gen_weather.py           # the same for base/assets/weather.png
   esplog.py                # stream device logs over the native API
   flash.py                 # compile + OTA, but refuses to upload if the SSID
                            #   compiled into main.cpp looks like a placeholder
@@ -315,6 +316,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
 | `settings.yaml` | The device's own switches as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output` toggle and a volume slider. Reached one swipe down from home (`idle_page_above: page_settings`). The on and off states differ in shape, not only colour, so the screen reads at a glance; the icons are the handful of Material Design glyphs actually used, downloaded at compile time. |
 | `media.yaml` | What is playing on any Home Assistant media player - title, artist, a progress bar and previous / play-pause / next as tap buttons. A **carousel screen**: one swipe left or right from home. It follows `external_media_player_id` on its own, so a room with one speaker names it once; set `media_entity` only when the screen should watch something else - a TV, another room, or the box's own player, `media_player.<name>_<friendly_name>` slugified. Where Music Assistant and the Cast integration both publish a speaker, pick the Music Assistant one: the raw Cast entity offers no previous/next and no track length. The bar advances locally between Home Assistant's occasional position updates, and only while the page is on screen. |
+| `weather.yaml` | Current conditions big - icon, temperature, humidity and wind - over a forecast row of up to seven days, each with its own icon and high/low. A **carousel screen**: one swipe sideways from home. Current conditions come straight from a `weather` entity; the forecast needs a small helper in Home Assistant, because since 2024.4 a forecast lives only in a service response and a device cannot read one. The screen draws a column per day it is given and centres them, so a five-day integration and a ten-day one both look deliberate. |
 | `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 32 looks for the home screen (fonts, colours, gradient backgrounds, layouts and a temperature/humidity dashboard) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 
 The **settings screen** is **one swipe down** from home - the device's own switches
@@ -329,6 +331,15 @@ advances between Home Assistant's occasional updates, and three controls that di
 themselves when the player does not support them:
 
 <p align="center"><img src="base/assets/media.png" width="300" alt="Media screen"></p>
+
+The **weather screen** is another carousel screen: what it is doing now, over
+what it will do for the rest of the week. The forecast row needs a helper in
+Home Assistant - the header of
+[`base/screens/weather.yaml`](base/screens/weather.yaml) has a template that
+produces it in a dozen lines - and without one the current conditions work on
+their own:
+
+<p align="center"><img src="base/assets/weather.png" width="300" alt="Weather screen"></p>
 
 Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
 clock, and the character idling. **Tap the screen to swap between them** -

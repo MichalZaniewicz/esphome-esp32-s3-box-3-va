@@ -39,6 +39,19 @@ BUILTIN_SUBS = {"name", "friendly_name", "device_name", "esphome_version"}
 
 SUB_REF = re.compile(r"\$\{(\w+)\}|\$(\w+)")
 
+# Pelne linie komentarza NIE sa kodem, a `${...}` w przykladzie uzycia w
+# naglowku pakietu jest dokumentacja, nie referencja. Bez tego media.yaml
+# zglaszal `assistant` jako niezdefiniowany, bo jego naglowek pokazuje, jak
+# dopisac postac do `files:` - a checker, ktory zawsze swieci na czerwono, jest
+# tym samym co checker wylaczony.
+COMMENT_LINE = re.compile(r"^[ 	]*#.*$", re.M)
+
+
+def code_only(text):
+    return COMMENT_LINE.sub("", text)
+
+
+
 
 # A YAML document with the SAME top-level key twice keeps only the last one, in
 # silence. That is how a whole `interval:` block - a watchdog, as it happens -
@@ -221,7 +234,8 @@ def _check_merged(args) -> int:
             return 1
         subs.update(doc.get("substitutions") or {})
         collect_ids(doc, ids, path.name)
-        bodies.append(re.sub(r"^substitutions:.*?(?=^\S)", "", text, flags=re.S | re.M))
+        bodies.append(code_only(
+            re.sub(r"^substitutions:.*?(?=^\S)", "", text, flags=re.S | re.M)))
 
     print("  OK    kazdy plik parsuje sie")
 
@@ -282,9 +296,9 @@ def _check(args) -> int:
 
         # 2. References vs definitions. Strip the substitutions block itself so
         #    a default that quotes another key does not count as a use.
-        body = re.sub(
+        body = code_only(re.sub(
             r"^substitutions:.*?(?=^\S)", "", text, flags=re.S | re.M
-        )
+        ))
         used = {m.group(1) or m.group(2) for m in SUB_REF.finditer(body)}
 
         undefined = sorted(used - set(subs) - BUILTIN_SUBS)
