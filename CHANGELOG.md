@@ -43,6 +43,18 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **A cover that failed to download was never retried.** The fetch guard records
+  a picture as "seen" before asking for it, so one failed download - Home
+  Assistant restarting, a blip - meant the note stayed until the track changed:
+  every later republish of the same `entity_picture` bounced off the guard. The
+  error handler now forgets the URL, so the next republish tries again.
+
+- **The cover of the last track stayed on screen after playback stopped.** Only
+  the download callbacks ever showed or hid it, so the album art sat under
+  "Nothing playing" until something else was played. It now follows the player's
+  state, which also makes `media_cover_ready` - written twice and read nowhere -
+  mean something.
+
 - **Cover art never arrived from Music Assistant, and the reason was a doubled
   address.** The screen prefixes `media_ha_base_url` to the player's
   `entity_picture`, which is what integrations that hand out a path need. Music
@@ -267,6 +279,10 @@ their alarm, the touchscreen, the home screen and the animated character.
   is a second of the user's sentence lost.
 
 ### Added
+
+- **One glyph less in the media screen's font.** `volume-medium` was compiled in
+  and never drawn: the volume is written as text. An unused glyph does not fail
+  a build, it just quietly costs flash.
 
 - **`morgana`**, a witch, taking the cast to 29. Her artwork arrived with no eyes
   and no mouth already, so nothing had to be erased - but the two dark marks over

@@ -7,12 +7,14 @@ Pure ESPHome, no custom C firmware: an always-on core you pull as a package, plu
 one thin config file you actually edit.
 
 > **Status: running on an ESP32-S3-BOX-3.** Wake word, the full Assist pipeline,
-> voice timers with their alarm, the touchscreen and the animated character are
-> all confirmed on device with ESPHome 2026.7.0. Flash usage 25.5%, RAM 37%.
-> The newest additions - the wake sound, the third wake word model and the idle
-> animation loop - are in the repo but have had less time on hardware than the
-> rest. [CHANGELOG.md](CHANGELOG.md) has the detail, including what turned out to
-> be wrong along the way.
+> voice timers with their alarm, the touchscreen, the animated character, the
+> home, settings and media screens are all confirmed on device with ESPHome
+> 2026.7.1. The shipped thin config - core plus one character - measures **flash
+> 25.3%, RAM 39.9%**; the author's own, with four characters for the picker plus
+> the media and home-style screens, measures 32.9% and 41.4%. Artwork is what
+> costs: 150 KB per character.
+> [CHANGELOG.md](CHANGELOG.md) has the detail, including what turned out to be
+> wrong along the way.
 
 > [!TIP]
 > ⭐ **Enjoying this project?** Every star is real motivation for me to keep
@@ -74,7 +76,7 @@ decision, switching between them is not. Artwork characters only. Details:
 
 ### The cast
 
-Twenty-nine of them, and they are not one face on twenty-nine bodies: the
+Twenty-eight of them, and they are not one face on twenty-eight bodies: the
 eyes, the colours, the range of every expression and in ten cases the entire way of
 being on screen belong to the character. Name any of them in lower case.
 

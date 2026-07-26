@@ -94,9 +94,11 @@ substitutions:
   media_button_radius: '8'
 
 font:
-  # Only the six glyphs this screen draws, so the flash cost is a few KB rather
+  # Only the five glyphs this screen draws, so the flash cost is a few KB rather
   # than a webfont. Codepoints checked against the webfont's own _variables.scss
-  # - an unverified one does not fail the build, it just draws nothing.
+  # - an unverified one does not fail the build, it just draws nothing, which is
+  # also how a sixth one (volume-medium, F0580) sat here paying rent: the volume
+  # is written as text, so nothing ever asked for the icon.
   - id: font_media_icon
     file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     size: 30
@@ -107,7 +109,6 @@ font:
       - "\U000F04AD"   # skip-next
       - "\U000F04AE"   # skip-previous
       - "\U000F0387"   # music-note
-      - "\U000F0580"   # volume-medium
 
 # Cover art. The URL here is never fetched - `update_interval: never` and the
 # component only downloads when asked - but one has to be given, so it is the
@@ -126,20 +127,31 @@ image:
     buffer_size: 32768
     update_interval: never
     on_download_finished:
+      # HAVING a picture and SHOWING it are two different questions, and this
+      # callback only answers the first. It used to show the cover itself, which
+      # outranked everything: Home Assistant hands out an `entity_picture` for a
+      # stopped player too, so after a reboot the box fetched the last track's
+      # art and put it on screen under "Nothing playing" - the exact thing the
+      # visibility rule in media_refresh was added to prevent. One place decides.
       - lambda: |-
           id(media_cover_ready) = true;
-      - lvgl.widget.hide: media_note
-      - lvgl.widget.show: media_cover_obj
       - lvgl.image.update:
           id: media_cover_obj
           src: media_cover
+      - script.execute: media_refresh
     on_error:
       # No artwork, a format the decoder does not speak, or Home Assistant not
       # reachable - all the same thing from here: show the note instead.
+      #
+      # FORGET THE URL as well. The fetch guard records a picture as "seen"
+      # before asking for it, so without this line a download that failed once
+      # is never retried: Home Assistant republishes the same `entity_picture`,
+      # the guard says "already have it", and the note stays until the track
+      # changes. A blip while HA restarts should cost one repaint, not a song.
       - lambda: |-
           id(media_cover_ready) = false;
-      - lvgl.widget.hide: media_cover_obj
-      - lvgl.widget.show: media_note
+          id(media_cover_url).clear();
+      - script.execute: media_refresh
 
 text_sensor:
   - platform: homeassistant
@@ -278,6 +290,25 @@ script:
           if (seen_artist != artist) {
             seen_artist = artist;
             lv_label_set_text(id(media_artist), artist.c_str());
+          }
+
+          // THE COVER BELONGS TO THE TRACK, so it goes when the track does.
+          // Nothing used to hide it: the download callbacks were the only thing
+          // touching either widget, so when the player stopped, the last album
+          // art sat there under "Nothing playing" until something else played.
+          // This is also the only reader of `media_cover_ready`, which was
+          // written twice and used nowhere.
+          static int seen_art = -1;
+          const int art = (active && id(media_cover_ready)) ? 1 : 0;
+          if (seen_art != art) {
+            seen_art = art;
+            if (art) {
+              lv_obj_add_flag(id(media_note), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_clear_flag(id(media_cover_obj), LV_OBJ_FLAG_HIDDEN);
+            } else {
+              lv_obj_clear_flag(id(media_note), LV_OBJ_FLAG_HIDDEN);
+              lv_obj_add_flag(id(media_cover_obj), LV_OBJ_FLAG_HIDDEN);
+            }
           }
 
           // The middle button shows what a TAP WILL DO, which is the opposite of
