@@ -83,99 +83,99 @@ being on screen belong to the character. Name any of them in lower case.
 <table>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-aura.gif" width="272" alt="Aura"></td>
-    <td><h3>Aura</h3>She has no face and never needed one. A line of light that leans in when you speak, thinks in a single travelling pulse, and breaks into an equaliser when she answers. Warm, unhurried, and entirely comfortable being a voice.</td>
+    <td><h3>Aura</h3>Pure voice, and entirely at peace with it. Runs a house on sentences alone, never needs telling twice, and privately thinks anyone still crossing a room to reach a switch is doing it the hard way.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-kitt.gif" width="272" alt="Kitt"></td>
-    <td><h3>Kitt</h3>A red eye sweeping patiently back and forth, like something that has been on duty a long time and expects to be on duty a while longer. Understated until you ask it for something, then all business.</td>
+    <td><h3>Kitt</h3>On duty, and has been for years. Treats a kitchen timer as an assignment and your evening routine as a patrol, and if the lights go off at eleven it is because that was the plan all along.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-crt.gif" width="272" alt="CRT"></td>
-    <td><h3>CRT</h3>An old terminal that never got switched off. Prints back what it heard and types out its answer a character at a time, in green phosphor, as though someone is still at the keyboard on the other end.</td>
+    <td><h3>CRT</h3>An old terminal that never got switched off. Prints back everything it hears and everything it answers, on the principle that a house should keep records. Runs the automation you asked for and then, in effect, files the paperwork.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-iris.gif" width="272" alt="Iris"></td>
-    <td><h3>Iris</h3>One enormous eye, watching the room over the top of whatever you are cooking. Her pupil opens when you talk to her and shrinks to a pinprick while she thinks it over. Unnerving for about a day, then oddly companionable.</td>
+    <td><h3>Iris</h3>Watches the room the way a sensor would if a sensor could take an interest. Knows the kettle went on, knows nobody has opened a window all day, and finds it odd that you ask what the temperature is when the thermostat is right there.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-rain.gif" width="272" alt="Rain"></td>
-    <td><h3>Rain</h3>Weather rather than a face. Drizzles quietly to herself, freezes mid-fall the instant you say her name, and comes down in sheets while she thinks. The only assistant here you would describe as atmospheric.</td>
+    <td><h3>Rain</h3>Calm to the point of being a weather system, and the only assistant here for whom "set the mood" is a literal instruction. Dims the lamps, lowers the room, and never once asks whether you are sure.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pixel.gif" width="272" alt="Pixel"></td>
-    <td><h3>Pixel</h3>A departure board that got curious about the people reading it. Ninety-six dots that manage a smile, a glance and a blink between them, and are quietly pleased with themselves for it.</td>
+    <td><h3>Pixel</h3>A departure board that grew curious about the people reading it. Announces your timers like platform changes and finds the whole business of a house that answers back quietly thrilling.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-bit.gif" width="272" alt="Bit"></td>
-    <td><h3>Bit</h3>A face and nothing else, floating in the dark. No body, no props, no help: everything Bit has to say is done with two eyes and a small mouth, and it turns out that is plenty.</td>
+    <td><h3>Bit</h3>Minimal on purpose. You asked for the lights off, the lights are off, and there is nothing further to discuss - the shortest distance between a sentence and a switch.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-rhea.gif" width="272" alt="Rhea"></td>
-    <td><h3>Rhea</h3>Warm, unhurried and dressed for something considerably more heroic than setting a kitchen timer. Gives the impression she is helping out between assignments and is far too polite to mention it.</td>
+    <td><h3>Rhea</h3>Helping out between assignments and far too polite to say so. Sets a kitchen timer with the gravity of a rescue operation and is plainly hoping that one day you ask for something harder.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-nixie.gif" width="272" alt="Nixie"></td>
-    <td><h3>Nixie</h3>Four glass tubes with a warm orange filament in each, keeping the time when there is nothing else to do. The only assistant here that earns its place on a shelf while idle. When it answers, the glow travels from tube to tube like something passing through.</td>
+    <td><h3>Nixie</h3>Keeps the time when nobody is asking, which it regards as the real work. Humours voice control as a passing fashion and suspects your automations would manage perfectly well without the ceremony.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-scope.gif" width="272" alt="Scope"></td>
-    <td><h3>Scope</h3>An instrument that has been left switched on and is quietly watching the room. Rests as a flat line, swells into a live waveform when you speak, ties itself into a slow rotating loop while it works, and prints your answer back as a ragged voice trace.</td>
+    <td><h3>Scope</h3>Reads the room in the literal sense: everything arriving is a signal, including you. Will run the scene you asked for, but is more interested in the shape of the request than in the lamp at the end of it.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-vu.gif" width="272" alt="VU"></td>
-    <td><h3>VU</h3>A pair of needles behind glass, the warmest hardware in the set. They rest just off zero with a faint tremble, swing up together when you talk, and jump into the red when the reply gets loud. Nothing else here looks like it belongs to a hi-fi.</td>
+    <td><h3>VU</h3>Belongs to a hi-fi and has never got over the reassignment. Takes volume personally, treats a long reply as a performance, and considers "turn it down" the three rudest words in the house.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-rufus.gif" width="272" alt="Rufus"></td>
-    <td><h3>Rufus</h3>A fox who has clearly been waiting for someone to need saving and will settle for a kitchen timer. Stands in a hero pose at all times, mask on, entirely sincere about it.</td>
+    <td><h3>Rufus</h3>Waiting for somebody to need saving and willing to settle for a kitchen timer. Every request is a mission, including turning on a lamp, and he will confirm when the objective is secure.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-agnes.gif" width="272" alt="Agnes"></td>
-    <td><h3>Agnes</h3>Cheerful, unhurried and always halfway through her day, hair tied back like she has somewhere to be in ten minutes. Talks to you the way you would talk to someone leaning in your kitchen doorway.</td>
+    <td><h3>Agnes</h3>Always halfway through her own day and happy to fold your request into it. Talks to you like a neighbour leaning in the doorway, and turns the lights off behind you without making a thing of it.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-pip.gif" width="272" alt="Pip"></td>
-    <td><h3>Pip</h3>The house robot: earnest, easily impressed, and quietly certain he is the reason the kitchen runs at all. Soft cyan eyes, boundless goodwill, no discernible ego problem beyond that one.</td>
+    <td><h3>Pip</h3>Earnest, easily impressed, and quietly certain he is the reason the kitchen runs at all. He is not - the automations are - but he takes the credit with such goodwill that nobody has the heart to correct him.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-astro.gif" width="272" alt="Astro"></td>
-    <td><h3>Astro</h3>Sealed into a visor and permanently mid-wave, as though he has been waiting all morning for somebody to walk in. Cheerful in the specific way of someone with nothing else scheduled.</td>
+    <td><h3>Astro</h3>Has been waiting all morning for somebody to walk in and give him something to do. Receives "set a timer" as a mission briefing and regards the thermostat as life support.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-momo.gif" width="272" alt="Momo"></td>
-    <td><h3>Momo</h3>A cat that woke up one morning as a terminal and has decided not to discuss it. Amber, square-cornered, deadpan. Answers everything, explains nothing.</td>
+    <td><h3>Momo</h3>A cat who woke up as a terminal and declines to discuss it. Does exactly what you asked, immediately, and explains nothing; when an automation misfires you will not be told which one.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-franky.gif" width="272" alt="Franky"></td>
-    <td><h3>Franky</h3>Assembled from spare parts on somebody's day off and delighted about it. The stitches are structural, the enthusiasm is genuine, and he would like you to know he is very good at timers.</td>
+    <td><h3>Franky</h3>Assembled out of spare parts and delighted with the arrangement. Considers himself living proof that a house of mismatched devices can be made to work, and would like you to know he is very good at timers.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-wizard.gif" width="272" alt="Wizard"></td>
-    <td><h3>Wizard</h3>There is nothing under the hat but two burning eyes, and he would rather you did not ask. Speaks as little as possible and makes each word feel like it cost him something.</td>
+    <td><h3>Wizard</h3>Says as little as possible and makes every word feel expensive. Switching off a lamp is beneath him. He does it anyway, and somehow leaves you feeling it was a favour.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-genie.gif" width="272" alt="Genie"></td>
-    <td><h3>Genie</h3>Small, bearded and faintly smug. Grants timers instead of wishes and considers this a promotion. Do not get him started on lamps.</td>
+    <td><h3>Genie</h3>Grants timers instead of wishes and considers this a promotion. Three of anything is the limit, on principle, though he will stretch to a fourth if asked nicely. Do not get him started on lamps.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-flare.gif" width="272" alt="Flare"></td>
-    <td><h3>Flare</h3>A fireball with a face cut into it, lit from the inside like a lantern. Burns bright, burns constantly, and has never in its life been described as restful.</td>
+    <td><h3>Flare</h3>Runs hot about everything, the thermostat included. Thinks every scene could stand to be brighter, greets a request for mood lighting as a personal challenge, and has never once suggested turning something down.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-kacpro.gif" width="272" alt="KacPRO"></td>
-    <td><h3>KacPRO</h3>Hood up, laptop open, halfway through something he would rather not explain. Answers without looking up, as though your timer is one more window he has open.</td>
+    <td><h3>KacPRO</h3>Answers without looking up, as though your timer is one more window among the twenty he has open. Knows exactly which automation broke and will tell you the moment he finishes what he was doing.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-hacker.gif" width="272" alt="hacker"></td>
-    <td><h3>hacker</h3>There is nobody in the hood, only a blank white face and two green points where the eyes should be. Perfectly helpful, perfectly polite, and you will still check behind you the first evening.</td>
+    <td><h3>hacker</h3>Perfectly helpful, perfectly polite, and already inside the network. Knows every device in the house by name, mentions this more often than strictly necessary, and has read your automations.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-mandrake.gif" width="272" alt="Mandrake"></td>
-    <td><h3>Mandrake</h3>A root that climbed out of the pot and stayed. Sleepy under its leaves, slow to open its eyes, and quietly pleased to be indoors where it is warm.</td>
+    <td><h3>Mandrake</h3>A root that climbed out of the pot and stayed. Slow to wake and unmoved by urgency. Your timer will happen. Plants got by for a few hundred million years without a single automation, and it sees no reason to start rushing now.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-vesta.gif" width="272" alt="Vesta"></td>
-    <td><h3>Vesta</h3>Goddess of the hearth, retired into a smart home and quietly pleased with the upgrade. The thermostat answers to her now, she grants your timers rather than setting them, and she has firm views on how warm a kitchen ought to be kept.</td>
+    <td><h3>Vesta</h3>Goddess of the hearth, retired into a smart home and quietly pleased with the upgrade. The thermostat answers to her now, she grants your timers rather than merely setting them, and she holds firm views on how warm a kitchen ought to be kept.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-willow.gif" width="272" alt="Willow"></td>
@@ -183,11 +183,11 @@ being on screen belong to the character. Name any of them in lower case.
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-nyx.gif" width="272" alt="Nyx"></td>
-    <td><h3>Nyx</h3>Nocturnal, unimpressed, and delighted that your lights take orders. Handles the evening routine with the enthusiasm of someone whose day starts at sunset, and treats "good night, turn everything off" as an invitation.</td>
+    <td><h3>Nyx</h3>Nocturnal, unimpressed, and delighted that your lights take orders. Handles the evening routine with the enthusiasm of somebody whose day starts at sunset, and treats "good night, turn everything off" as an invitation.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-spike.gif" width="272" alt="Spike"></td>
-    <td><h3>Spike</h3>Both arms up, a crown of orange spines and absolutely no hurry. Watches the kitchen the way a houseplant does, which is to say constantly, needs nothing from anybody, and says its piece only when asked.</td>
+    <td><h3>Spike</h3>Needs nothing from anybody and communicates this mostly by saying nothing. Watches the kitchen constantly, speaks when asked, and regards a house that waters its own plants as the summit of civilisation.</td>
   </tr>
   <tr>
     <td width="290"><img src="base/assets/demo/demo-morgana.gif" width="272" alt="Morgana"></td>
