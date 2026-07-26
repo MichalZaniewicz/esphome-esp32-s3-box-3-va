@@ -1,0 +1,259 @@
+# =============================================================================
+# SPIKE 2, gałąź `audio-stack`. A voice assistant on the duplex audio stack.
+# -----------------------------------------------------------------------------
+# Spike 1 answered the hardware question: this board carries the speaker DAC
+# back into the ES7210, on TDM slot 1, and the component runs full duplex at
+# 48 kHz with 16-bit slots. See SPIKE-FINDINGS.md.
+#
+# This one answers the only question left before any migration is worth
+# planning: **does an assistant actually work on it, and does AEC buy barge-in?**
+#
+# Deliberately NOT a port of base/core.yaml. No display, no LVGL, no character,
+# no carousel, no TTS routing, no timers - one microphone, one wake word, one
+# pipeline, one speaker. Every one of those omissions is a variable this test
+# does not have to control.
+#
+# WHAT TO TRY, in order:
+#
+#   1. Say "Alexa, what time is it" with the room quiet. If the pipeline does
+#      not complete, nothing else here matters and the migration is off.
+#   2. Play something on the box (media player entity in Home Assistant), then
+#      say "Alexa" over it. THIS IS THE WHOLE POINT: on the current firmware the
+#      wake word is not even running while the speaker plays, so this is
+#      impossible today.
+#   3. Turn the AEC switch off and repeat 2. The difference between the two is
+#      what the echo canceller is worth on this hardware.
+#
+# The assistant here has no screen, so watch Home Assistant's
+# `assist_satellite.*` entity for listening / processing / responding, exactly
+# as the kitchen box is measured.
+# =============================================================================
+
+substitutions:
+  name: box3-va-duplex
+  friendly_name: BOX3 VA duplex
+
+  i2c_sda: GPIO8
+  i2c_scl: GPIO18
+  i2s_mclk: GPIO2
+  i2s_bclk: GPIO17
+  i2s_lrclk: GPIO45
+  i2s_dout: GPIO15
+  i2s_din: GPIO16
+  amp_enable: GPIO46
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  name_add_mac_suffix: false
+
+esp32:
+  board: esp32s3box
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+  level: DEBUG
+
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+i2c:
+  - id: i2c_bus
+    sda: ${i2c_sda}
+    scl: ${i2c_scl}
+    scan: true
+    frequency: 400kHz
+
+external_components:
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.7.0
+    components: [esp_audio_stack, esp_aec, esp_afe]
+
+switch:
+  # The amplifier stays on for the whole spike: barge-in cannot be tested
+  # against a speaker nobody can hear.
+  - platform: gpio
+    id: amp_on
+    name: Amplifier
+    pin: ${amp_enable}
+    restore_mode: ALWAYS_ON
+  - platform: esp_audio_stack
+    esp_audio_stack_id: audio_stack
+    aec:
+      name: AEC
+
+  # Mute stops the wake word outright. No phases and no screen to keep in step
+  # here - that is the core's job, and this file is not the core.
+  - platform: template
+    name: Mute
+    id: mic_mute
+    icon: "mdi:microphone-off"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - micro_wake_word.stop:
+    turn_off_action:
+      - micro_wake_word.start:
+
+button:
+  - platform: restart
+    name: Restart
+
+esp_afe:
+  id: afe_processor
+  type: sr
+  mode: low_cost
+  mic_num: 1
+  aec_enabled: true
+  ns_enabled: true
+  vad_enabled: false
+  agc_enabled: true
+
+esp_audio_stack:
+  id: audio_stack
+  processor_id: afe_processor
+  # All four measured in spike 1, and they only work together: 32 bits at 48 kHz
+  # fails the I2S init, and a 16 kHz bus plays silence because the speaker is
+  # still fed 48 kHz with no conversion.
+  sample_rate: 48000
+  output_sample_rate: 16000
+  bits_per_sample: 16
+  slot_bit_width: 16
+
+  i2s_mclk_pin: ${i2s_mclk}
+  i2s_bclk_pin: ${i2s_bclk}
+  i2s_lrclk_pin: ${i2s_lrclk}
+  i2s_din_pin: ${i2s_din}
+  i2s_dout_pin: ${i2s_dout}
+
+  use_tdm_reference: true
+  tdm_total_slots: 4
+  tdm_mic_slot: 0
+  tdm_ref_slot: 1          # measured: the only slot that moves with the amplifier off
+  tdm_tx_slot: 0
+
+  codec:
+    input:
+      type: es7210
+      address: 0x40
+    output:
+      type: es8311
+      address: 0x18
+
+# Kept from spike 1 so the reference can be re-checked without another build.
+sensor:
+  - platform: esp_audio_stack
+    esp_audio_stack_id: audio_stack
+    tdm_slot_levels:
+      - slot: 0
+        name: TDM slot 0
+      - slot: 1
+        name: TDM slot 1
+      - slot: 2
+        name: TDM slot 2
+      - slot: 3
+        name: TDM slot 3
+
+microphone:
+  - platform: esp_audio_stack
+    id: clean_mic
+    esp_audio_stack_id: audio_stack
+
+speaker:
+  - platform: esp_audio_stack
+    id: speaker_out
+    esp_audio_stack_id: audio_stack
+    sample_rate: 48000
+    bits_per_sample: 16
+    buffer_duration: 500ms
+
+media_player:
+  - platform: speaker
+    id: box_player
+    name: Box player
+    announcement_pipeline:
+      speaker: speaker_out
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+
+# THE POINT OF THE WHOLE FILE: the wake word runs on the PROCESSED microphone,
+# the one the AEC has already had its way with. On the current firmware it runs
+# on the raw stream and is stopped outright whenever the speaker plays.
+micro_wake_word:
+  id: mww
+  microphone:
+    microphone: clean_mic
+    channels: 0
+    gain_factor: 4
+  models:
+    - model: alexa
+      probability_cutoff: 0.6
+      sliding_window_size: 3
+
+voice_assistant:
+  id: va
+  microphone: clean_mic
+  micro_wake_word: mww
+  # Same reason as in the core: without a media player Home Assistant stops
+  # offering the wake word picker and the satellite never leaves `responding`.
+  media_player: box_player
+  noise_suppression_level: 0     # the AFE already does this; do not do it twice
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+  on_client_connected:
+    - micro_wake_word.start:
+  on_client_disconnected:
+    - micro_wake_word.stop:
+  # WAKE WORD MUSI WRACAC, I TO WIELOMA DROGAMI. Pierwsza wersja tego pliku
+  # miala tylko start przy polaczeniu Home Assistant - trafienie zatrzymalo
+  # wake word, pipeline nie doszedl do konca, i urzadzenie zostalo gluche na
+  # stale, bez jednej linii w logu. Rdzen ma na to cztery sciezki i nie bez
+  # powodu.
+  on_end:
+    - delay: 200ms
+    - if:
+        condition:
+          and:
+            - not:
+                voice_assistant.is_running:
+            - switch.is_off: mic_mute
+        then:
+          - micro_wake_word.start:
+  on_error:
+    - delay: 200ms
+    - if:
+        condition:
+          switch.is_off: mic_mute
+        then:
+          - micro_wake_word.start:
+
+interval:
+  # Ostatnia deska ratunku. Jesli zaden z powyzszych nie zadzialal, po dziesieciu
+  # sekundach ciszy wake word i tak wraca. Lepiej sprawdzic warunek za duzo razy
+  # niz raz zostac gluchym do restartu.
+  - interval: 10s
+    then:
+      - if:
+          condition:
+            and:
+              - not:
+                  voice_assistant.is_running:
+              - not:
+                  micro_wake_word.is_running:
+              - switch.is_off: mic_mute
+          then:
+            - logger.log: "watchdog: wake word nie chodzil, podnosze"
+            - micro_wake_word.start:
