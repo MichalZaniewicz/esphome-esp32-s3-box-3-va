@@ -177,6 +177,9 @@ text_sensor:
             id(media_pos_base) += (millis() - id(media_pos_at)) / 1000.0f;
             id(media_pos_at) = 0;
           }
+      # Odtwarzacz wlasnie ozyl: okladka, ktora przy zatrzymanym byla pomijana,
+      # ma sie teraz pobrac. Straznik w srodku i tak odsieje powtorke.
+      - script.execute: media_fetch_cover
       - script.execute: media_refresh
   - platform: homeassistant
     id: media_title_src
@@ -404,6 +407,19 @@ script:
       - if:
           condition:
             lambda: |-
+              // NIE POBIERAJ DLA ZATRZYMANEGO ODTWARZACZA. Home Assistant podaje
+              // `entity_picture` takze wtedy, gdy nic nie gra - przy starcie
+              // urzadzenia przychodzi okladka ostatniego utworu sprzed godzin.
+              // Box sciagal ja wtedy i dekodowal: 113 KB JPEG-a, 1.7 sekundy
+              // zablokowanej petli i szesc ostrzezen "Not enough free bytes in
+              // ring buffer" z wake worda, dla obrazka, ktorego i tak nie widac,
+              // bo ekran mowi "Nothing playing".
+              //
+              // Adres NIE jest zapamietywany, gdy pobranie sie nie odbylo, wiec
+              // po nacisnieciu play ten sam obrazek zostanie pobrany normalnie.
+              const std::string st = id(media_state).state;
+              if (st != "playing" && st != "paused" && st != "buffering")
+                return false;
               const std::string pic = id(media_picture_src).state;
               if (pic.empty() || pic == id(media_cover_url)) return false;
               id(media_cover_url) = pic;
