@@ -284,8 +284,8 @@ among them: Home Assistant supplies the time zone along with the time.
 | Substitution | Default | What it does |
 |---|---|---|
 | `name` / `friendly_name` | `esp32-s3-box-3-va` / `S3 Box 3 Voice` | Device name. Changing `name` re-creates every entity in Home Assistant. |
-| `external_media_player_id` | `media_player.living_room` | Where the reply goes when `TTS output` is `External player` or `Both`. |
-| `tts_output_default` | `This device` | Boot default of that select. |
+| `external_media_player_id` | `media_player.none` | The speaker this room has besides the box. Where the reply goes when `TTS output` is `External player` or `Both`, and what `media.yaml` watches unless told otherwise. The default is not a real entity: it means there is no such speaker, everything stays on the box, and nothing has to be set. |
+| `tts_output_default` | `This device` | Boot default of that select. Leave it here when there is no external speaker. |
 
 Everything else has a working default: wake word tuning, sounds, fonts, screen
 pages, the boot animation, pins. All of it is in the
@@ -306,7 +306,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `home.yaml` | Clock, date, room temperature/humidity and outdoor temperature, in place of the core's plain text idle screen. Needs `idle_page: page_home` and your HA entity ids; day and month names are substitutions, so it localises without touching the core. |
 | `face.yaml` | An animated assistant: a static character image with eyes, pupils and a mouth drawn on top as LVGL rectangles, reshaped per phase - blinking and glancing about while idle, wide-eyed listening, pupils darting while thinking, mouth moving while replying, red and shaking when a timer goes off. Claims the active phases and leaves idle alone, so it composes with `home.yaml`. Only the small widgets ever redraw, never the background. |
 | `settings.yaml` | The device's own switches as tap tiles - microphone mute, wake sound and the screen, plus the `TTS output` toggle and a volume slider. Reached one swipe down from home (`idle_page_above: page_settings`). The on and off states differ in shape, not only colour, so the screen reads at a glance; the icons are the handful of Material Design glyphs actually used, downloaded at compile time. |
-| `media.yaml` | What is playing on any Home Assistant media player - title, artist, a progress bar and previous / play-pause / next as tap buttons. A **carousel screen**: one swipe left or right from home. Point `media_entity` at a player; it need not be this box. The bar advances locally between Home Assistant's occasional position updates, and only while the page is on screen. |
+| `media.yaml` | What is playing on any Home Assistant media player - title, artist, a progress bar and previous / play-pause / next as tap buttons. A **carousel screen**: one swipe left or right from home. It follows `external_media_player_id` on its own, so a room with one speaker names it once; set `media_entity` only when the screen should watch something else - a TV, another room, or the box's own player, `media_player.<name>_<friendly_name>` slugified. Where Music Assistant and the Cast integration both publish a speaker, pick the Music Assistant one: the raw Cast entity offers no previous/next and no track length. The bar advances locally between Home Assistant's occasional position updates, and only while the page is on screen. |
 | `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 32 looks for the home screen (fonts, colours, gradient backgrounds, layouts and a temperature/humidity dashboard) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 
 The **settings screen** is **one swipe down** from home - the device's own switches

@@ -31,11 +31,16 @@ substitutions:
   name: esp32-s3-box-3-va
   friendly_name: "S3 Box 3 Voice"
 
-  # Where spoken replies come out. `tts_output_default` is the boot default of
-  # the "TTS output" select; you can change it live in Home Assistant.
+  # The speaker this room has besides the box, if any. Name it and two things
+  # can use it: spoken replies, and the optional media screen. Leave it alone if
+  # the box is the only speaker - `media_player.none` is not a real entity, and
+  # everything quietly stays local.
+  #
+  # `tts_output_default` is the boot default of the "TTS output" select; you can
+  # change it live in Home Assistant.
   #   This device / External player / Both        (see README.md)
   # The timer alarm ignores this and always rings on the box.
-  external_media_player_id: media_player.living_room
+  external_media_player_id: media_player.none
   tts_output_default: "This device"
 
   # --- Screens ---------------------------------------------------------------

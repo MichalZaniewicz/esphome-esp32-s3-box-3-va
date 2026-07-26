@@ -34,21 +34,33 @@
 # exactly like a broken screen. So the player's `supported_features` bitmask is
 # read, unsupported buttons are painted dim and their tap does nothing.
 #
-# COVER ART is downloaded by the device from Home Assistant's own image proxy.
-# That needs two things you have to provide: `media_ha_base_url`, because the
-# player's `entity_picture` is a path and not a full URL, and a base URL the
-# BOX can reach - `homeassistant.local` may resolve for your laptop and not for
-# an ESP32. It is fetched fresh on every track change and decoded as JPEG, which
+# COVER ART is downloaded by the device from whatever image proxy the player's
+# `entity_picture` names. Most integrations give a PATH, which is why
+# `media_ha_base_url` exists and has to be an address the BOX can reach -
+# `homeassistant.local` may resolve for your laptop and not for an ESP32. Some,
+# Music Assistant among them, give a complete URL instead; that one is used as
+# it stands. It is fetched fresh on every track change and decoded as JPEG, which
 # is what the proxy serves for practically all album art; anything else fails
 # the decode and the screen falls back to the note icon, which is also what
 # happens when there is no artwork at all.
 ###############################################################################
 
 substitutions:
-  # The player to watch. It has nothing to do with `external_media_player_id`,
-  # which is where the assistant's replies come out - though naming the same one
-  # is a perfectly good idea.
-  media_entity: media_player.living_room
+  # The player to watch. It follows `external_media_player_id` from core.yaml by
+  # default, because the speaker the replies come out of is usually the speaker
+  # you want to see - one line names both. Override it here when they differ: a
+  # TV, a player in another room, or the BOX ITSELF, which Home Assistant names
+  # media_player.<name>_<friendly_name> with both slugified. That last one is
+  # the answer for a box with no external speaker at all: core.yaml's default,
+  # `media_player.none`, exists nowhere, so left alone this screen correctly
+  # reports that nothing is playing.
+  #
+  # Music Assistant note: it publishes its own entity for a speaker ALONGSIDE
+  # the one from the Cast integration, and the two are not equal. The raw Cast
+  # entity does not announce previous/next and does not report media_duration,
+  # so with it the buttons stay dim and the progress bar has nothing to divide
+  # by. Prefer the Music Assistant entity where both exist.
+  media_entity: ${external_media_player_id}
 
   # Where the device fetches cover art from. Scheme and port included, no
   # trailing slash. Leave it at the default and the cover simply never arrives:
@@ -342,7 +354,17 @@ script:
           then:
             - online_image.set_url:
                 id: media_cover
-                url: !lambda return std::string("${media_ha_base_url}") + id(media_cover_url);
+                # `entity_picture` comes in two shapes and only one of them wants
+                # the base URL. The Cast integration gives a path
+                # ("/api/media_player_proxy/..."), Music Assistant gives a whole
+                # URL on its own image proxy port. Prefixing the second produced
+                # "http://host:8123http://host:8095/..." and ESP-IDF answered
+                # "Error parse url", so the cover never arrived at all.
+                url: !lambda |-
+                  const std::string &pic = id(media_cover_url);
+                  if (pic.rfind("http://", 0) == 0 || pic.rfind("https://", 0) == 0)
+                    return pic;
+                  return std::string("${media_ha_base_url}") + pic;
 
 interval:
   - interval: ${media_tick}

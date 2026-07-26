@@ -134,13 +134,32 @@ substitutions:
   hey_jarvis_sliding_window: '3'
 
   # ---------------------------------------------------------------------------
-  # TTS routing (see the header). `tts_output_default` picks the boot default of
-  # the "TTS output" select; the user can change it live in HA.
+  # THE SPEAKER THIS ROOM HAS, if it has one besides the box. It is named once
+  # and used twice: spoken replies can be routed to it, and the optional media
+  # screen watches it, so a config with one external speaker sets one line.
+  #
+  # THE DEFAULT IS "THERE ISN'T ONE". `media_player.none` exists in no Home
+  # Assistant - it is spelled as an entity because the components below insist
+  # on that shape - and everything degrades quietly around it: replies stay on
+  # the box, and the media screen says nothing is playing. So a box that is the
+  # only speaker in the room needs no setting at all.
+  #
+  # To have the media screen follow the BOX ITSELF rather than an external
+  # speaker, leave this alone and set `media_entity` in screens/media.yaml to
+  # the box's own player, which Home Assistant names after the device
+  # (media_player.<name>_<friendly_name>, both slugified). Do NOT point this
+  # substitution there: it would let "External player" hand the reply back to
+  # the box through Home Assistant, which is the one thing that mode exists to
+  # avoid.
+  #
+  # `tts_output_default` picks the boot default of the "TTS output" select; the
+  # user can change it live in HA, and the choice is restored from flash.
   #   "This device"     - the box speaks (upstream behaviour)
   #   "External player" - only ${external_media_player_id} speaks
   #   "Both"            - both, at the cost of the local decode
+  # The last two do nothing at all while this is `media_player.none`.
   # ---------------------------------------------------------------------------
-  external_media_player_id: media_player.living_room
+  external_media_player_id: media_player.none
   tts_output_default: "This device"
 
   # When TTS plays on an external speaker the box hands over a URL and hears
