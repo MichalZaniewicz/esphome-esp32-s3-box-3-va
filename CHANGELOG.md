@@ -43,6 +43,17 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **Every boot downloaded and decoded a cover for a player that was not
+  playing.** Home Assistant hands out `entity_picture` whatever the state, so a
+  box starting up next to a stopped speaker fetched the last track's artwork
+  from hours ago: 113 KB of JPEG, **1.7 seconds of blocked loop** and six
+  `Not enough free bytes in ring buffer` warnings from the wake word, for a
+  picture the screen then hid behind "Nothing playing". The fetch now waits for
+  the player to be playing, paused or buffering, and does not record the URL as
+  seen when it skips - so pressing play fetches it normally. Measured on
+  hardware: loop time max at boot fell from **1738 ms to 89 ms**, and the wake
+  word warnings are gone.
+
 - **A cover that failed to download was never retried.** The fetch guard records
   a picture as "seen" before asking for it, so one failed download - Home
   Assistant restarting, a blip - meant the note stayed until the track changed:
