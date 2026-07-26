@@ -268,6 +268,20 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Added
 
+- **`morgana`**, a witch, taking the cast to 29. Her artwork arrived with no eyes
+  and no mouth already, so nothing had to be erased - but the two dark marks over
+  her forehead are BROWS, not the closed eyes they look like at a glance. Read as
+  eyes they would have put the whole face up on the forehead; read as brows they
+  set the eye spacing and act for free, the way nyx's and mandrake's do.
+
+  Her mouth is the one number here that is a decision rather than a measurement,
+  and the file says so: nothing is drawn below her eyes except the blush, so the
+  mouth sits on the line between the two blush marks. The ratio that placed
+  earlier faces would have put it 9 px lower, on the chin. Her eyes are also
+  deliberately larger than the measurement gives - chibi artwork carries its
+  expression in the eye, and the measured size read as beady against cheeks that
+  size.
+
 - **The room's speaker is named once.** `media_entity` used to be a separate
   setting with an unrelated default, so a box with one external speaker named it
   twice and a box with none had nowhere to say so. The media screen now follows

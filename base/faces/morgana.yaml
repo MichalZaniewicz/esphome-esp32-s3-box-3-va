@@ -1,0 +1,93 @@
+# Morgana - holds that every switch in this house answers to her, and, given
+# what she is wired into, she is not wrong. She waves the wand, Home Assistant
+# does the work, and she takes the credit. A lamp that stays dark never puts the
+# incantation in doubt; it puts your Wi-Fi in doubt. Her repertoire runs two
+# spells deep - "lights out", and "lights out, I said" - and she will tell you
+# the pause before a scene runs is dramatic timing rather than a round trip.
+#
+# Her spells compile to hex, same as every colour below.
+#
+# The artwork arrived with NO eyes and NO mouth already: the two dark angled
+# marks over the forehead are BROWS, not closed eyes, so nothing had to be
+# erased and nothing may be drawn on top of them. They set the eye spacing and
+# they do the acting for free, the way nyx's and mandrake's do.
+#
+# Measured: skin x 128..193, chin at y 137, brow tips ending at y 88. Brow
+# centres are x 143 and x 178, so the mirror axis is 160 - the frame's own - and
+# the eyes hang 16 px either side of it, just under the tips at y 101.
+#
+# THE MOUTH IS A DECISION, NOT A MEASUREMENT, because the artwork draws none.
+# The blush marks are the only landmark below the eyes - centres near y 120,
+# x 134 and x 188 - and on a face of this shape the mouth belongs between them,
+# so it sits at y 120 on their line. The ratio a realistic face would give puts
+# it at y 129, down on the chin, and that is wrong here. Do not "correct" it.
+#
+# The eyes are 19x15 with a 9x10 pupil, which is large for this repo and small
+# for the style: chibi artwork carries most of its expression in the eye, and
+# the measured-looking 17x13 with a 7x8 pupil read as beady against cheeks this
+# big. Compared side by side before choosing.
+#
+# Usage: `assistant: morgana` in your thin config. See base/faces/README.md.
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: faces/morgana.yaml"
+
+# This character is artwork plus measurements; the drawing and animating is done
+# by base/screens/face.yaml, which it pulls in itself. That is what lets a config
+# name one assistant and get everything it needs - see the repository README.
+packages:
+  face_engine:
+    url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
+    ref: main
+    files:
+      - base/screens/face.yaml
+    refresh: 0s
+
+substitutions:
+  face_background_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/faces/morgana.png
+
+  # White eyes with a deep violet pupil, taken from her own hair rather than
+  # black, and a plum mouth: on skin a black one reads as a hole.
+  face_color: '0xFFFFFF'
+  face_mouth_color: '0xA8425F'
+  face_pupil_color: '0x2E1A46'
+  face_alarm_color: '0xFF4D6A'
+
+  face_center_x: '0'
+  face_eye_offset: '16'
+  face_eye_y: '-19'
+  face_eye_w: '19'
+  face_eye_h: '15'
+  face_mouth_y: '0'
+  face_mouth_w: '13'
+  face_mouth_h: '3'
+
+  face_pupil_w: '9'
+  face_pupil_h: '10'
+  face_pupil_radius: '4'
+  face_pupil_dilate: '2'
+  face_pupil_shrink: '2'
+  face_gaze_dx: '4'
+
+  face_eye_h_wide: '18'
+  face_eye_h_think: '15'
+  face_eye_h_narrow: '6'
+  face_eye_h_shut: '3'
+  face_mouth_open_h: '12'
+  face_mouth_small_w: '9'
+  face_mouth_think_w: '7'
+  face_mouth_o_w: '9'
+  face_mouth_o_h: '9'
+  face_mouth_alarm_w: '15'
+  face_mouth_alarm_h: '11'
+  face_mouth_error_w: '9'
+  face_listen_pulse: '3'
+  face_shake_dx: '4'
+  face_tick: 120ms
+  face_eye_radius: '7'
+  face_mouth_radius: '2'
