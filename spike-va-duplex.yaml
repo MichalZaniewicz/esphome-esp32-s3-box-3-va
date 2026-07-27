@@ -13,20 +13,28 @@
 # pipeline, one speaker. Every one of those omissions is a variable this test
 # does not have to control.
 #
-# WHAT TO TRY, in order:
+# WSZYSTKIE TRZY PYTANIA SPIKE'A MAJA JUZ ODPOWIEDZ, zmierzona 2026-07-27:
+# rozmowa dziala, referencja echa siedzi na slocie 1, barge-in dziala. Zostala
+# jedna rzecz przed migracja rdzenia: wykrywanie na strumieniu po AEC jest
+# slabsze niz na surowym mikrofonie. Maksima wysokie, 0.85 do 0.98, ale srednia
+# z trzech klatek 0.37 do 0.60 wobec 0.60 do 0.79 w kuchennym firmware. Szczyt
+# jest krotki, nie sygnal slaby, i dzis stoi na oknie jednej klatki.
 #
-#   1. Say "Alexa, what time is it" with the room quiet. If the pipeline does
-#      not complete, nothing else here matters and the migration is off.
-#   2. Play something on the box (media player entity in Home Assistant), then
-#      say "Alexa" over it. THIS IS THE WHOLE POINT: on the current firmware the
-#      wake word is not even running while the speaker plays, so this is
-#      impossible today.
-#   3. Turn the AEC switch off and repeat 2. The difference between the two is
-#      what the echo canceller is worth on this hardware.
+# DLATEGO TEN PLIK JEST TERAZ PRZYRZADEM POMIAROWYM. Trzy pokretla dzialaja na
+# zywo, bez przebudowy, bo kazda kosztowala trzy minuty i wgranie:
 #
-# The assistant here has no screen, so watch Home Assistant's
-# `assist_satellite.*` entity for listening / processing / responding, exactly
-# as the kitchen box is measured.
+#   Prog wykrywania   0.20 do 0.95   ile modelu trzeba, zeby uznac trafienie
+#   Wzmocnienie mww   1 do 16        mnoznik PRZED modelem, z obcinaniem
+#   Tryb AEC          trzy tryby     przekonfigurowanie kanceleru bez restartu
+#
+# I przelacznik `Tryb strojenia`, ktory odcina rozmowe: wybudzenie tylko sie
+# liczy i wake word nie zatrzymuje sie po trafieniu. Bez tego seria dziesieciu
+# "Alexa" mierzy pierwsze slowo i dziewiec razy cisze, bo pipeline trzyma
+# mikrofon kilkanascie sekund.
+#
+# METODA: dziesiec razy "Alexa" z tego samego miejsca, co trzy sekundy. Trafienia
+# licza sie same, na ekranie i w logu. Potem jedno pokretlo w bok i to samo raz
+# jeszcze. Falszywe wybudzenia mierzy sie odwrotnie: okno ciszy i licznik.
 # =============================================================================
 
 substitutions:
@@ -99,6 +107,27 @@ switch:
     esp_audio_stack_id: audio_stack
     aec:
       name: AEC
+
+  # STROJENIE. Wlaczone: wybudzenie tylko sie liczy, rozmowa nie startuje, a
+  # wake word nie zatrzymuje sie po trafieniu - `stop_after_detection` jest
+  # ustawiane w locie, bo w YAML jest tylko stale. Wylaczone: normalny asystent.
+  - platform: template
+    name: Tryb strojenia
+    id: tuning_mode
+    icon: "mdi:tune"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: config
+    turn_on_action:
+      - lambda: id(mww).set_stop_after_detection(false);
+      - if:
+          condition:
+            not:
+              micro_wake_word.is_running:
+          then:
+            - micro_wake_word.start:
+    turn_off_action:
+      - lambda: id(mww).set_stop_after_detection(true);
 
   # Mute stops the wake word outright. No phases and no screen to keep in step
   # here - that is the core's job, and this file is not the core.
@@ -232,6 +261,14 @@ lvgl:
             text_font: font_small
             text_color: 0x8FA6C0
 
+globals:
+  # Licznik od startu urzadzenia. W trybie strojenia to jedyna rzecz, ktora
+  # Michal widzi z drugiego konca kuchni: czy slowo w ogole trafilo.
+  - id: detect_count
+    type: int
+    restore_value: false
+    initial_value: '0'
+
 script:
   - id: show
     mode: restart
@@ -244,6 +281,24 @@ script:
           lv_label_set_text(id(lbl_phase), big.c_str());
           lv_label_set_text(id(lbl_info), small.c_str());
           lv_obj_set_style_text_color(id(lbl_phase), lv_color_hex(col), LV_PART_MAIN);
+
+  # Mrugniecie na czas strojenia: pipeline nie startuje, wiec nic nie odeslaloby
+  # ekranu do nasluchu. `restart`, bo przy niskim progu wybudzenia potrafia isc
+  # jedno po drugim.
+  - id: blip
+    mode: restart
+    then:
+      - script.execute:
+          id: show
+          big: "ALEXA!"
+          small: !lambda 'return "wybudzen: " + to_string(id(detect_count));'
+          col: 0x35D07F
+      - delay: 1200ms
+      - script.execute:
+          id: show
+          big: "NASLUCH"
+          small: !lambda 'return "wybudzen: " + to_string(id(detect_count));'
+          col: 0x2FA8E0
 
 # Kept from spike 1 so the reference can be re-checked without another build.
 sensor:
@@ -270,6 +325,82 @@ number:
       max_value: 30
     master_volume:
       name: Master volume
+
+  # PROG WYKRYWANIA NA ZYWO. `set_probability_cutoff` jest publiczne na modelu, a
+  # `get_wake_words()` na komponencie, wiec caly sweep progu robi sie bez jednej
+  # przebudowy. Wczesniej kazdy krok kosztowal kompilacje i wgranie.
+  #
+  # `restore_value: false` i `initial_value` rowne temu, co jest wkompilowane:
+  # po restarcie urzadzenie ma wrocic do stanu z pliku, a nie do przypadkowej
+  # wartosci z flasha, ktora sfalszowalaby nastepny pomiar.
+  - platform: template
+    name: Prog wykrywania
+    id: mww_cutoff
+    icon: "mdi:target-variant"
+    optimistic: true
+    restore_value: false
+    initial_value: 0.60
+    min_value: 0.20
+    max_value: 0.95
+    step: 0.01
+    mode: box
+    entity_category: config
+    set_action:
+      - lambda: |-
+          uint8_t q = (uint8_t) lroundf(x * 255.0f);
+          for (auto *m : id(mww).get_wake_words()) {
+            m->set_probability_cutoff(q);
+          }
+          ESP_LOGI("stroj", "prog wykrywania = %.2f (%u/255)", x, q);
+
+  # WZMOCNIENIE PRZED MODELEM, tez na zywo. Mnozenie jest twarde i z obcinaniem
+  # (clamp do Q25), wiec jesli wyjscie AEC jest juz glosne, x4 obcina szczyty i
+  # deformuje widmo - a to wyglada dokladnie tak jak objaw, ktory tu tropimy.
+  # Rdzen na surowym mikrofonie mial to obojetne, ale tam sygnal jest cichszy.
+  - platform: template
+    name: Wzmocnienie mww
+    id: mww_gain
+    icon: "mdi:volume-plus"
+    optimistic: true
+    restore_value: false
+    initial_value: 4
+    min_value: 1
+    max_value: 16
+    step: 1
+    mode: box
+    entity_category: config
+    set_action:
+      - lambda: |-
+          id(mww_mic_src).set_gain_factor((int32_t) lroundf(x));
+          ESP_LOGI("stroj", "wzmocnienie mww = %d", (int) lroundf(x));
+
+# TRYB AEC NA ZYWO. Komponent umie sie przekonfigurowac bez restartu, wiec
+# porownanie trybow to trzy klikniecia zamiast trzech przebudowy.
+#
+#   sr_low_cost   - liniowy AEC pod wake word, to jest obecny i domyslny
+#   sr_high_perf  - ten sam typ, wiecej obliczen; potrzebuje 40 KB ciaglej
+#                   pamieci DMA na 4 zaczepy i sam odmawia, gdy jej nie ma
+#   fd_low_cost   - full duplex z tlumieniem nieliniowym (esp-sr 2.4+)
+#
+# Bez `restore_value`, z opcja startowa rowna wkompilowanej: po restarcie stan
+# ma byc ten z pliku.
+select:
+  - platform: template
+    name: Tryb AEC
+    id: aec_mode
+    icon: "mdi:tune-variant"
+    optimistic: true
+    restore_value: false
+    initial_option: sr_low_cost
+    entity_category: config
+    options:
+      - sr_low_cost
+      - sr_high_perf
+      - fd_low_cost
+    on_value:
+      - esp_aec.set_mode:
+          id: aec_processor
+          mode: !lambda return x;
 
 microphone:
   - platform: esp_audio_stack
@@ -307,6 +438,9 @@ media_player:
 micro_wake_word:
   id: mww
   microphone:
+    # Nazwany, zeby `gain_factor` dalo sie przestawiac w locie z lambdy. To jest
+    # jedyny sposob, bo MicroWakeWord nie oddaje swojego zrodla mikrofonu.
+    id: mww_mic_src
     microphone: clean_mic
     channels: 0
     gain_factor: 4
@@ -328,17 +462,28 @@ micro_wake_word:
   # wyzwalaczem, a ja go tu pominalem. Objaw: piec wybudzen w logu i zero
   # zdarzen pipeline'u, przy satelicie stojacym w Home Assistant na `idle`.
   on_wake_word_detected:
-    # Diagnostyka: request_start() milczy, gdy asystent nie jest w IDLE, a
-    # ESP_LOGE leci tylko przy braku klienta API. Zero linii po detekcji da sie
-    # wiec wytlumaczyc dwojako - albo wyzwalacz nie startuje, albo startuje i
-    # trafia w cichy powrot. Ta linijka to rozdziela.
-    - logger.log: "TRIGGER: wybudzenie, wolam voice_assistant.start"
-    - script.execute:
-        id: show
-        big: "ALEXA!"
-        small: "slysze cie"
-        col: 0x35D07F
-    - voice_assistant.start:
+    - lambda: id(detect_count)++;
+    - if:
+        condition:
+          switch.is_on: tuning_mode
+        then:
+          # STROJENIE: samo wybudzenie, bez rozmowy. Pipeline zabralby mikrofon
+          # na kilkanascie sekund i kazde nastepne "Alexa" z serii poszloby w
+          # prozne, a seria jest cala metoda pomiaru.
+          - logger.log: "STROJENIE: wybudzenie policzone, pipeline pominiety"
+          - script.execute: blip
+        else:
+          # Diagnostyka: request_start() milczy, gdy asystent nie jest w IDLE, a
+          # ESP_LOGE leci tylko przy braku klienta API. Zero linii po detekcji da
+          # sie wiec wytlumaczyc dwojako - albo wyzwalacz nie startuje, albo
+          # startuje i trafia w cichy powrot. Ta linijka to rozdziela.
+          - logger.log: "TRIGGER: wybudzenie, wolam voice_assistant.start"
+          - script.execute:
+              id: show
+              big: "ALEXA!"
+              small: "slysze cie"
+              col: 0x35D07F
+          - voice_assistant.start:
 
 voice_assistant:
   id: va
