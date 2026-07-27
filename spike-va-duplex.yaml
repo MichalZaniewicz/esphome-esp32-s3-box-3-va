@@ -111,19 +111,22 @@ button:
   - platform: restart
     name: Restart
 
-esp_afe:
-  id: afe_processor
-  type: sr
-  mode: low_cost
-  mic_num: 1
-  aec_enabled: true
-  ns_enabled: true
-  vad_enabled: false
-  agc_enabled: true
+# PROBA 1 z listy: samo kasowanie echa, bez reszty front endu.
+#
+# Zmierzone na pelnym AFE: maksima 0.55 do 0.95, ale SREDNIE 0.35 do 0.59 przy
+# progu 0.60 - model rozpoznaje slowo pewnie, tylko przez zbyt krotka chwile, a
+# uśrednianie po trzech klatkach to rozwadnia. Na surowym mikrofonie tej samej
+# plytki te same slowa daja srednie 0.60 do 0.79. Redukcja szumu i AGC sa
+# najbardziej podejrzane o przerobienie dynamiki, wiec tu ich po prostu nie ma.
+esp_aec:
+  id: aec_processor
+  sample_rate: 16000
+  mode: sr_low_cost
+  filter_length: 4
 
 esp_audio_stack:
   id: audio_stack
-  processor_id: afe_processor
+  processor_id: aec_processor
   # All four measured in spike 1, and they only work together: 32 bits at 48 kHz
   # fails the I2S init, and a 16 kHz bus plays silence because the speaker is
   # still fed 48 kHz with no conversion.
@@ -166,6 +169,18 @@ sensor:
       - slot: 3
         name: TDM slot 3
 
+# Pokretla na zywo. mic_gain wchodzi PRZED procesorem, wiec dotyczy tego, co
+# widzi wake word - i o to chodzi w tym stroju.
+number:
+  - platform: esp_audio_stack
+    esp_audio_stack_id: audio_stack
+    mic_gain:
+      name: Mic gain
+      min_value: -20
+      max_value: 30
+    master_volume:
+      name: Master volume
+
 microphone:
   - platform: esp_audio_stack
     id: clean_mic
@@ -192,6 +207,13 @@ media_player:
 # THE POINT OF THE WHOLE FILE: the wake word runs on the PROCESSED microphone,
 # the one the AEC has already had its way with. On the current firmware it runs
 # on the raw stream and is stopped outright whenever the speaker plays.
+# STROJENIE, NIE PRODUKCJA. Prog zbity do 0.35 celowo: micro_wake_word nie
+# loguje NICZEGO dla proby ponizej progu, wiec przy 0.6 "nie wykrywa" jest
+# nieodroznialne od "nie slyszy". Nizszy prog zamienia to w liczby.
+#
+# gain_factor zostaje na 4 jak w rdzeniu, ale tam karmi surowy strumien, a tu
+# wyjscie AFE - dlatego prawdziwym pokretlem jest `mic_gain` nizej, ustawialne
+# na zywo bez przebudowy.
 micro_wake_word:
   id: mww
   microphone:
@@ -200,8 +222,23 @@ micro_wake_word:
     gain_factor: 4
   models:
     - model: alexa
+      # PROBA 2 z listy. Zmierzone na tym stosie, dwa razy, przy dwoch roznych
+      # procesorach: maksima 0.85 do 0.98, srednie z trzech klatek 0.37 do 0.60.
+      # Szczyt jest krotki i sasiednie klatki go rozwadniaja, wiec usrednianie po
+      # trzech pracuje przeciwko nam. Okno 1 porownuje z progiem to, co model
+      # naprawde widzi w najlepszej klatce.
+      #
+      # To nie jest obejscie: dokladnie tak naprawiono wykrywanie w rdzeniu, gdzie
+      # skrocenie okna bylo tym, co zadzialalo. Cena jest znana - krotsze okno to
+      # wieksza podatnosc na falszywe wybudzenia - i dlatego prog wraca na 0.6.
       probability_cutoff: 0.6
-      sliding_window_size: 3
+      sliding_window_size: 1
+  # BEZ TEGO DETEKCJA PADA W PROZNIE. `voice_assistant: micro_wake_word: mww`
+  # nie uruchamia pipeline'u samo z siebie - rdzen robi to jawnie tym samym
+  # wyzwalaczem, a ja go tu pominalem. Objaw: piec wybudzen w logu i zero
+  # zdarzen pipeline'u, przy satelicie stojacym w Home Assistant na `idle`.
+  on_wake_word_detected:
+    - voice_assistant.start:
 
 voice_assistant:
   id: va
@@ -214,6 +251,11 @@ voice_assistant:
   auto_gain: 31dBFS
   volume_multiplier: 2.0
   on_client_connected:
+    # WAKE WORD JEST NA URZADZENIU, WIEC HOME ASSISTANT NIE MA GO ROBIC. Bez tej
+    # linii `voice_assistant.start` z wyzwalacza detekcji nie zaklada pipeline'u:
+    # w logu widac wybudzenia, w historii satelity samo `idle`. Rdzen ustawia to
+    # w dwoch miejscach i to nie jest ozdobnik.
+    - lambda: id(va).set_use_wake_word(false);
     - micro_wake_word.start:
   on_client_disconnected:
     - micro_wake_word.stop:
