@@ -238,7 +238,13 @@ micro_wake_word:
   # wyzwalaczem, a ja go tu pominalem. Objaw: piec wybudzen w logu i zero
   # zdarzen pipeline'u, przy satelicie stojacym w Home Assistant na `idle`.
   on_wake_word_detected:
+    # Diagnostyka: request_start() milczy, gdy asystent nie jest w IDLE, a
+    # ESP_LOGE leci tylko przy braku klienta API. Zero linii po detekcji da sie
+    # wiec wytlumaczyc dwojako - albo wyzwalacz nie startuje, albo startuje i
+    # trafia w cichy powrot. Ta linijka to rozdziela.
+    - logger.log: "TRIGGER: wybudzenie, wolam voice_assistant.start"
     - voice_assistant.start:
+    - logger.log: "TRIGGER: po voice_assistant.start"
 
 voice_assistant:
   id: va
