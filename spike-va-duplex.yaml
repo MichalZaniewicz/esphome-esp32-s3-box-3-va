@@ -41,6 +41,12 @@ substitutions:
   i2s_dout: GPIO15
   i2s_din: GPIO16
   amp_enable: GPIO46
+  lcd_clk: GPIO7
+  lcd_mosi: GPIO6
+  lcd_cs: GPIO5
+  lcd_dc: GPIO4
+  lcd_reset: GPIO48
+  lcd_backlight: GPIO47
 
 esphome:
   name: ${name}
@@ -155,6 +161,90 @@ esp_audio_stack:
       type: es8311
       address: 0x18
 
+# EKRAN, zeby wybudzenie dalo sie potwierdzic wzrokiem, a nie tylko logiem.
+# Jedna strona, jeden wielki napis, kolor na faze. Zadnej postaci, zadnej
+# karuzeli - to nadal jest spike, a nie port rdzenia.
+spi:
+  - id: spi_bus
+    clk_pin: ${lcd_clk}
+    mosi_pin: ${lcd_mosi}
+
+display:
+  - platform: mipi_spi
+    id: s3_box_lcd
+    model: S3BOX
+    data_rate: 40MHz
+    cs_pin: ${lcd_cs}
+    dc_pin: ${lcd_dc}
+    reset_pin:
+      number: ${lcd_reset}
+      inverted: true
+    invert_colors: false
+    update_interval: never
+    auto_clear_enabled: false
+
+output:
+  - platform: ledc
+    pin: ${lcd_backlight}
+    id: backlight_output
+
+light:
+  - platform: monochromatic
+    id: backlight
+    name: Screen
+    output: backlight_output
+    restore_mode: ALWAYS_ON
+
+font:
+  - id: font_big
+    file:
+      type: gfonts
+      family: Figtree
+      weight: 700
+    size: 44
+    glyphs: "ABCDEFGHIJKLMNOPRSTUWYZ .!?"
+  - id: font_small
+    file:
+      type: gfonts
+      family: Figtree
+      weight: 400
+    size: 18
+    glyphs: "abcdefghijklmnoprstuwyzABCDEFGHIJKLMNOPRSTUWYZ .,:!?0123456789"
+
+lvgl:
+  displays: [s3_box_lcd]
+  pages:
+    - id: page_main
+      bg_color: 0x000000
+      widgets:
+        - label:
+            id: lbl_phase
+            align: CENTER
+            y: -20
+            text: "NASLUCH"
+            text_font: font_big
+            text_color: 0x2FA8E0
+        - label:
+            id: lbl_info
+            align: CENTER
+            y: 40
+            text: "powiedz Alexa"
+            text_font: font_small
+            text_color: 0x8FA6C0
+
+script:
+  - id: show
+    mode: restart
+    parameters:
+      big: string
+      small: string
+      col: int
+    then:
+      - lambda: |-
+          lv_label_set_text(id(lbl_phase), big.c_str());
+          lv_label_set_text(id(lbl_info), small.c_str());
+          lv_obj_set_style_text_color(id(lbl_phase), lv_color_hex(col), LV_PART_MAIN);
+
 # Kept from spike 1 so the reference can be re-checked without another build.
 sensor:
   - platform: esp_audio_stack
@@ -243,8 +333,12 @@ micro_wake_word:
     # wiec wytlumaczyc dwojako - albo wyzwalacz nie startuje, albo startuje i
     # trafia w cichy powrot. Ta linijka to rozdziela.
     - logger.log: "TRIGGER: wybudzenie, wolam voice_assistant.start"
+    - script.execute:
+        id: show
+        big: "ALEXA!"
+        small: "slysze cie"
+        col: 0x35D07F
     - voice_assistant.start:
-    - logger.log: "TRIGGER: po voice_assistant.start"
 
 voice_assistant:
   id: va
@@ -256,6 +350,24 @@ voice_assistant:
   noise_suppression_level: 0     # the AFE already does this; do not do it twice
   auto_gain: 31dBFS
   volume_multiplier: 2.0
+  on_listening:
+    - script.execute:
+        id: show
+        big: "SLUCHAM"
+        small: "mow"
+        col: 0x2FA8E0
+  on_stt_vad_end:
+    - script.execute:
+        id: show
+        big: "MYSLE"
+        small: "..."
+        col: 0xFFB020
+  on_tts_start:
+    - script.execute:
+        id: show
+        big: "ODPOWIADAM"
+        small: "..."
+        col: 0xB56CE0
   on_client_connected:
     # WAKE WORD JEST NA URZADZENIU, WIEC HOME ASSISTANT NIE MA GO ROBIC. Bez tej
     # linii `voice_assistant.start` z wyzwalacza detekcji nie zaklada pipeline'u:
@@ -272,6 +384,11 @@ voice_assistant:
   # powodu.
   on_end:
     - delay: 200ms
+    - script.execute:
+        id: show
+        big: "NASLUCH"
+        small: "powiedz Alexa"
+        col: 0x2FA8E0
     - if:
         condition:
           and:
