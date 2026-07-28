@@ -132,10 +132,28 @@ swapping `esp_afe` for `esp_aec`, which drops noise suppression, AGC and VAD and
 keeps only echo cancellation, moved the numbers by less than the spread between
 two utterances.
 
-Still open, and the reason this is not finished: **the price of a one-frame
-window is false wakes**, and that needs a long quiet measurement rather than an
-argument. A gain sweep from +24 to -6 dB found no trend, so level is not the
-knob; the window was.
+A gain sweep from +24 to -6 dB found no trend, so level is not the knob; the
+window was.
+
+## And the price of that window, also measured
+
+**Two false wakes in forty minutes of listening at the production cutoff**, in a
+lived-in kitchen on 2026-07-28, with the owner confirming he had not said the
+wake word. One more at a cutoff of 0.45. In normal mode each of those starts a
+conversation, so the one-frame window is not shippable as it stands.
+
+The first false wake with a recorded score came in at **0.72**, which is the
+worst case for the cheap fix. A cutoff high enough to reject it, 0.75, also
+drops three of the ten real words above (0.64, 0.68, 0.72).
+
+Untried, and both settable live: the other AEC modes (`sr_high_perf`,
+`fd_low_cost`) and a lower hardware `Mic gain`. Every number in this file was
+taken on `sr_low_cost` at 24 dB, so the front end has had exactly one setting
+across the whole spike.
+
+Measuring this needs the counter on the device, not a log subscription: the
+first overnight attempt hung on a socket from a laptop that went to sleep, and
+produced no number at all while printing a coverage figure that looked fine.
 
 ## The tuning instrument this left behind
 
