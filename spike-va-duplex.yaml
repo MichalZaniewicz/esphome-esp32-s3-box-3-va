@@ -146,6 +146,28 @@ button:
   - platform: restart
     name: Restart
 
+  # DODATNIA PROBA DLA LICZNIKA. Bez niej "zero wybudzen przez noc" i "licznik
+  # nie dziala" wygladaja identycznie, a raportowanie zera z nieprzetestowanego
+  # przyrzadu to zmyslanie wyniku. Wybudzenia nie da sie wywolac na zadanie, a
+  # zagranie "Alexa" z glosnika obudziloby ktorys z trzech satelitow w domu -
+  # wiec sprawdzamy to ogniwo, ktore naprawde jest nieznane: globalna zmienna
+  # widziana przez czujnik.
+  - platform: template
+    name: Test licznika
+    id: btn_test_counter
+    icon: "mdi:counter"
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(detect_count)++;
+      - logger.log: "TEST: licznik podbity recznie, to nie jest wybudzenie"
+      # Wlasny napis, nie `blip`. Pierwsza wersja odpalala to samo mrugniecie co
+      # wybudzenie i ekran krzyczal ALEXA, kiedy nikt nic nie powiedzial.
+      - script.execute:
+          id: show
+          big: "TEST"
+          small: !lambda 'return "recznie, licznik: " + to_string(id(detect_count));'
+          col: 0xFFB020
+
 # PROBA 1 z listy: samo kasowanie echa, bez reszty front endu.
 #
 # Zmierzone na pelnym AFE: maksima 0.55 do 0.95, ale SREDNIE 0.35 do 0.59 przy
@@ -231,14 +253,17 @@ font:
       family: Figtree
       weight: 700
     size: 44
-    glyphs: "ABCDEFGHIJKLMNOPRSTUWYZ .!?"
+    # X BYLO POTRZEBNE OD POCZATKU: lista glifow byla polskim alfabetem, bez q, v
+    # i x, a slowo ktore ten ekran wypisuje najczesciej to "ALEXA". Zamiast litery
+    # stal kwadrat zastepczy.
+    glyphs: "ABCDEFGHIJKLMNOPQRSTUVWXYZ .!?"
   - id: font_small
     file:
       type: gfonts
       family: Figtree
       weight: 400
     size: 18
-    glyphs: "abcdefghijklmnoprstuwyzABCDEFGHIJKLMNOPRSTUWYZ .,:!?0123456789"
+    glyphs: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ .,:!?0123456789"
 
 lvgl:
   displays: [s3_box_lcd]
@@ -300,8 +325,29 @@ script:
           small: !lambda 'return "wybudzen: " + to_string(id(detect_count));'
           col: 0x2FA8E0
 
-# Kept from spike 1 so the reference can be re-checked without another build.
 sensor:
+  # LICZYDLO SIEDZI W URZADZENIU, nie w moim gniezdzie. Nocny pomiar przez
+  # subskrypcje logu przepadl w calosci: komputer poszedl spac razem z procesem,
+  # gniazdo padlo bez jednej linii ostrzezenia, a cichy log wyglada dokladnie tak
+  # samo jak spokojna noc. Licznik na urzadzeniu tego nie ma jak zmyslic, a
+  # historia Home Assistant zapisuje go co dziesiec sekund niezaleznie ode mnie.
+  - platform: template
+    name: Wybudzenia razem
+    id: sens_detect_count
+    icon: "mdi:counter"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    update_interval: 10s
+    lambda: return id(detect_count);
+
+  # Restart zeruje licznik, bo `detect_count` celowo nie przezywa reboota. Bez
+  # tego czujnika "licznik spadl" i "noc byla spokojna" wygladaja tak samo.
+  - platform: uptime
+    name: Czas pracy
+    id: sens_uptime
+    update_interval: 60s
+
+  # Kept from spike 1 so the reference can be re-checked without another build.
   - platform: esp_audio_stack
     esp_audio_stack_id: audio_stack
     tdm_slot_levels:
