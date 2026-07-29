@@ -103,14 +103,16 @@ substitutions:
   # HARDWARE mic gain on the ES7210 ADC, in dB. Unlike `mww_gain_factor` this
   # sits before the split: it raises or lowers the RAW stream that feeds BOTH the
   # wake word and the Home Assistant speech-to-text, so it is the real "how
-  # sensitive is the microphone" knob. The chip's default is 24 dB and that is
-  # what this board ran on until now. Lower it if the mic picks up too much;
-  # if the wake word then needs shouting at, raise `mww_gain_factor` to give it
+  # sensitive is the microphone" knob. The chip's default is 24 dB; lowered to
+  # 12 on 2026-07-29 after measuring false wakes in the active kitchen at three
+  # levels (24/12/0 dB, same threshold and AEC mode): 12 dB gave the fewest false
+  # wakes of the three with no loss on the ten-word hit test (10/10, same as 24).
+  # If the wake word then needs shouting at, raise `mww_gain_factor` to give it
   # back its headroom without making HA hear more. Exposed as a live `number`
   # further down, which restores across reboots and overrides this at boot - this
   # value is only the starting point and the pre-restore default.
   # Valid ES7210 steps: 0,3,6,9,12,15,18,21,24,27,30,33,34.5,36,37.5.
-  mic_gain_default: '24'
+  mic_gain_default: '12'
 
   # Wake word tuning. The cutoff is compared against the average probability over
   # the sliding window, NOT the peak - which is why the window size matters more
