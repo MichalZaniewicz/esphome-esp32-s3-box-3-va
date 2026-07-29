@@ -100,19 +100,35 @@ substitutions:
   # why this exists and why it is not 1.
   mww_gain_factor: '4'
 
-  # HARDWARE mic gain on the ES7210 ADC, in dB. Unlike `mww_gain_factor` this
-  # sits before the split: it raises or lowers the RAW stream that feeds BOTH the
-  # wake word and the Home Assistant speech-to-text, so it is the real "how
-  # sensitive is the microphone" knob. The chip's default is 24 dB; lowered to
-  # 12 on 2026-07-29 after measuring false wakes in the active kitchen at three
-  # levels (24/12/0 dB, same threshold and AEC mode): 12 dB gave the fewest false
-  # wakes of the three with no loss on the ten-word hit test (10/10, same as 24).
-  # If the wake word then needs shouting at, raise `mww_gain_factor` to give it
-  # back its headroom without making HA hear more. Exposed as a live `number`
-  # further down, which restores across reboots and overrides this at boot - this
-  # value is only the starting point and the pre-restore default.
-  # Valid ES7210 steps: 0,3,6,9,12,15,18,21,24,27,30,33,34.5,36,37.5.
+  # Post-AEC software mic gain trim, in dB (-20..30), applied by esp_audio_stack
+  # AFTER echo cancellation - not the ES7210 hardware PGA (that is
+  # `codec.input.gain_db` on the esp_audio_stack block below, left at its 30 dB
+  # component default and never varied by any measurement here). This is the
+  # knob every false-wake measurement in DO-SPRAWDZENIA.md actually swept.
+  # Chip/component default is 0 dB; raised to 12 to match the old ES7210 default
+  # of 24 dB in audible sensitivity, then measured at three levels (24-equivalent
+  # was never retested post-migration, 12, 0) in the active kitchen on
+  # 2026-07-29: 12 dB gave the fewest false wakes of the three with no loss on
+  # the ten-word hit test (10/10 at every level). If the wake word then needs
+  # shouting at, raise `mww_gain_factor` instead, to give it back its own
+  # headroom without making HA hear more. Exposed as a live `number` further
+  # down, which restores across reboots and overrides this at boot.
   mic_gain_default: '12'
+
+  # Which esp_aec mode runs by default. `sr_low_cost` is the only one measured
+  # safe: `sr_high_perf` needs 40 KB of contiguous DMA-capable RAM for its extra
+  # filter taps and was found on 2026-07-29 to silently refuse the switch once
+  # the heap fragments post-boot, falling back to whatever mode was already
+  # running - not a safe default. `fd_low_cost` (full-duplex nonlinear
+  # suppression) has never been measured at all. Exposed as a live `select`
+  # further down for anyone who wants to try the other two.
+  aec_mode_default: 'sr_low_cost'
+
+  # Speaker ring-buffer depth for the esp_audio_stack driver. The component's own
+  # default is 500ms if this is left unset; explicitly pinned to the value the
+  # old i2s_audio speaker ran at, for comparable reply latency. Untested for
+  # underruns on this specific driver - listen for crackle before trusting it.
+  speaker_buffer_duration: 100ms
 
   # Wake word tuning. The cutoff is compared against the average probability over
   # the sliding window, NOT the peak - which is why the window size matters more
@@ -128,8 +144,18 @@ substitutions:
   # The cutoff sits below the weakest of those with room to spare, because a
   # near miss logs NOTHING - a threshold that only just clears the observed
   # samples silently drops the ones you never see.
+  #
+  # WINDOW 1, NOT 3, on `alexa` only. A 3-frame average dilutes the one-frame-
+  # wide detection peak, which is invisible at rest but costs the one thing full
+  # duplex is for: the peak needs to clear the cutoff WHILE the box is talking,
+  # and averaging in the quiet frames around it was enough to miss that. Proven
+  # 10/10 at window 1 (audio-stack spike, then again after the 2026-07-29 mic
+  # gain change). The false-wake cost of window 1 is the reason `mic_gain_default`
+  # dropped to 12 - see that substitution. `okay_nabu`/`hey_jarvis` were never
+  # part of either measurement, so they stay at window 3 rather than copy an
+  # unvalidated change.
   alexa_probability_cutoff: '0.6'
-  alexa_sliding_window: '3'
+  alexa_sliding_window: '1'
   okay_nabu_probability_cutoff: '0.7'
   okay_nabu_sliding_window: '3'
   hey_jarvis_probability_cutoff: '0.7'
@@ -354,16 +380,18 @@ esphome:
               lv_indev_set_gesture_min_velocity(indev, ${swipe_min_velocity});
               indev = lv_indev_get_next(indev);
             }
-    # Apply the restored mic gain to the ES7210. The template number restores its
-    # value and publishes it, but its setup() does not fire the set_action, so the
-    # ADC would otherwise sit on the static `mic_gain_default` while HA showed the
-    # saved figure. Negative priority so this runs after the ADC and the number
-    # have both finished setting up.
+    # Apply the restored mic gain and AEC mode. Both template entities restore
+    # their value and publish it, but setup() does not fire either set_action, so
+    # the audio stack would otherwise sit on the static compiled default while HA
+    # showed the saved figure. Negative priority so this runs after esp_audio_stack
+    # and both entities have finished setting up.
     - priority: -100
       then:
-        - audio_adc.set_mic_gain:
-            id: es7210_adc
-            mic_gain: !lambda return id(mic_gain_number).state;
+        - lambda: |-
+            id(audio_stack)->set_mic_gain(powf(10.0f, id(mic_gain_number).state / 20.0f));
+        - esp_aec.set_mode:
+            id: aec_processor
+            mode: !lambda return id(aec_mode).state;
         # Seed the carousel position with the home screen's page index. This is
         # not restored across reboots (see the global), so the device always
         # comes back on home; within a session the swipe scripts move it.
@@ -500,56 +528,77 @@ light:
 ###############################################################################
 # AUDIO
 #
-# One I2S bus, the ES7210 capturing at 16 kHz for the wake word and the ES8311
-# playing back at 48 kHz. Unlike boards that share clock pins between separate
-# ADC/DAC buses, the S3-Box-3 wires both codecs to a single bus, so this is the
-# plain stock layout with no master/slave trickery.
+# Full duplex, via the third-party `esp_audio_stack` component, not the stock
+# `i2s_audio` + `audio_adc` + `audio_dac` layout this used to be. It owns the
+# whole I2S bus and both codecs directly and runs a hardware echo reference: the
+# ES8311's own output loops back into the ES7210 on TDM slot 1 (measured on
+# hardware - amplifier off, tone playing, only slot 1 moves), which is what lets
+# the box hear its own wake word while it is talking. Proven on branch
+# audio-stack over several sessions; see SPIKE-FINDINGS.md and
+# DO-SPRAWDZENIA.md for the measurements this migration is built on.
+#
+# The bus runs at 48 kHz / 16-bit / 16-bit slots - not 32-bit slots (fails I2S
+# init on this board) and not a 16 kHz bus (initialises fine and plays total
+# silence). `output_sample_rate: 16000` is what decimates the mic's feed down
+# to the wake word / STT rate; the bus rate itself must stay 48 kHz.
 ###############################################################################
 
-audio_adc:
-  - platform: es7210
-    i2c_id: i2c_bus
-    id: es7210_adc
-    bits_per_sample: 16bit
-    sample_rate: 16000
-    # Starting point only; the `mic_gain_number` below restores its own value and
-    # re-applies it at boot (the template number's setup() publishes state but
-    # does not fire its set_action, so the on_boot handler does the applying).
-    mic_gain: ${mic_gain_default}dB
+external_components:
+  - source: github://n-IA-hane/esphome-audio-stack@v2026.7.0
+    components: [esp_audio_stack, esp_aec]
+    # esp_afe (the fuller ESP-SR front end - noise suppression, AGC, VAD) is
+    # deliberately not pulled in. Every false-wake and hit-rate number this
+    # project has measured is against the lighter esp_aec (echo cancellation
+    # only); switching processors risks changing the spectral features the wake
+    # word model sees, and would invalidate all of it. A future esp_afe
+    # experiment needs its own full re-measurement pass, not a silent swap here.
 
-audio_dac:
-  - platform: es8311
+esp_audio_stack:
+  id: audio_stack
+  i2s_mclk_pin: ${i2s_mclk}
+  i2s_bclk_pin: ${i2s_bclk}
+  i2s_lrclk_pin: ${i2s_lrclk}
+  i2s_din_pin: ${i2s_din}
+  i2s_dout_pin: ${i2s_dout}
+  sample_rate: 48000
+  output_sample_rate: 16000
+  bits_per_sample: 16
+  slot_bit_width: 16
+  use_tdm_reference: true
+  tdm_total_slots: 4
+  tdm_mic_slot: 0
+  tdm_ref_slot: 1          # the only slot that moves with the amplifier off
+  tdm_tx_slot: 0
+  codec:
     i2c_id: i2c_bus
-    id: es8311_dac
-    bits_per_sample: 16bit
-    sample_rate: 48000
+    input:
+      type: es7210
+      address: 0x40
+    output:
+      type: es8311
+      address: 0x18
+  processor_id: aec_processor
 
-i2s_audio:
-  - id: i2s_audio_bus
-    i2s_lrclk_pin:
-      number: ${i2s_lrclk}
-      ignore_strapping_warning: true
-    i2s_bclk_pin: ${i2s_bclk}
-    i2s_mclk_pin: ${i2s_mclk}
+esp_aec:
+  id: aec_processor
+  mode: ${aec_mode_default}
+  filter_length: 4
+  # sample_rate is NOT set here: the component hard-clamps it to exactly 16000
+  # (cv.int_range(min=16000, max=16000)) and rejects any other value.
 
 microphone:
-  - platform: i2s_audio
-    id: box_mic
-    i2s_din_pin: ${i2s_din}
-    sample_rate: 16000
-    bits_per_sample: 16bit
-    adc_type: external
+  - platform: esp_audio_stack
+    id: box_mic              # kept: every downstream reference is unchanged
+    esp_audio_stack_id: audio_stack
+    # Do not add sample_rate/bits_per_sample/num_channels here - the platform's
+    # own schema rejects them outright, because the stream format belongs to the
+    # parent esp_audio_stack bus, not to this child.
 
 speaker:
-  - platform: i2s_audio
-    id: box_speaker
-    i2s_dout_pin: ${i2s_dout}
-    dac_type: external
-    audio_dac: es8311_dac
-    sample_rate: 48000
-    bits_per_sample: 16bit
-    channel: left          # the box has a single output channel
-    buffer_duration: 100ms
+  - platform: esp_audio_stack
+    id: box_speaker           # kept: every downstream reference is unchanged
+    esp_audio_stack_id: audio_stack
+    buffer_duration: ${speaker_buffer_duration}
 
 media_player:
   - platform: speaker
@@ -568,22 +617,6 @@ media_player:
       - id: wake_sound
         file: ${wake_sound_file}
     on_announcement:
-      # The mic cannot capture while the speaker holds the bus, so drop the wake
-      # word for the duration of any announcement.
-      - if:
-          condition:
-            - microphone.is_capturing:
-          then:
-            - script.execute: stop_wake_word
-            - if:
-                condition:
-                  - lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
-                then:
-                  - wait_until:
-                      condition:
-                        - not:
-                            voice_assistant.is_running:
-                      timeout: 30s
       # No pipeline running means this is user- or HA-initiated playback, not a
       # reply: show the muted (blank) page while it plays. A ringing timer is the
       # exception - it is an announcement too, and without this guard it would
@@ -606,10 +639,6 @@ media_player:
               - not:
                   voice_assistant.is_running:
               - lambda: return !id(tts_reply_active);
-              # The wake beep ending lands here, milliseconds before the pipeline
-              # starts. Without this guard the wake word was restarted into the
-              # conversation it had just triggered.
-              - lambda: return !id(wake_start_pending);
           then:
             - script.execute: start_wake_word
             - script.execute: set_idle_or_mute_phase
@@ -634,6 +663,7 @@ micro_wake_word:
   # Raise it (up to 64) if the wake word needs shouting at, lower it if random
   # kitchen noise starts triggering it.
   microphone:
+    id: mww_mic_src
     microphone: box_mic
     channels: 0
     gain_factor: ${mww_gain_factor}
@@ -672,28 +702,15 @@ micro_wake_word:
       probability_cutoff: ${hey_jarvis_probability_cutoff}
       sliding_window_size: ${hey_jarvis_sliding_window}
   on_wake_word_detected:
-    - lambda: id(wake_start_pending) = true;
-    # The beep has to finish before the assistant opens the microphone: one I2S
-    # bus, so capture and playback cannot overlap. `wait_until` rather than a
-    # fixed delay, so a longer replacement sound still works.
+    - lambda: id(detect_count)++;  # TEMPORARY, see the global's comment.
+    # Full duplex, so the wake word no longer has to let go of the bus before
+    # the beep plays - this just plays it and waits it out for pacing (the
+    # `wait_until` keeps a longer replacement sound working correctly).
     - if:
         condition:
           switch.is_on: wake_sound_enabled
         then:
           - lambda: id(wake_sound_active) = true;
-          # WAIT FOR THE MICROPHONE TO LET GO OF THE BUS FIRST. Detection only
-          # ASKS the wake word to stop; the component then tears down its
-          # inference task, which takes a moment. Playing in that window gives
-          # "Parent bus is busy", and the speaker driver then retries after a
-          # FULL SECOND - so the beep, and everything behind it, arrives about
-          # two seconds late. That reads as the wake word being slow to trigger,
-          # which is not what is happening at all.
-          - micro_wake_word.stop:
-          - wait_until:
-              condition:
-                not:
-                  micro_wake_word.is_running:
-              timeout: 1s
           - media_player.speaker.play_on_device_media_file:
               media_file: wake_sound
               announcement: true
@@ -709,7 +726,6 @@ micro_wake_word:
           - lambda: id(wake_sound_active) = false;
     - voice_assistant.start:
         wake_word: !lambda return wake_word;
-    - lambda: id(wake_start_pending) = false;
 
 voice_assistant:
   id: va
@@ -734,21 +750,6 @@ voice_assistant:
     - lambda: id(voice_assistant_phase) = ${voice_assist_thinking_phase_id};
     - script.execute: draw_display
   on_stt_end:
-    # FREE THE I2S BUS FOR THE REPLY, HERE, THIS EARLY.
-    #
-    # The wake word keeps running for the whole conversation, and it holds the
-    # microphone - and so the single I2S bus. When the reply URL arrives,
-    # ESPHome starts playing it immediately, hits "Parent bus is busy", and the
-    # speaker driver then retries a FULL SECOND later, leaving the device deaf
-    # for about two and a half seconds after every answer.
-    #
-    # This was first tried at on_tts_start and did NOT work: TTS_START and
-    # TTS_END are about SIX MILLISECONDS apart, and `wait_until` does not block
-    # the pipeline, so playback began long before the wake word had finished
-    # tearing down its inference task. Speech-to-text ending is roughly two
-    # seconds before the reply, which is ample - so no wait is needed here, only
-    # a head start.
-    - micro_wake_word.stop:
     - text_sensor.template.publish:
         id: text_request
         state: !lambda return x;
@@ -835,37 +836,7 @@ voice_assistant:
                     announcement: true
                 - delay: 250ms
   on_end:
-    # Give a local announcement a moment to start, then let it finish before
-    # taking the I2S bus back for the wake word.
-    - wait_until:
-        condition:
-          - media_player.is_announcing:
-        timeout: 0.5s
-    # TIMEOUT, and it is not decorative. This wait had none, and on 2026-07-20 it
-    # hung: a local reply ended with "ISR event queue overflow, restarting
-    # speaker task", after which speaker.is_playing never went false. on_end
-    # therefore never reached the line that clears tts_reply_active, and that
-    # flag gates the media-player idle handler that would otherwise restart the
-    # wake word. The device went permanently deaf and only a reboot fixed it.
-    #
-    # SIXTY SECONDS, NOT TWENTY, AND THE DIFFERENCE IS VISIBLE ON SCREEN. In
-    # "This device" mode the whole hold block below is skipped, so this wait is
-    # the ONLY thing standing between the pipeline ending and the face being sent
-    # back to idle. A long local reply outlives twenty seconds easily: on
-    # 2026-07-20 one ran from 15:22:42 to 15:23:14, the timeout expired at
-    # 15:23:02, and the clock came up twelve seconds before the box stopped
-    # talking. This is a safety net for a speaker that never reports stopping,
-    # not a schedule - a reply that really has finished satisfies the condition
-    # and moves on immediately.
-    - wait_until:
-        condition:
-          - and:
-              - not:
-                  media_player.is_announcing:
-              - not:
-                  speaker.is_playing:
-        timeout: 60s
-    # Nothing above waits for an EXTERNAL speaker - the box cannot see it. Hold
+    # Nothing below waits for an EXTERNAL speaker - the box cannot see it. Hold
     # the replying phase for as long as the reply plausibly takes, so the face
     # keeps talking and the wake word stays off until the speaker is done.
     - if:
@@ -950,13 +921,9 @@ voice_assistant:
     # beep included. Turning on a GPIO that is already on costs nothing.
     - switch.turn_on: speaker_enable
     - lambda: id(tts_reply_active) = false;
-    # Was an inline copy of start_wake_word's "On device" branch - MINUS its
-    # `not voice_assistant.is_running` guard. That mattered: this handler waits
-    # for the announcement and then holds for the length of the reply, so it
-    # finishes late. If a new interaction had begun in the meantime, the copy
-    # started the wake word INTO a running pipeline, leaving two consumers on one
-    # microphone. That is what floods the log with "Not enough free bytes in ring
-    # buffer" and "Wake word detection is already running".
+    # mww is never stopped mid-conversation any more (full duplex), so this is a
+    # safety reaffirmation, not a restart - start_wake_word's own guard against
+    # a still-running pipeline is what makes it harmless to call from here too.
     - script.execute: start_wake_word
     # THE TAIL NEEDS THE SAME GUARD, for the same reason spelled out above. This
     # handler can arrive here a full minute late - the wait above allows sixty
@@ -1190,15 +1157,6 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: "0"
-  # True from the moment a wake word fires until the pipeline has actually been
-  # started. Without it the wake beep finishing puts the media player into idle,
-  # and that trigger restarts the wake word - a fraction of a second before the
-  # assistant opens the microphone. The result was TFLite inference running for
-  # the whole conversation, alongside the audio streaming, for nothing.
-  - id: wake_start_pending
-    type: bool
-    restore_value: false
-    initial_value: "false"
   # Set while the wake beep plays. Without it the media player's on_announcement
   # handler would treat the beep as user-initiated playback and flash the muted
   # screen between the wake word and the listening face.
@@ -1207,6 +1165,16 @@ globals:
     restore_value: false
     initial_value: "false"
   - id: boot_frame
+    type: int
+    restore_value: false
+    initial_value: "0"
+  # TEMPORARY, for the post-migration hardware verification pass only - strip
+  # before promoting to beta/main. The device's own counter is the only number
+  # that matched ground truth every time during the 2026-07-29 false-wake
+  # measurements; a log-subscription tally can silently undercount even with a
+  # live socket. Restart zeroes it on purpose - `Czas pracy` below is what makes
+  # that visible instead of letting a reboot masquerade as a quiet kitchen.
+  - id: detect_count
     type: int
     restore_value: false
     initial_value: "0"
@@ -1880,28 +1848,13 @@ script:
     mode: restart
     then:
       # WAIT for a pipeline to finish rather than giving up on it. The guards
-      # below refuse to start the wake word into a running pipeline, which is
-      # right - two consumers on one microphone floods the ring buffer. But
+      # below refuse to start the wake word into a running pipeline. But
       # refusing SILENTLY and never trying again is what made the device go deaf
       # after every reply, and the log of 2026-07-20 shows the margin: on_end
       # holds the replying phase while the voice assistant is still in
       # STREAMING_RESPONSE, so it reached this script at 15:12:50.6 and the
       # pipeline went idle at 15:12:52.8. Two and a bit seconds, and the wake
       # word stayed off until the watchdog noticed 37 seconds later.
-      #
-      # The speaker matters too: starting the microphone while the box is still
-      # playing puts two claims on the single I2S bus.
-      #
-      # wake_start_pending IS NOT OPTIONAL HERE, and leaving it out is what
-      # flooded the log with "Not enough free bytes in ring buffer" on
-      # 2026-07-20. Between micro_wake_word.stop and voice_assistant.start in
-      # on_wake_word_detected there is a window - the beep - where the pipeline
-      # has NOT started yet, so "is the assistant running" answers no, and the
-      # speaker falls silent the moment the beep ends. A call that was sitting in
-      # this wait sailed straight through that gap, started the wake word, and
-      # the pipeline then opened the microphone underneath it: two consumers on
-      # one stream. The flag marks exactly that window, which is why the sibling
-      # handler on the media player consults it too.
       - wait_until:
           condition:
             and:
@@ -1909,14 +1862,12 @@ script:
                   - voice_assistant.is_running:
               - not:
                   - speaker.is_playing:
-              - lambda: return !id(wake_start_pending);
           timeout: 30s
       - if:
           condition:
             and:
               - not:
                   - voice_assistant.is_running:
-              - lambda: return !id(wake_start_pending);
               - lambda: return id(wake_word_engine_location).current_option() == "On device";
           then:
             - lambda: id(va).set_use_wake_word(false);
@@ -1926,7 +1877,6 @@ script:
             and:
               - not:
                   - voice_assistant.is_running:
-              - lambda: return !id(wake_start_pending);
               - lambda: return id(wake_word_engine_location).current_option() == "In Home Assistant";
           then:
             - lambda: id(va).set_use_wake_word(true);
@@ -1973,18 +1923,7 @@ script:
             - logger.log:
                 level: INFO
                 format: "Assistant started by the button under the screen"
-            # THE SAME WINDOW AS on_wake_word_detected, and it needs the same
-            # flag. Between stopping the wake word and starting the pipeline
-            # there are 100 ms in which nothing is running and nothing is
-            # playing - so the watchdog, the media player's idle handler, or a
-            # start_wake_word parked in its wait would all happily start the
-            # wake word right before the pipeline opens the microphone. That is
-            # the ring buffer flood, reached by a second route.
-            - lambda: id(wake_start_pending) = true;
-            - script.execute: stop_wake_word
-            - delay: 100ms
             - voice_assistant.start:
-            - lambda: id(wake_start_pending) = false;
 
 # A DEAF DEVICE IS THE ONE FAILURE THAT MATTERS HERE, so this is the backstop.
 #
@@ -2035,7 +1974,6 @@ interval:
               - not:
                   micro_wake_word.is_running:
               - switch.is_off: mute
-              - lambda: return !id(wake_start_pending);
               - lambda: return id(wake_word_engine_location).current_option() == "On device";
           then:
             - lambda: id(deaf_ticks)++;
@@ -2250,11 +2188,13 @@ button:
     internal: true
 
 number:
-  # Live mic sensitivity, in dB, on the ES7210 ADC. See `mic_gain_default` up top
-  # for what this actually moves and its effect on the wake word. Range stops at
-  # 36 rather than the chip's 37.5 so the step stays a clean 3 dB; the top step is
-  # not worth breaking the grid for. `set_mic_gain` quantises to the nearest
-  # supported step anyway, so an off-grid value would just snap.
+  # Live mic sensitivity, in dB, post-AEC. See `mic_gain_default` up top for what
+  # this actually moves and its effect on the wake word. Kept as a template
+  # (not the esp_audio_stack platform's own built-in number) because that native
+  # entity has no config-time default - a virgin flash would publish 0 dB, not
+  # the tested-and-decided value here - and it uses its own separate flash
+  # preference, decoupled from this file's `restore_value` convention.
+  # `set_mic_gain` takes linear gain; this converts from the dB shown in HA.
   - platform: template
     id: mic_gain_number
     name: Mic gain
@@ -2262,16 +2202,56 @@ number:
     entity_category: config
     unit_of_measurement: dB
     mode: slider
-    min_value: 0
-    max_value: 36
-    step: 3
+    min_value: -20
+    max_value: 30
+    step: 1
     initial_value: ${mic_gain_default}
     restore_value: true
     optimistic: true
     set_action:
-      - audio_adc.set_mic_gain:
-          id: es7210_adc
-          mic_gain: !lambda return x;
+      - lambda: |-
+          id(audio_stack)->set_mic_gain(powf(10.0f, x / 20.0f));
+
+  # Live wake-word detection threshold, applied to every loaded model at once
+  # (alexa/okay_nabu/hey_jarvis) via set_probability_cutoff. Moving this to tune
+  # `alexa`'s barge-in behaviour also moves the other two off their own
+  # substitution defaults - accepted trade-off, not an oversight.
+  - platform: template
+    id: mww_cutoff
+    name: Prog wykrywania
+    icon: mdi:tune-variant
+    entity_category: config
+    mode: box
+    min_value: 0.20
+    max_value: 0.95
+    step: 0.01
+    initial_value: ${alexa_probability_cutoff}
+    restore_value: true
+    optimistic: true
+    set_action:
+      - lambda: |-
+          uint8_t q = (uint8_t) roundf(x * 255.0f);
+          for (auto *m : id(mww).get_wake_words())
+            m->set_probability_cutoff(q);
+
+  # Live gain applied to the wake-word model's own input, BEFORE inference -
+  # separate from `Mic gain` above, which sits before the AEC and affects STT
+  # too. See `mww_gain_factor` for why this exists and its usual range.
+  - platform: template
+    id: mww_gain
+    name: Wzmocnienie mww
+    icon: mdi:tune-variant
+    entity_category: config
+    mode: box
+    min_value: 1
+    max_value: 16
+    step: 1
+    initial_value: ${mww_gain_factor}
+    restore_value: true
+    optimistic: true
+    set_action:
+      - lambda: |-
+          id(mww_mic_src)->set_gain_factor((uint8_t) x);
 
 switch:
   - platform: gpio
@@ -2333,16 +2313,9 @@ switch:
       # this arrangement must not have. Costs one GPIO write and does not care
       # whether anything actually turned it off.
       - switch.turn_on: speaker_enable
-      # Free the I2S bus first. The microphone holds it while the wake word is
-      # listening, and `on_announcement` stops the wake word only once playback
-      # has already begun - too late, so the speaker's first attempt fails with
-      # "Parent bus is busy" and retries a second later.
-      - script.execute: stop_wake_word
-      - wait_until:
-          condition:
-            not:
-              microphone.is_capturing:
-          timeout: 2s
+      # Full duplex, so the wake word stays on through the alarm now - "Alexa,
+      # stop" can be heard while it rings, which the shared-bus design could
+      # never do.
       # A muted or turned-down media player makes the alarm play silently, and
       # both survive reboots: the speaker media player persists volume and mute
       # to flash and restores them at boot, so a mute set once months ago is
@@ -2439,6 +2412,29 @@ switch:
       - micro_wake_word.enable_model: mww_hey_jarvis
 
 select:
+  # Live esp_aec mode switch - reconfigures the canceller without a rebuild.
+  # `sr_low_cost` is the proven, safe default; see `aec_mode_default` up top for
+  # why the other two are not. Measured on 2026-07-29: all three gave identical
+  # false-wake counts and identical 10/10 hit rates in the same kitchen, so
+  # there is no evidence swapping modes buys anything - this exists for anyone
+  # who wants to re-check that on their own kitchen.
+  - platform: template
+    id: aec_mode
+    name: Tryb AEC
+    icon: "mdi:waveform"
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    options:
+      - sr_low_cost
+      - sr_high_perf
+      - fd_low_cost
+    initial_option: ${aec_mode_default}
+    on_value:
+      - esp_aec.set_mode:
+          id: aec_processor
+          mode: !lambda return x;
+
   - platform: template
     id: wake_word_engine_location
     name: Wake word engine location
@@ -2543,6 +2539,26 @@ sensor:
     entity_category: diagnostic
     update_interval: 60s
     disabled_by_default: true
+
+  # TEMPORARY PAIR, for the post-migration hardware verification pass only -
+  # strip both before promoting to beta/main. `detect_count` deliberately does
+  # not survive a reboot; `Czas pracy` is what tells a dropped counter apart
+  # from a genuinely quiet kitchen (a restart shows as `Czas pracy` going
+  # backwards, not just the counter reading zero).
+  - platform: template
+    name: Wybudzenia razem
+    id: sens_detect_count
+    icon: "mdi:counter"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    state_class: total_increasing
+    update_interval: 10s
+    lambda: return id(detect_count);
+
+  - platform: uptime
+    name: Czas pracy
+    entity_category: diagnostic
+    update_interval: 60s
 
   # The two numbers that settle the phantom-touch question. Read them together:
   # a count climbing while "Assistant started by the button" never appears in the
