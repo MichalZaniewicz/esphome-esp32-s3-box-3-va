@@ -124,11 +124,14 @@ substitutions:
   # further down for anyone who wants to try the other two.
   aec_mode_default: 'sr_low_cost'
 
-  # Speaker ring-buffer depth for the esp_audio_stack driver. The component's own
-  # default is 500ms if this is left unset; explicitly pinned to the value the
-  # old i2s_audio speaker ran at, for comparable reply latency. Untested for
-  # underruns on this specific driver - listen for crackle before trusting it.
-  speaker_buffer_duration: 100ms
+  # Speaker ring-buffer depth for the esp_audio_stack driver. 500ms is the
+  # component's own default and what the whole audio-stack spike was proven on.
+  # It was briefly set to 100ms (the old i2s_audio speaker's value, for reply
+  # latency) on 2026-07-29 and that firmware could not start I2S at all -
+  # "Cannot enable I2S from error state", speaker dead, in a retry loop. Not
+  # conclusively pinned on this one value, but it was a deviation from the
+  # proven config and it is not worth re-deviating without a reason.
+  speaker_buffer_duration: 500ms
 
   # Wake word tuning. The cutoff is compared against the average probability over
   # the sliding window, NOT the peak - which is why the window size matters more
@@ -380,18 +383,22 @@ esphome:
               lv_indev_set_gesture_min_velocity(indev, ${swipe_min_velocity});
               indev = lv_indev_get_next(indev);
             }
-    # Apply the restored mic gain and AEC mode. Both template entities restore
-    # their value and publish it, but setup() does not fire either set_action, so
-    # the audio stack would otherwise sit on the static compiled default while HA
-    # showed the saved figure. Negative priority so this runs after esp_audio_stack
-    # and both entities have finished setting up.
+    # Apply the restored mic gain. The template number restores its value and
+    # publishes it, but setup() does not fire the set_action, so the audio stack
+    # would otherwise sit on the compiled default while HA showed the saved
+    # figure. Negative priority so this runs after esp_audio_stack and the
+    # number have both finished setting up.
+    #
+    # THE AEC MODE IS DELIBERATELY NOT RE-APPLIED HERE. An earlier version did,
+    # and re-initialising the canceller during boot is a large contiguous DMA
+    # allocation at the worst possible moment - the same allocation that was
+    # measured refusing outright once the heap fragments. The select below is
+    # non-persistent for the same reason: it always starts at the compiled
+    # default, so there is nothing to restore and nothing to re-apply.
     - priority: -100
       then:
         - lambda: |-
             id(audio_stack)->set_mic_gain(powf(10.0f, id(mic_gain_number).state / 20.0f));
-        - esp_aec.set_mode:
-            id: aec_processor
-            mode: !lambda return id(aec_mode).state;
         # Seed the carousel position with the home screen's page index. This is
         # not restored across reboots (see the global), so the device always
         # comes back on home; within a session the swipe scripts move it.
@@ -418,6 +425,23 @@ esp32:
       CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
       CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
       CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+      # THE THREE BELOW ARE WHY THE SPEAKER WORKS AT ALL. Measured on hardware
+      # 2026-07-30 without them: after the audio stack prepares I2S there were
+      # 6736 bytes of internal RAM left, 2284 of it DMA-capable, largest block
+      # 1280. The microphone path fits in that; the moment anything tries to
+      # play - the wake beep, a reply, the timer alarm - the TX path cannot be
+      # allocated, I2S drops into an error state and every later start refuses
+      # with "Cannot enable I2S from error state". The box then answers exactly
+      # one question and goes deaf, because the wake word is never restarted.
+      #
+      # All three move something out of internal RAM and into PSRAM: executable
+      # code, read-only data, and TLS buffers. They are the esp_audio_stack
+      # README's own starting profile for the S3, and this config is far heavier
+      # than the spike the stack was proven on - LVGL, three wake word models,
+      # fonts and artwork all want the same internal RAM the DMA descriptors do.
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
+      CONFIG_SPIRAM_RODATA: "y"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
 
 # The mipi_spi S3BOX model hard-requires PSRAM, and LVGL's draw buffer lives
 # here too.
@@ -569,6 +593,24 @@ esp_audio_stack:
   tdm_mic_slot: 0
   tdm_ref_slot: 1          # the only slot that moves with the amplifier off
   tdm_tx_slot: 0
+
+  # BOTH OF THESE EXIST BECAUSE THIS BOARD RUNS OUT OF INTERNAL RAM, and the
+  # failure is not subtle: TX claims its DMA descriptors, RX then fails with
+  # ESP_ERR_NO_MEM, the whole stack drops into an error state and takes the
+  # microphone down with it. The box answers one question and goes deaf.
+  # Measured 2026-07-30: 40020 bytes of DMA free but the largest contiguous
+  # block only 22528, while each TDM channel wants 6 x 384 frames x 4 slots x
+  # 2 bytes = 18432 of it. One channel fits, the second does not.
+  #
+  # `buffers_in_psram` moves the non-DMA audio buffers out of internal RAM
+  # (~15 KB back), which is what leaves room for two DMA blocks rather than
+  # one. DMA buffers themselves always stay internal, so this does not shrink
+  # the allocation - it stops everything else competing for the same pool.
+  buffers_in_psram: true
+  # Four descriptors instead of the default six: 32 ms of buffering per channel
+  # rather than 48, still a full audio-task frame. This is the other half of
+  # the same problem - it shrinks what each channel actually asks for.
+  dma_desc_num: 4
   codec:
     i2c_id: i2c_bus
     input:
@@ -2418,13 +2460,18 @@ select:
   # false-wake counts and identical 10/10 hit rates in the same kitchen, so
   # there is no evidence swapping modes buys anything - this exists for anyone
   # who wants to re-check that on their own kitchen.
+  # NOT persistent, on purpose: it always comes back on `aec_mode_default` after
+  # a reboot. Restoring it would mean re-initialising the canceller at boot, and
+  # that allocation is exactly what was measured refusing on a fragmented heap.
+  # Nothing is lost - all three modes measured identical on 2026-07-29, so this
+  # is a diagnostic knob, not a setting anyone needs to keep.
   - platform: template
     id: aec_mode
     name: Tryb AEC
     icon: "mdi:waveform"
     entity_category: config
     optimistic: true
-    restore_value: true
+    restore_value: false
     options:
       - sr_low_cost
       - sr_high_perf
