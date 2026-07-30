@@ -157,7 +157,17 @@ substitutions:
   # dropped to 12 - see that substitution. `okay_nabu`/`hey_jarvis` were never
   # part of either measurement, so they stay at window 3 rather than copy an
   # unvalidated change.
-  alexa_probability_cutoff: '0.6'
+  #
+  # Raised 0.6 -> 0.7 on 2026-07-30: the mic-gain fix cut false wakes but did not
+  # end them (Michal still saw them 2026-07-30 morning), and one measured false
+  # wake already scored 0.72 - a threshold that only blocks that one would need
+  # 0.75, which throws away three real hits (0.64, 0.68, 0.72). 0.7 is the
+  # accepted middle ground: it costs the two weakest real hits (0.64, 0.68) and
+  # still lets the 0.72/0.85 false wakes through, but combined with `vad:`
+  # below it should catch more of the noise-only false wakes for free. If real
+  # quiet "Alexa" attempts start getting missed, this is the first knob to walk
+  # back down (live, via `Prog wykrywania`, before a rebuild).
+  alexa_probability_cutoff: '0.7'
   alexa_sliding_window: '1'
   okay_nabu_probability_cutoff: '0.7'
   okay_nabu_sliding_window: '3'
@@ -730,15 +740,22 @@ micro_wake_word:
   # wake word competes for - if detection starts getting flaky after adding a
   # fourth, that is the first thing to suspect.
   #
-  # NOTE: `vad:` is currently off. The VAD model gates every detection - a wake
-  # word the VAD disagrees with is suppressed - and it is a third network to run
-  # per frame. Upstream's S3-Box-3 config does not use it at all. It is off here
-  # LEAVE THIS OFF. An earlier comment here invited turning it back on once the
-  # wake word worked - do not. `vad:` was part of what broke detection in the
-  # first place: together with a long sliding window it kept the running average
-  # below the cutoff, so the wake word never fired. Dropping it and shortening
-  # the window is what fixed it, and the settings below are the result.
-  # vad:
+  # RE-ENABLED 2026-07-30, alongside the alexa_probability_cutoff bump above,
+  # to fight false wakes that survived the 2026-07-29 mic-gain fix (see
+  # DO-SPRAWDZENIA.md, "Fałszywe wybudzenia"). The VAD model gates every
+  # detection - a wake word the VAD disagrees with is suppressed - at the cost
+  # of a third network to run per frame. It only suppresses non-speech (fridge
+  # hum, running water, dishwasher); a false wake caused by an actual voice
+  # (TV dialogue, kitchen conversation) will pass VAD just like a real "Alexa"
+  # does, so this is not a full fix by itself.
+  #
+  # It was dropped once before (2026-07-19, commit 625a901) combined with a
+  # LONG sliding window, which later turned out to be what actually broke
+  # detection - not necessarily VAD itself. `alexa` now runs window 1, a
+  # different combination that was never tested with VAD on. UNTESTED: watch
+  # for quiet real "Alexa" attempts going missing, and revert this one line
+  # first if they do, before touching the cutoff.
+  vad:
 
   # Cutoffs are exposed because they are the only way to see how close a wake
   # word is getting: the component logs a detection and its probability, but
