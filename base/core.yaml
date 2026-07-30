@@ -442,6 +442,21 @@ esp32:
       CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
       CONFIG_SPIRAM_RODATA: "y"
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+    # ONE esp-dsp FOR TWO CALLERS THAT DISAGREE. `esp_aec` pulls esp-sr 2.4.x,
+    # which requires esp-dsp 1.8.0 exactly. ESPHome's own `runtime_image` pins
+    # esp-dsp to 1.7.1 for the SIMD paths in its JPEG decoder - and that is what
+    # the optional media screen needs for album art. Component requests are
+    # last-write-wins, so whichever ran last silently replaced the other and the
+    # IDF solver then refused the build outright: "Because project depends on
+    # both espressif/esp-dsp (1.7.1) and espressif/esp-sr (^2.4.6), version
+    # solving failed."
+    #
+    # Components declared here in YAML are applied at FINAL priority, after every
+    # code-added one, so this settles it for both. 1.8.0 is the version esp-sr
+    # cannot do without; the JPEG decoder only wants headers that exist in both.
+    components:
+      - name: espressif/esp-dsp
+        ref: 1.8.0
 
 # The mipi_spi S3BOX model hard-requires PSRAM, and LVGL's draw buffer lives
 # here too.
@@ -878,7 +893,38 @@ voice_assistant:
                     announcement: true
                 - delay: 250ms
   on_end:
-    # Nothing below waits for an EXTERNAL speaker - the box cannot see it. Hold
+    # WAIT OUT THE LOCAL REPLY. This is not bus arbitration - full duplex made
+    # that part unnecessary and it was removed with the rest. This wait has a
+    # second job that survived the migration, and dropping it cost an evening:
+    # `on_end` fires when the PIPELINE ends, which the log shows happening
+    # BEFORE the answer has even started playing ("Assist Pipeline ended" then
+    # "State changed to ANNOUNCING"). Without this, the tail below tests "has
+    # the assistant finished" while it is still streaming the reply, the test
+    # fails, and nothing else ever sends the face back to idle - so the mouth
+    # keeps talking forever over a box that went quiet minutes ago.
+    #
+    # In "This device" mode the external hold block below is skipped entirely,
+    # which makes this the ONLY thing holding the replying phase for the length
+    # of the reply.
+    - wait_until:
+        condition:
+          - media_player.is_announcing:
+        timeout: 0.5s
+    # TIMEOUT, and it is not decorative. This wait had none, and on 2026-07-20
+    # it hung: a local reply ended with "ISR event queue overflow, restarting
+    # speaker task", after which speaker.is_playing never went false, and the
+    # device went permanently deaf until a reboot. Sixty seconds because a long
+    # local reply outlives twenty easily; a reply that has really finished
+    # satisfies the condition and moves on immediately.
+    - wait_until:
+        condition:
+          - and:
+              - not:
+                  media_player.is_announcing:
+              - not:
+                  speaker.is_playing:
+        timeout: 60s
+    # Nothing above waits for an EXTERNAL speaker - the box cannot see it. Hold
     # the replying phase for as long as the reply plausibly takes, so the face
     # keeps talking and the wake word stays off until the speaker is done.
     - if:
