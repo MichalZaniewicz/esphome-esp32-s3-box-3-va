@@ -776,7 +776,6 @@ micro_wake_word:
       probability_cutoff: ${hey_jarvis_probability_cutoff}
       sliding_window_size: ${hey_jarvis_sliding_window}
   on_wake_word_detected:
-    - lambda: id(detect_count)++;  # TEMPORARY, see the global's comment.
     # Full duplex, so the wake word no longer has to let go of the bus before
     # the beep plays - this just plays it and waits it out for pacing (the
     # `wait_until` keeps a longer replacement sound working correctly).
@@ -1270,16 +1269,6 @@ globals:
     restore_value: false
     initial_value: "false"
   - id: boot_frame
-    type: int
-    restore_value: false
-    initial_value: "0"
-  # TEMPORARY, for the post-migration hardware verification pass only - strip
-  # before promoting to beta/main. The device's own counter is the only number
-  # that matched ground truth every time during the 2026-07-29 false-wake
-  # measurements; a log-subscription tally can silently undercount even with a
-  # live socket. Restart zeroes it on purpose - `Czas pracy` below is what makes
-  # that visible instead of letting a reboot masquerade as a quiet kitchen.
-  - id: detect_count
     type: int
     restore_value: false
     initial_value: "0"
@@ -2649,26 +2638,6 @@ sensor:
     entity_category: diagnostic
     update_interval: 60s
     disabled_by_default: true
-
-  # TEMPORARY PAIR, for the post-migration hardware verification pass only -
-  # strip both before promoting to beta/main. `detect_count` deliberately does
-  # not survive a reboot; `Czas pracy` is what tells a dropped counter apart
-  # from a genuinely quiet kitchen (a restart shows as `Czas pracy` going
-  # backwards, not just the counter reading zero).
-  - platform: template
-    name: Wybudzenia razem
-    id: sens_detect_count
-    icon: "mdi:counter"
-    entity_category: diagnostic
-    accuracy_decimals: 0
-    state_class: total_increasing
-    update_interval: 10s
-    lambda: return id(detect_count);
-
-  - platform: uptime
-    name: Czas pracy
-    entity_category: diagnostic
-    update_interval: 60s
 
   # The two numbers that settle the phantom-touch question. Read them together:
   # a count climbing while "Assistant started by the button" never appears in the
