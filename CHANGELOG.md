@@ -522,6 +522,82 @@ their alarm, the touchscreen, the home screen and the animated character.
   Assistant `number` restored across reboots and re-applied at boot. It sits
   before the split that feeds the wake word and the speech-to-text both, so it is
   the real microphone-sensitivity knob where `mww_gain_factor` only touches the
-  wake word. Defaults to the chip's 24 dB, so nothing changes until you move it;
-  drop it if the mic is too hot, and raise `mww_gain_factor` afterwards if the
-  wake word then wants shouting at.
+  wake word. Defaulted to the chip's 24 dB at the time this was written; the
+  full-duplex migration below later moved the default to 12 dB. Drop it further
+  if the mic is too hot, and raise `mww_gain_factor` afterwards if the wake word
+  then wants shouting at.
+
+- **Full duplex audio, with a hardware echo reference.** The stock
+  `audio_adc`/`audio_dac`/`i2s_audio` layout is replaced by `esp_audio_stack` +
+  `esp_aec`: mic on TDM slot 0, the box's own speaker output looped back onto
+  slot 1 as a hardware echo reference, 48 kHz bus decimated to 16 kHz for the
+  wake word and speech-to-text. The point of it: the microphone no longer has
+  to let go of the bus for the speaker to use it, which the rest of this
+  section is built on.
+
+  Getting it onto real hardware cost two separate defects, both root-caused
+  from a USB serial log rather than the network API (the first happens before
+  WiFi comes up, so the API log only ever shows the aftermath). DMA-capable
+  internal RAM ran out once the full core was loaded on top of it - LVGL,
+  three wake word models, fonts and artwork all competing with the audio
+  driver's own DMA descriptors - and took the microphone down with it after
+  exactly one question, every boot; fixed by moving code, constants, TLS
+  buffers and the non-DMA audio buffers into PSRAM and asking for less DMA per
+  channel. And a wait in `on_end` that looked like leftover bus-arbitration
+  code turned out to be the only thing keeping the talking animation synced to
+  how long the reply actually takes; removed once, restored with the reason
+  written down this time.
+
+  `alexa_sliding_window` drops from 3 to 1: a 3-frame average dilutes the
+  one-frame-wide detection peak that barge-in (below) needs to clear while the
+  box is talking. `okay_nabu` and `hey_jarvis` stay at 3, since neither was
+  part of the measurement. Hardware mic gain moves from an ES7210 register to
+  a post-AEC software trim defaulting to 12 dB rather than the chip's stock
+  24 (see above): measured at 1 false wake per 35 minutes in a lived-in
+  kitchen against 3 at the default, with no cost to a ten-for-ten hit rate.
+  `alexa_probability_cutoff` later moved from 0.6 to 0.7 and the wake-word
+  model's own VAD gate was re-enabled, once the mic-gain change alone turned
+  out not to be enough - one measured false wake had already scored 0.72,
+  so a cutoff-only fix would have needed 0.75 and cost three of ten real
+  words.
+
+  This also lifts the bus-sharing constraint noted above for the wake sound:
+  mic and speaker no longer fight over one I2S bus, so the beep no longer has
+  to finish before the assistant can listen. The sound itself was not
+  lengthened; 180 ms already works.
+
+- **Barge-in: saying the wake word interrupts a reply mid-sentence**, on the
+  box's own speaker and on an external one. Two separate stock-ESPHome
+  behaviours had to be worked around, both found by testing the real thing
+  rather than trusting a Home Assistant history timestamp that looked like
+  evidence but was not. `on_wake_word_detected` calling `voice_assistant.start:`
+  is `request_start()`, which silently does nothing unless the component is
+  already `IDLE` - so a wake word heard mid-reply used to do nothing at all,
+  even once it was confirmed the wake word itself was heard fine. And
+  `micro_wake_word` turns itself off the instant a pipeline leaves `IDLE` and
+  only comes back once the whole reply has finished, so there was no listener
+  present during a reply regardless of the first fix. Fixed by explicitly
+  restarting the wake word in `on_tts_start` and having
+  `on_wake_word_detected` stop the running reply and wait for `IDLE` before
+  starting the next one.
+
+  For a reply routed to an external speaker, the stop now reaches it too: the
+  audible copy there is a separate `media_player.play_media` call to Home
+  Assistant, untouched by the box's own state, so it needed its own explicit
+  `media_player.media_stop`.
+
+  Confirmed on hardware, mic and speaker running at once for the first time on
+  this board (`Runtime state: duplex` in the log): a mid-reply "Alexa" at
+  0.72-0.99 cuts the reply within about 90 ms and a new listen starts cleanly,
+  repeatedly, with no sign of the DMA/RAM exhaustion this board hit during the
+  migration itself.
+
+- **A ringing timer can be silenced by saying the wake word**, not just by
+  touch. `micro_wake_word` never stops for a ringing timer - it does not touch
+  `voice_assistant` state at all - so "Alexa" is heard immediately. The first
+  attempt on hardware left the wake-confirmation beep looping every 1.4
+  seconds instead: silencing only the current sound left the timer's own
+  "repeat until silenced" setting armed on the media player, and the beep
+  that played next inherited it. Fixed by having a detected wake word turn the
+  `Timer ringing` switch off directly, reusing the cleanup that switch already
+  does correctly for a touch or a Home Assistant automation.

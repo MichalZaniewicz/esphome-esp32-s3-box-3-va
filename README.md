@@ -9,14 +9,15 @@ Pure ESPHome, no custom C firmware: an always-on core you pull as a package, plu
 one thin config file you actually edit.
 
 > **Status: running on an ESP32-S3-BOX-3.** Wake word, the full Assist pipeline,
-> voice timers with their alarm, the touchscreen, the animated character, the
-> home, settings, media, weather and thermostat screens are all confirmed on
-> device with ESPHome 2026.7.1. The shipped thin config - core plus one
-> character - measures **flash 25.3%, RAM 39.9%**; the author's own, with four
-> characters for the picker plus every optional screen, measures 33.8% and
-> 42.3%. Artwork is what costs: 150 KB per character.
-> [CHANGELOG.md](CHANGELOG.md) has the detail, including what turned out to be
-> wrong along the way.
+> full duplex audio with barge-in, voice timers with their alarm, the
+> touchscreen, the animated character, the home, settings, media, weather and
+> thermostat screens are all confirmed on device with ESPHome 2026.7.1. The
+> shipped thin config - core plus one character - measures **flash 27.0%, RAM
+> 41.3%**, up from 25.3%/39.9% before the full-duplex migration; the
+> four-characters-plus-every-optional-screen figure predates that migration
+> and has not been remeasured yet. Artwork is what costs: 150 KB per
+> character. [CHANGELOG.md](CHANGELOG.md) has the detail, including what
+> turned out to be wrong along the way.
 
 > [!TIP]
 > ⭐ **Enjoying this project?** Every star is real motivation for me to keep
@@ -28,6 +29,11 @@ one thin config file you actually edit.
   pick one in Home Assistant) via
   `micro_wake_word`, the full Home Assistant Assist pipeline (STT / LLM / TTS),
   and a mic that mutes from HA.
+- **Full duplex, with a hardware echo reference**: the mic never has to let go
+  of the bus for the speaker to use it. Practical effect: say the wake word
+  again while a reply is still playing and it cuts the reply short and starts
+  listening, on the box's own speaker or an external one; a ringing timer can
+  be silenced the same way, not just by touch.
 - **LVGL UI**: a page per assistant phase, claimed by whichever screen package
   you install. With none, the core shows plain text status screens; that is the
   floor, not the intended look.
