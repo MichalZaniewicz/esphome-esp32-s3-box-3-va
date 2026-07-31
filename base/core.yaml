@@ -2383,7 +2383,7 @@ number:
   # substitution defaults - accepted trade-off, not an oversight.
   - platform: template
     id: mww_cutoff
-    name: Prog wykrywania
+    name: Wake word cutoff
     icon: mdi:tune-variant
     entity_category: config
     mode: box
@@ -2404,7 +2404,7 @@ number:
   # too. See `mww_gain_factor` for why this exists and its usual range.
   - platform: template
     id: mww_gain
-    name: Wzmocnienie mww
+    name: Wake word gain
     icon: mdi:tune-variant
     entity_category: config
     mode: box
@@ -2590,7 +2590,7 @@ select:
   # is a diagnostic knob, not a setting anyone needs to keep.
   - platform: template
     id: aec_mode
-    name: Tryb AEC
+    name: AEC mode
     icon: "mdi:waveform"
     entity_category: config
     optimistic: true
