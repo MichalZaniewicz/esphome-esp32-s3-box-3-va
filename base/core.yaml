@@ -799,6 +799,22 @@ micro_wake_word:
         condition:
           voice_assistant.is_running:
         then:
+          # EXTERNAL SPEAKER, added 2026-07-31. `voice_assistant.stop:` below
+          # only reaches the box's OWN media player - in "External player"/
+          # "Both" mode the audible reply is a separate `media_player.play_media`
+          # call to Home Assistant (see on_tts_end), untouched by the box's own
+          # state machine. Without this, barge-in would silently stop nothing
+          # the room could actually hear. Fired before the local stop, same
+          # reasoning as on_tts_end's "cancel goes first": it is a network
+          # round trip, so give it the head start.
+          - if:
+              condition:
+                lambda: return id(tts_output).current_option() != "This device";
+              then:
+                - homeassistant.service:
+                    service: media_player.media_stop
+                    data:
+                      entity_id: ${external_media_player_id}
           - voice_assistant.stop:
           - wait_until:
               condition:
