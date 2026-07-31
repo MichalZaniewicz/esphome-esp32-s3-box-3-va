@@ -2255,42 +2255,46 @@ binary_sensor:
     filters:
       - delayed_on: 50ms
     on_press:
-      - lambda: id(btn_down_ms) = millis();
-      # THREE THINGS, in order of what is most urgent to interrupt.
-      #
-      # A ringing timer wins: you are reaching for the box to make it stop.
-      #
-      # Then, if the assistant is already running, this CANCELS it. A false wake
-      # word used to mean standing there for fifteen seconds while it listened to
-      # a room that was not talking to it, because `tap_to_talk` declines to start
-      # a second pipeline and so the button did nothing at all. Same button, same
-      # press, and now it is the way out.
-      #
-      # Only then does a press start one.
-      #
-      # Cancelling mid-REPLY stops the pipeline but will not reliably cut audio
-      # that is already playing: a stop issued while the box is still fetching is
-      # discarded, which is documented at length around `on_tts_end`. It ends the
-      # turn, it does not always end the sound.
       - if:
           condition:
-            switch.is_on: timer_ringing
+            switch.is_on: home_button_enabled
           then:
-            - switch.turn_off: timer_ringing
-          else:
+            - lambda: id(btn_down_ms) = millis();
+            # THREE THINGS, in order of what is most urgent to interrupt.
+            #
+            # A ringing timer wins: you are reaching for the box to make it stop.
+            #
+            # Then, if the assistant is already running, this CANCELS it. A false wake
+            # word used to mean standing there for fifteen seconds while it listened to
+            # a room that was not talking to it, because `tap_to_talk` declines to start
+            # a second pipeline and so the button did nothing at all. Same button, same
+            # press, and now it is the way out.
+            #
+            # Only then does a press start one.
+            #
+            # Cancelling mid-REPLY stops the pipeline but will not reliably cut audio
+            # that is already playing: a stop issued while the box is still fetching is
+            # discarded, which is documented at length around `on_tts_end`. It ends the
+            # turn, it does not always end the sound.
             - if:
                 condition:
-                  not:
-                    voice_assistant.is_running:
+                  switch.is_on: timer_ringing
                 then:
-                  # Starting stays on PRESS, because a button that starts talking
-                  # should feel immediate.
-                  - lambda: id(btn_wants_cancel) = false;
-                  - script.execute: tap_to_talk
+                  - switch.turn_off: timer_ringing
                 else:
-                  # Cancelling is decided here but CARRIED OUT ON RELEASE, and
-                  # only if the press was long enough - see on_release below.
-                  - lambda: id(btn_wants_cancel) = true;
+                  - if:
+                      condition:
+                        not:
+                          voice_assistant.is_running:
+                      then:
+                        # Starting stays on PRESS, because a button that starts talking
+                        # should feel immediate.
+                        - lambda: id(btn_wants_cancel) = false;
+                        - script.execute: tap_to_talk
+                      else:
+                        # Cancelling is decided here but CARRIED OUT ON RELEASE, and
+                        # only if the press was long enough - see on_release below.
+                        - lambda: id(btn_wants_cancel) = true;
     # How long the touch lasted, which is the number the debounce above was set
     # blind. A real fingertip rests for well over a hundred milliseconds; if the
     # phantom presses report far less, the filter is doing its job, and if they
@@ -2300,39 +2304,43 @@ binary_sensor:
     # MINUS the debounce. Anything the filter drops entirely never appears here
     # at all - a press that is invisible in this log is one the debounce ate.
     on_release:
-      - logger.log:
-          level: INFO
-          format: "Touch on the button under the screen lasted %u ms"
-          args: ['(unsigned) (millis() - id(btn_down_ms))']
-      # CANCEL, IF THIS WAS A REAL PRESS. Deciding on press and acting on release
-      # is not ceremony - it is the only way to tell a finger from a phantom.
-      #
-      # This screen produces touches nobody made: seventeen of them in half an
-      # hour on 2026-07-22, measured. They used to be harmless, because
-      # `tap_to_talk` declines to start a second pipeline, so a phantom arriving
-      # mid-conversation did nothing. The moment a press started CANCELLING
-      # instead, every phantom became a conversation killer - which is exactly
-      # what was reported: listening ending after one second, over and over.
-      #
-      # The numbers separate them cleanly. Measured phantoms last 21 ms; measured
-      # fingers last 119-151 ms. The 50 ms debounce already eats the short ones,
-      # and this catches anything that slips past it. 100 ms sits five times above
-      # the phantom and comfortably below a real press.
-      #
-      # Starting is left forgiving on purpose: a phantom that starts a pipeline
-      # wastes fifteen seconds, a phantom that cancels one loses what you said.
       - if:
           condition:
-            and:
-              - lambda: return id(btn_wants_cancel);
-              - lambda: return (millis() - id(btn_down_ms)) >= 100;
-              - voice_assistant.is_running:
+            switch.is_on: home_button_enabled
           then:
             - logger.log:
                 level: INFO
-                format: "Assistant cancelled by the button under the screen"
-            - voice_assistant.stop:
-      - lambda: id(btn_wants_cancel) = false;
+                format: "Touch on the button under the screen lasted %u ms"
+                args: ['(unsigned) (millis() - id(btn_down_ms))']
+            # CANCEL, IF THIS WAS A REAL PRESS. Deciding on press and acting on release
+            # is not ceremony - it is the only way to tell a finger from a phantom.
+            #
+            # This screen produces touches nobody made: seventeen of them in half an
+            # hour on 2026-07-22, measured. They used to be harmless, because
+            # `tap_to_talk` declines to start a second pipeline, so a phantom arriving
+            # mid-conversation did nothing. The moment a press started CANCELLING
+            # instead, every phantom became a conversation killer - which is exactly
+            # what was reported: listening ending after one second, over and over.
+            #
+            # The numbers separate them cleanly. Measured phantoms last 21 ms; measured
+            # fingers last 119-151 ms. The 50 ms debounce already eats the short ones,
+            # and this catches anything that slips past it. 100 ms sits five times above
+            # the phantom and comfortably below a real press.
+            #
+            # Starting is left forgiving on purpose: a phantom that starts a pipeline
+            # wastes fifteen seconds, a phantom that cancels one loses what you said.
+            - if:
+                condition:
+                  and:
+                    - lambda: return id(btn_wants_cancel);
+                    - lambda: return (millis() - id(btn_down_ms)) >= 100;
+                    - voice_assistant.is_running:
+                then:
+                  - logger.log:
+                      level: INFO
+                      format: "Assistant cancelled by the button under the screen"
+                  - voice_assistant.stop:
+            - lambda: id(btn_wants_cancel) = false;
 
   # THE UNFILTERED TWIN, and it starts nothing. Same GT911 index as the button
   # above, no `filters:`, so it sees every reported touch including the ones the
@@ -2454,6 +2462,19 @@ switch:
     entity_category: config
 
   - platform: template
+    id: home_button_enabled
+    name: Touch button
+    icon: "mdi:gesture-tap-button"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    # Gates the touch button under the screen (GT911 index 0) - starting the
+    # assistant, cancelling a conversation, and silencing a ringing timer by
+    # touch. Off does not touch the physical top button (GPIO0, factory reset
+    # and its own timer-silence) or the unfiltered touch counter used for the
+    # phantom-touch diagnostic - both keep working regardless.
+
+  - platform: template
     id: mute
     name: Mute
     icon: "mdi:microphone-off"
@@ -2543,54 +2564,6 @@ switch:
           then:
             - script.execute: set_idle_or_mute_phase
             - script.execute: draw_display
-
-  # ---------------------------------------------------------------------------
-  # DIAGNOSTICS. Both exist to A/B a wake word that never fires, from Home
-  # Assistant, without a reflash between arms. Remove them once it works.
-  # ---------------------------------------------------------------------------
-
-  # Theory: LVGL starves the audio path. The main loop is regularly logged
-  # blocking for ~70 ms ("lvgl took a long time for an operation"), and the
-  # microphone ring buffer only holds ~120 ms, so dropped frames would leave the
-  # wake word deaf while Home Assistant's own STT still copes. Pausing LVGL
-  # freezes the screen on its last frame; the assistant keeps running.
-  - platform: template
-    id: diag_pause_lvgl
-    name: "Diag: pause LVGL"
-    icon: "mdi:television-pause"
-    optimistic: true
-    # DISABLED, not ALWAYS_OFF: any restore mode that sets a state at boot makes
-    # the switch fire its own on_turn_off during setup(), i.e. `lvgl.resume:`
-    # against an LVGL that does not exist yet. That crashed the device in a
-    # 40-second loop. Same trap as the template selects in the Waveshare project.
-    restore_mode: DISABLED
-    entity_category: diagnostic
-    on_turn_on:
-      - lvgl.pause:
-    on_turn_off:
-      - lvgl.resume:
-
-  # Theory: two wake word models plus feature extraction do not fit the frame
-  # budget, so inference falls behind real time. The previous, working config ran
-  # a single model. This drops back to one at runtime.
-  - platform: template
-    id: diag_single_model
-    name: "Diag: only the alexa model"
-    icon: "mdi:numeric-1-box"
-    optimistic: true
-    restore_mode: DISABLED   # see diag_pause_lvgl above - fires in setup() otherwise
-    entity_category: diagnostic
-    # BOTH of the others, because there are three models, not two. This used to
-    # disable okay_nabu alone and so left TWO running while claiming to leave
-    # one - a diagnostic that misreports its own state is worse than none, since
-    # the whole point is to answer "does the inference budget explain the missed
-    # wake words" with a number you can trust.
-    on_turn_on:
-      - micro_wake_word.disable_model: mww_okay_nabu
-      - micro_wake_word.disable_model: mww_hey_jarvis
-    on_turn_off:
-      - micro_wake_word.enable_model: mww_okay_nabu
-      - micro_wake_word.enable_model: mww_hey_jarvis
 
 select:
   # Live esp_aec mode switch - reconfigures the canceller without a rebuild.
