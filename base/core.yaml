@@ -452,6 +452,24 @@ esp32:
       CONFIG_SPIRAM_FETCH_INSTRUCTIONS: "y"
       CONFIG_SPIRAM_RODATA: "y"
       CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      # 2026-07-31: the box crashed (IllegalInstruction, core 1) while a reply
+      # was streaming and the media screen was decoding fresh album art at the
+      # same moment. Backtrace bottomed out in `operator new` failing inside
+      # ESPHome's JpegDecoder and aborting instead of returning null.
+      #
+      # Cause: the default SPI RAM mode here (SPIRAM_USE_CAPS_ALLOC) means plain
+      # malloc()/new can ONLY come from internal RAM - PSRAM is only reachable
+      # through code that explicitly asks for it with heap_caps_malloc(...,
+      # MALLOC_CAP_SPIRAM). With full duplex's DMA buffers and everything else
+      # already competing for that same internal RAM, a small allocation like a
+      # JPEG decoder object can lose that race even with 14MB of PSRAM sitting
+      # idle - there was nowhere else for it to go, so it aborted instead.
+      #
+      # SPIRAM_USE_MALLOC still prefers internal RAM for small allocations (it's
+      # faster), but lets malloc()/new fall back to PSRAM when internal is full
+      # instead of failing outright. DMA buffers are unaffected - they request
+      # MALLOC_CAP_DMA explicitly, which this setting does not change.
+      CONFIG_SPIRAM_USE_MALLOC: "y"
     # ONE esp-dsp FOR TWO CALLERS THAT DISAGREE. `esp_aec` pulls esp-sr 2.4.x,
     # which requires esp-dsp 1.8.0 exactly. ESPHome's own `runtime_image` pins
     # esp-dsp to 1.7.1 for the SIMD paths in its JPEG decoder - and that is what
