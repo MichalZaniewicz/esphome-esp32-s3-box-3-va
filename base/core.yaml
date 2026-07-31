@@ -779,6 +779,32 @@ micro_wake_word:
     # Full duplex, so the wake word no longer has to let go of the bus before
     # the beep plays - this just plays it and waits it out for pacing (the
     # `wait_until` keeps a longer replacement sound working correctly).
+    #
+    # BARGE-IN, added 2026-07-31. `voice_assistant.start:` below is
+    # `request_start()`, which is a stock-ESPHome no-op unless the component
+    # is already IDLE (confirmed against the compiled source) - so a wake
+    # word heard mid-reply used to do nothing at all, even though mww kept
+    # hearing it fine through the AEC (Michal confirmed: "alexa nie przerywa
+    # tekstu"). Stopping first forces the running response to end (media
+    # player STOP + a stop signal to HA) so the start below actually lands on
+    # an IDLE state instead of being silently dropped.
+    #
+    # RISK, carried over from 2026-07-22: interrupting local playback
+    # mid-flight (`speaker.mute_on`, back then) once hung the NEXT pipeline in
+    # "listening" for reasons never root-caused. This is a different
+    # mechanism (`voice_assistant.stop:`, not muting the codec) but the same
+    # category of "interrupt audio while it is live" - watch for the same
+    # symptom before trusting this broadly.
+    - if:
+        condition:
+          voice_assistant.is_running:
+        then:
+          - voice_assistant.stop:
+          - wait_until:
+              condition:
+                not:
+                  voice_assistant.is_running:
+              timeout: 2s
     - if:
         condition:
           switch.is_on: wake_sound_enabled
@@ -832,6 +858,35 @@ voice_assistant:
         id(tts_chars) = x.length();
         id(tts_started_ms) = millis();
         id(tts_reply_active) = true;
+    # BARGE-IN, part 2, 2026-07-31. `micro_wake_word` turns itself off the
+    # instant a pipeline leaves IDLE and, left alone, only comes back via
+    # `start_wake_word`, which refuses to run while the assistant is still
+    # active - so for the ENTIRE reply, on stock behaviour, nothing is
+    # listening at all. Confirmed on hardware: a diagnostic capture with the
+    # cutoff dropped to 0.25 showed zero detections between "Stopping wake
+    # word detection" and the reply's natural end, a ~15 s window with no
+    # listener present regardless of threshold. This is what part 1 (the
+    # stop-then-start in on_wake_word_detected, 2026-07-31) was missing - it
+    # can only fire if mww is running to hear anything in the first place.
+    #
+    # Restarting HERE, not at on_tts_start's end or in on_listening, uses the
+    # ~1.5 s gap this project's own log showed between the TTS URL arriving
+    # and the speaker actually producing sound (FLAC read + decode). mww's
+    # mic consumer registers and brings the shared audio stack up FIRST, so
+    # the speaker joins an already-running full-duplex session a moment
+    # later rather than both cold-starting DMA at once - see
+    # [[internal-ram-is-the-constraint]] for why a simultaneous cold start on
+    # this board is the failure mode to avoid.
+    #
+    # UNTESTED: mic and speaker have never run at the same time on this board
+    # before now, on-device counters or not. Watch for the exact signature
+    # documented for the DMA/RAM ceiling - "answers once, then never hears
+    # the wake word again" - not a crash, not a log line naming memory.
+    - if:
+        condition:
+          lambda: return id(wake_word_engine_location).current_option() == "On device";
+        then:
+          - micro_wake_word.start:
     # CUT THE AMPLIFIER for an External-player reply. The box downloads and
     # decodes every reply whatever the routing says, because `voice_assistant:`
     # has to keep its `media_player:` - without one Home Assistant stops offering
