@@ -795,6 +795,22 @@ micro_wake_word:
     # mechanism (`voice_assistant.stop:`, not muting the codec) but the same
     # category of "interrupt audio while it is live" - watch for the same
     # symptom before trusting this broadly.
+    #
+    # TIMER ALARM, added 2026-07-31 after it broke on hardware. `timer_ringing`
+    # never touches `voice_assistant` state at all, so mww keeps running
+    # through it untouched - Michal confirmed "Alexa" gets heard fine at 0.93
+    # while it rings. But `timer_ringing`'s on_turn_on sets REPEAT_ONE plus a
+    # 1 s playlist delay directly on `speaker_media_player`, and stopping only
+    # the CURRENT announcement (below) leaves that repeat mode armed - the
+    # wake beep that plays next inherits it and loops forever instead of
+    # playing once. `switch.turn_off: timer_ringing` is the existing, already
+    # -correct cleanup (REPEAT_OFF + stop): reuse it rather than duplicate it
+    # here half right.
+    - if:
+        condition:
+          switch.is_on: timer_ringing
+        then:
+          - switch.turn_off: timer_ringing
     - if:
         condition:
           voice_assistant.is_running:
