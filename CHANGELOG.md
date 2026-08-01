@@ -485,23 +485,30 @@ their alarm, the touchscreen, the home screen and the animated character.
   moment one ends. Needs home, weather, climate and media all installed,
   because unlike `home-styles.yaml` this file has to name pages that live in
   someone else's optional package.
-- **`base/screens/canvas.yaml`**: a "Draw on screen" `text` entity Home
-  Assistant writes a small shape spec to (rect, circle, text and a 20-icon
+- **`base/screens/canvas.yaml`**: two doors, one drawing engine. Home
+  Assistant writes a small shape spec (rect, circle, text and a 20-icon
   Material Design set - a hand-parsed `type,x,y,...|type,...` format, not
   JSON, the same choice `weather.yaml` and `climate.yaml` already made; no
   diagonal lines - `lv_line` turned out not to be compiled into this build's
   LVGL at all, confirmed on hardware, and a rect covers anything axis-aligned)
-  and the device draws it on a blank page it switches to on its own -
-  no button, no swipe, no way to reach it from the Box itself, only from
-  Home Assistant setting the entity. A bar chart is just rects of different
-  heights, which is what "draw the next 24h of temperature" actually needs;
-  every icon codepoint is one already shipped and confirmed elsewhere in this
-  repo, not a freshly guessed one, because a wrong MDI codepoint does not
-  fail the build, it just draws nothing. Tapping or swiping the drawing hands
-  the idle screen back to exactly what was on it before - `idle_pos`,
-  `idle_page_idx` and `idle_alt` are snapshotted the moment the drawing takes
-  over and restored on dismissal, not just "the next carousel stop". Needs
-  nothing but `base/core.yaml`.
+  either to a native API service, `draw_on_screen` (no length limit - it is
+  a call parameter, never persisted as entity state, so the real ceiling is
+  the 30-element widget pool, not a character count), or to a "Draw on
+  screen" `text` entity capped at Home Assistant's 255-character entity-state
+  limit, kept around for quick manual testing from the HA UI. Either way the
+  device draws on a blank page it switches to on its own - no button, no
+  swipe, no way to reach it from the Box itself, only from Home Assistant. A
+  bar chart is just rects of different heights, which is what "draw the next
+  24h of temperature" actually needs; every icon codepoint is one already
+  shipped and confirmed elsewhere in this repo, not a freshly guessed one,
+  because a wrong MDI codepoint does not fail the build, it just draws
+  nothing. Tapping or swiping the drawing hands the idle screen back to
+  exactly what was on it before - `idle_pos`, `idle_page_idx` and `idle_alt`
+  are snapshotted the moment the drawing takes over and restored on
+  dismissal, not just "the next carousel stop". Needs nothing but
+  `base/core.yaml`. The service is meant to be wrapped in a Home Assistant
+  `script:` with one field before Assist calls it - a bare service is no
+  more reliable from voice than `select.select_option` was.
 - **Performance instrumentation**, all `disabled_by_default` so it costs nothing
   until you switch it on in Home Assistant: `loop_time`, free heap, largest free
   block and free PSRAM. The reason it exists: the only signal this project had
