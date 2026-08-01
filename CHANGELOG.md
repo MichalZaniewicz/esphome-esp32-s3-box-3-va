@@ -486,17 +486,20 @@ their alarm, the touchscreen, the home screen and the animated character.
   because unlike `home-styles.yaml` this file has to name pages that live in
   someone else's optional package.
 - **`base/screens/canvas.yaml`**: a "Draw on screen" `text` entity Home
-  Assistant writes a small shape spec to (rectangles, pill/circle shapes and
-  text - a hand-parsed `type,x,y,...|type,...` format, not JSON, the same
-  choice `weather.yaml` and `climate.yaml` already made) and the device draws
-  it on a blank page it switches to on its own - no button, no swipe, no way
-  to reach it from the Box itself, only from Home Assistant setting the
-  entity. A bar chart is just rects of different heights, which is what
-  "draw the next 24h of temperature" actually needs. Tapping or swiping the
-  drawing hands the idle screen back to exactly what was on it before -
-  `idle_pos`, `idle_page_idx` and `idle_alt` are snapshotted the moment the
-  drawing takes over and restored on dismissal, not just "the next carousel
-  stop". Needs nothing but `base/core.yaml`.
+  Assistant writes a small shape spec to (rect, circle, line, text and a
+  20-icon Material Design set - a hand-parsed `type,x,y,...|type,...`
+  format, not JSON, the same choice `weather.yaml` and `climate.yaml` already
+  made) and the device draws it on a blank page it switches to on its own -
+  no button, no swipe, no way to reach it from the Box itself, only from
+  Home Assistant setting the entity. A bar chart is just rects of different
+  heights, which is what "draw the next 24h of temperature" actually needs;
+  every icon codepoint is one already shipped and confirmed elsewhere in this
+  repo, not a freshly guessed one, because a wrong MDI codepoint does not
+  fail the build, it just draws nothing. Tapping or swiping the drawing hands
+  the idle screen back to exactly what was on it before - `idle_pos`,
+  `idle_page_idx` and `idle_alt` are snapshotted the moment the drawing takes
+  over and restored on dismissal, not just "the next carousel stop". Needs
+  nothing but `base/core.yaml`.
 - **Performance instrumentation**, all `disabled_by_default` so it costs nothing
   until you switch it on in Home Assistant: `loop_time`, free heap, largest free
   block and free PSRAM. The reason it exists: the only signal this project had
