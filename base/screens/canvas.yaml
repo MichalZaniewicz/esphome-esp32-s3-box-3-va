@@ -1,11 +1,18 @@
 ###############################################################################
 # Canvas: a screen Home Assistant draws on, not one you swipe to.
 #
-# One `text` entity, "Draw on screen". Write a spec to it and the device draws
-# rectangles, pill/circle shapes and text on a blank page, then switches the
-# idle screen to it - no button, no swipe, no way to reach it from the Box at
-# all. That is deliberate: nothing on the device names it, so the only way in
-# is Home Assistant setting the text entity.
+# Two doors, one drawing engine. A native API service, `draw_on_screen`
+# (shows up in Home Assistant as `esphome.<your device name>_draw_on_screen`),
+# takes the spec as a plain call parameter - no length limit, because it is
+# never stored as an entity's state. A `text` entity, "Draw on screen", does
+# the same thing for quick manual testing from the HA UI, capped at 255
+# characters because entity state itself is capped at 255 characters
+# (Home Assistant's limit, not this file's - weather.yaml's header runs into
+# the same wall). Both call the same script, `canvas_draw`, so there is one
+# parser, not two. Either way the device draws on a blank page and switches
+# to it on its own - no button, no swipe, no way to reach it from the Box
+# itself. That is deliberate: nothing on the device names it, so the only way
+# in is Home Assistant.
 #
 # NEEDS NOTHING BUT base/core.yaml - it does not touch or require any other
 # screen, unlike base/screens/show-screen.yaml.
@@ -15,6 +22,14 @@
 #       files:
 #         - base/core.yaml
 #         - base/screens/canvas.yaml
+#
+# THE SERVICE IS THE ONE TO CALL FROM VOICE. Wrap it in a Home Assistant
+# `script:` with one text field and call THAT from Assist - a bare
+# `esphome.xxx_draw_on_screen` service is not something Assist reliably
+# reaches for any more than it reliably reached for `select.select_option`
+# (see base/screens/show-screen.yaml's header); a script with one field is
+# the same "reduce it to one unambiguous action" fix, just carrying a string
+# instead of nothing.
 #
 # THE SPEC IS A SMALL TEXT FORMAT, not JSON - the same choice weather.yaml and
 # climate.yaml already made for the same reason: a hand-written walk over
@@ -37,9 +52,11 @@
 # and a rect substitutes fine for anything axis-aligned. SIZE for text is 0
 # (small, 16px), 1 (medium, 24px) or 2 (large, 40px). Colour is six hex
 # digits, no "#". Every coordinate is pixels on the device's native 320x240.
-# A shape past its pool (16 rect/circle, 8 text, 6 icon) in one spec is
-# dropped, not queued - the pools are fixed at boot, never reallocated per
-# draw.
+# A shape past its pool (16 rect/circle, 8 text, 6 icon - 30 elements total)
+# in one spec is dropped, not queued - the pools are fixed at boot, never
+# reallocated per draw. Through the service that is the real ceiling; through
+# the 255-character text entity, the character limit runs out first, around
+# 8-12 short elements.
 #
 # ICON draws one Material Design glyph. `name` is one of a small, fixed list -
 # every codepoint here is one already shipped and confirmed drawing correctly
@@ -144,6 +161,12 @@ globals:
     restore_value: false
     initial_value: "0"
   - id: canvas_prev_alt
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  # Set by canvas_draw, read by the step right after it - see the comment
+  # there. Not meaningful outside that one handoff.
+  - id: canvas_had_content
     type: bool
     restore_value: false
     initial_value: "false"
@@ -268,6 +291,25 @@ globals:
     restore_value: false
     initial_value: "nullptr"
 
+# A plain HA entity state is capped at 255 characters, which the drawing
+# spec runs into fast (see the substitutions header above). Home Assistant
+# script FIELDS have no such cap - they are just call parameters, never
+# persisted as a state - so the real drawing entry point is the native API
+# service below, which a Home Assistant `script:` calls directly, bypassing
+# entity state entirely. The `text` entity still exists and still draws
+# (via the same shared `canvas_draw` script both paths call into) - it is
+# just no longer the only door in, so it can stay capped at 255 for quick
+# manual testing from the HA UI without anyone hitting a wall.
+api:
+  services:
+    - service: draw_on_screen
+      variables:
+        spec: string
+      then:
+        - script.execute:
+            id: canvas_draw
+            spec: !lambda 'return spec;'
+
 text:
   - platform: template
     id: canvas_spec
@@ -276,18 +318,17 @@ text:
     mode: text
     optimistic: true
     min_length: 0
-    # 255, not a rounder number: Home Assistant caps every entity state at
-    # 255 characters (the same limit weather.yaml's own header runs into),
-    # and this text entity's value IS the state. In practice that is 8-12
-    # short elements, well under any of the pools below - the pools were
-    # never going to be the tighter limit.
     max_length: 255
     on_value:
-      - script.execute: canvas_redraw
+      - script.execute:
+          id: canvas_draw
+          spec: !lambda 'return id(canvas_spec).state;'
 
 script:
-  - id: canvas_redraw
+  - id: canvas_draw
     mode: single
+    parameters:
+      spec: string
     then:
       - lambda: |-
           lv_obj_t *shapes[16] = {id(canvas_shape_0),id(canvas_shape_1),id(canvas_shape_2),id(canvas_shape_3),
@@ -312,7 +353,8 @@ script:
             {"minus","\U000F0374"}, {"plus","\U000F0415"},
           };
 
-          const std::string spec = id(canvas_spec).state;
+          // `spec` is already in scope - it is this script's own parameter,
+          // set above by whichever entry point called it.
           int ns = 0, nt = 0, ni = 0;
           size_t at = 0;
           while (at <= spec.size()) {
@@ -415,14 +457,21 @@ script:
             id(idle_pos) = 0;
             id(idle_page_idx) = (int) id(page_canvas)->index;
           }
+          // Read by the step below. A global, not a second read of `spec`
+          // here, because this runs inside the SAME lambda that already has
+          // it - but the step after this one is a separate action and
+          // cannot see this lambda's local variables, and unlike the old
+          // single-entry-point version there is no one entity left whose
+          // state it could re-read instead.
+          id(canvas_had_content) = !spec.empty();
       - if:
           condition:
-            lambda: return !id(canvas_spec).state.empty();
+            lambda: return id(canvas_had_content);
           then:
             - script.execute: show_phase_page
 
   # Tap or swipe while the drawing is on screen: hand the idle screen back to
-  # whatever canvas_redraw snapshotted, exactly, not just the next carousel
+  # whatever canvas_draw snapshotted, exactly, not just the next carousel
   # stop. No-ops if the drawing is not what is currently claiming the screen.
   - id: canvas_dismiss
     then:
