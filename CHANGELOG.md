@@ -471,7 +471,9 @@ their alarm, the touchscreen, the home screen and the animated character.
   invented; `Station Aura` matches the `aura` character instead, right down to
   its divider, which freezes one frame of the same idle line `aura.yaml` breathes
   on the character screen. Reuses Dashboard's three widgets and its 20-second,
-  visibility-gated refresh rather than adding a second set of sensors.
+  visibility-gated refresh rather than adding a second set of sensors. Gallery
+  previews rendered by the new `scripts/gen_home_styles_station.py`, since the
+  original 32 styles' generator was never committed to this repo.
 - **`base/screens/show-screen.yaml`**: four "Show ... screen" `button`
   entities so Assist can change the idle screen by voice ("show weather")
   with no custom sentence. Started as one `select` with four options; dropped

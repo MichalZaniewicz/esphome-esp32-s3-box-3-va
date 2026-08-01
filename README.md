@@ -280,6 +280,8 @@ scripts/
                            #   screen's own coordinates, colours and fonts
   gen_weather.py           # the same for base/assets/weather.png
   gen_climate.py           # the same for base/assets/climate.png
+  gen_home_styles_station.py # redraws the 8 Station previews in base/assets/home-styles/
+  gen_canvas_example.py    # redraws base/assets/canvas-example.png from a canvas.yaml spec
   esplog.py                # stream device logs over the native API
   flash.py                 # compile + OTA, but refuses to upload if the SSID
                            #   compiled into main.cpp looks like a placeholder
@@ -467,16 +469,29 @@ vertical and horizontal gradient backgrounds, and light themes:
 <sub>Previews rendered at 320x240 with the device's own fonts; the panel itself
 looks the same bar minor anti-aliasing.</sub>
 
-Eight more aren't in the gallery above yet, but are already in the selector: the
-**Station** family - `Station`, `Station Aura`, `Station Neon`, `Station Amber`,
-`Station Fire`, `Station Ice`, `Station Forest`, `Station Paper`. Same three
-sensors as the small row under Dashboard's clock, drawn bigger and split
-differently: a big outdoor reading up top, a small indoor temperature/humidity
-strip below a divider. Each borrows its palette from the matching style above
-it - `Station Neon` is `Neon`'s cyan and magenta, `Station Paper` is `Paper`'s
-cream and ink - except `Station Aura`, which matches the `aura` character
-instead: its divider freezes a single frame of the same line `aura.yaml`
-breathes on the character screen.
+Eight more: the **Station** family, same three sensors as the small row under
+Dashboard's clock, drawn bigger and split differently - a big outdoor reading
+up top, a small indoor temperature/humidity strip below a divider. Each
+borrows its palette from the matching style above it - `Station Neon` is
+`Neon`'s cyan and magenta, `Station Paper` is `Paper`'s cream and ink - except
+`Station Aura`, which matches the `aura` character instead: its divider
+freezes a single frame of the same line `aura.yaml` breathes on the character
+screen.
+
+<table>
+<tr>
+<td align="center"><img src="base/assets/home-styles/station.png" width="200"><br><sub><b>Station</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/station-aura.png" width="200"><br><sub><b>Station Aura</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/station-neon.png" width="200"><br><sub><b>Station Neon</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/station-amber.png" width="200"><br><sub><b>Station Amber</b></sub></td>
+</tr>
+<tr>
+<td align="center"><img src="base/assets/home-styles/station-fire.png" width="200"><br><sub><b>Station Fire</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/station-ice.png" width="200"><br><sub><b>Station Ice</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/station-forest.png" width="200"><br><sub><b>Station Forest</b></sub></td>
+<td align="center"><img src="base/assets/home-styles/station-paper.png" width="200"><br><sub><b>Station Paper</b></sub></td>
+</tr>
+</table>
 
 `home.yaml` is parameterised, so the Default look is unchanged and any single
 value - a colour, the clock font - can also be pinned at compile time by setting
@@ -547,8 +562,15 @@ SIZE for text is 0 (16px), 1 (24px) or 2 (40px); for icon, 0 (24px) or
 anything else (48px). Colour is six hex digits, no `#`. Icon names: `sun
 cloud partly-cloudy rain pouring snow snow-rain fog hail lightning storm
 wind wind2 night alert thermometer humidity fire minus plus`. A bar chart
-is just rects of different heights:
-`rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|text,20,205,0,8FA6C0,6`
+is just rects of different heights, which is what "narysuj wykres
+temperatury" actually needs - no diagonal lines anywhere in this file's
+vocabulary, and a bar chart never wanted one:
+
+```
+rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|rect,80,90,20,110,0,FF8A3D|text,20,205,0,8FA6C0,6|text,50,205,0,8FA6C0,12|text,80,205,0,8FA6C0,18
+```
+
+<p align="center"><img src="base/assets/canvas-example.png" width="300" alt="Canvas screen showing the bar chart example spec above"></p>
 
 **Nothing is auto-corrected - every coordinate has to land inside 320x240
 yourself.** An element placed off-panel is simply invisible past the edge,
