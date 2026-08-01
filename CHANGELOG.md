@@ -472,15 +472,31 @@ their alarm, the touchscreen, the home screen and the animated character.
   its divider, which freezes one frame of the same idle line `aura.yaml` breathes
   on the character screen. Reuses Dashboard's three widgets and its 20-second,
   visibility-gated refresh rather than adding a second set of sensors.
-- **`base/screens/show-screen.yaml`**: a "Show screen" `select` so Assist can
-  change the idle screen by voice ("show weather") with no custom sentence -
-  a `select` is a domain Assist already knows how to operate once the entity
-  is exposed to it. Picking an option sets the same `idle_pos`/`idle_page_idx`
-  globals a horizontal swipe leaves behind and calls the core's own phase
-  router, so it never interrupts an active conversation and lands on the right
-  screen the moment one ends. Needs home, weather, climate and media all
-  installed, because unlike `home-styles.yaml` this file has to name pages
-  that live in someone else's optional package.
+- **`base/screens/show-screen.yaml`**: four "Show ... screen" `button`
+  entities so Assist can change the idle screen by voice ("show weather")
+  with no custom sentence. Started as one `select` with four options; dropped
+  after Michal's OpenAI Conversation agent kept calling the generic `turn_on`
+  intent on it instead of `select.select_option` and failed every time
+  (`IntentHandleError` in the log) - a button only ever does one thing on
+  press, so there is no service name or option value left for the model to
+  get wrong. Pressing one sets the same `idle_pos`/`idle_page_idx` globals a
+  horizontal swipe leaves behind and calls the core's own phase router, so it
+  never interrupts an active conversation and lands on the right screen the
+  moment one ends. Needs home, weather, climate and media all installed,
+  because unlike `home-styles.yaml` this file has to name pages that live in
+  someone else's optional package.
+- **`base/screens/canvas.yaml`**: a "Draw on screen" `text` entity Home
+  Assistant writes a small shape spec to (rectangles, pill/circle shapes and
+  text - a hand-parsed `type,x,y,...|type,...` format, not JSON, the same
+  choice `weather.yaml` and `climate.yaml` already made) and the device draws
+  it on a blank page it switches to on its own - no button, no swipe, no way
+  to reach it from the Box itself, only from Home Assistant setting the
+  entity. A bar chart is just rects of different heights, which is what
+  "draw the next 24h of temperature" actually needs. Tapping or swiping the
+  drawing hands the idle screen back to exactly what was on it before -
+  `idle_pos`, `idle_page_idx` and `idle_alt` are snapshotted the moment the
+  drawing takes over and restored on dismissal, not just "the next carousel
+  stop". Needs nothing but `base/core.yaml`.
 - **Performance instrumentation**, all `disabled_by_default` so it costs nothing
   until you switch it on in Home Assistant: `loop_time`, free heap, largest free
   block and free PSRAM. The reason it exists: the only signal this project had

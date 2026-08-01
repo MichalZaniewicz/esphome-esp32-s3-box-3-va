@@ -1,0 +1,370 @@
+###############################################################################
+# Canvas: a screen Home Assistant draws on, not one you swipe to.
+#
+# One `text` entity, "Draw on screen". Write a spec to it and the device draws
+# rectangles, pill/circle shapes and text on a blank page, then switches the
+# idle screen to it - no button, no swipe, no way to reach it from the Box at
+# all. That is deliberate: nothing on the device names it, so the only way in
+# is Home Assistant setting the text entity.
+#
+# NEEDS NOTHING BUT base/core.yaml - it does not touch or require any other
+# screen, unlike base/screens/show-screen.yaml.
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/canvas.yaml
+#
+# THE SPEC IS A SMALL TEXT FORMAT, not JSON - the same choice weather.yaml and
+# climate.yaml already made for the same reason: a hand-written walk over
+# find()/substr() is something this file can parse without pulling in a JSON
+# library whose availability in a raw lambda isn't a given. One element per
+# line, elements separated by "|", fields within an element by ",":
+#
+#   rect,X,Y,W,H,RADIUS,RRGGBB
+#   text,X,Y,SIZE,RRGGBB,label text
+#
+# RECT is the only shape - a circle is a rect with W==H and a RADIUS bigger
+# than half of either (LVGL clamps it, the same trick base/faces/iris.yaml
+# uses for its sclera), and a line is a rect 2-3 px thick. SIZE for text is
+# 0 (small, 16px), 1 (medium, 24px) or 2 (large, 40px). Colour is six hex
+# digits, no "#". X/Y/W/H/RADIUS are pixels on the device's native 320x240.
+# A shape past the 16th, or a text past the 8th, in one spec is dropped - that
+# is the whole budget, fixed at boot, not reallocated per draw.
+#
+# A little sun, off-centre:
+#   rect,140,80,40,40,999,FFD700|rect,155,58,10,16,0,FFD700|rect,155,126,10,16,0,FFD700|rect,108,95,16,10,0,FFD700|rect,196,95,16,10,0,FFD700|text,120,180,1,FFFFFF,Slonko
+#
+# A bar chart is just rects of different heights, bottom-aligned, which is
+# what "narysuj wykres temperatury na 24h" actually needs - no diagonal lines
+# anywhere in this file's vocabulary, and a bar chart never wanted one:
+#   rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|rect,80,90,20,110,0,FF8A3D|text,20,205,0,8FA6C0,6|text,50,205,0,8FA6C0,12|text,80,205,0,8FA6C0,18
+#
+# Setting the text entity to "" clears every shape but does NOT switch the
+# screen to a blank page - only a non-empty spec does that.
+#
+# TAP OR SWIPE THE SCREEN WHILE IT IS SHOWING TO DISMISS IT: the device
+# remembers exactly what was on screen the moment Home Assistant first put
+# the drawing up (idle_pos, idle_page_idx, idle_alt) and restores precisely
+# that, not just "the next carousel stop". Drawing again while already on
+# this screen does not re-arm that memory - only a transition INTO the
+# drawing from something else does.
+###############################################################################
+
+substitutions:
+  canvas_bg_color: '0x000000'
+
+font:
+  - id: font_canvas_med
+    file: { type: gfonts, family: "${font_family}", weight: 400 }
+    size: 24
+    glyphsets:
+      - ${font_glyphsets}
+  - id: font_canvas_lg
+    file: { type: gfonts, family: "${font_family}", weight: 500 }
+    size: 40
+    glyphsets:
+      - ${font_glyphsets}
+  # Small text reuses font_body (16px, already compiled for every build) -
+  # a third font asset here would cost flash for a size font_body already is.
+
+globals:
+  - id: canvas_ready
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  # Whether the drawing currently owns the idle screen, and what to restore
+  # when it lets go - a snapshot of the three globals that together describe
+  # "what was on screen", taken once at the moment Home Assistant first puts
+  # a drawing up, not touched again until it is dismissed.
+  - id: canvas_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: canvas_prev_pos
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: canvas_prev_idx
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: canvas_prev_alt
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: canvas_shape_0
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_1
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_2
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_3
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_4
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_5
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_6
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_7
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_8
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_9
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_10
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_11
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_12
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_13
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_14
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_shape_15
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_text_0
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_text_1
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_text_2
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_text_3
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_text_4
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_text_5
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_text_6
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: canvas_text_7
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+
+text:
+  - platform: template
+    id: canvas_spec
+    name: "Draw on screen"
+    icon: "mdi:draw"
+    mode: text
+    optimistic: true
+    min_length: 0
+    max_length: 600
+    on_value:
+      - script.execute: canvas_redraw
+
+script:
+  - id: canvas_redraw
+    mode: single
+    then:
+      - lambda: |-
+          lv_obj_t *shapes[16] = {id(canvas_shape_0),id(canvas_shape_1),id(canvas_shape_2),id(canvas_shape_3),
+                                  id(canvas_shape_4),id(canvas_shape_5),id(canvas_shape_6),id(canvas_shape_7),
+                                  id(canvas_shape_8),id(canvas_shape_9),id(canvas_shape_10),id(canvas_shape_11),
+                                  id(canvas_shape_12),id(canvas_shape_13),id(canvas_shape_14),id(canvas_shape_15)};
+          lv_obj_t *texts[8] = {id(canvas_text_0),id(canvas_text_1),id(canvas_text_2),id(canvas_text_3),
+                                id(canvas_text_4),id(canvas_text_5),id(canvas_text_6),id(canvas_text_7)};
+          for (int i = 0; i < 16; i++) if (shapes[i]) lv_obj_add_flag(shapes[i], LV_OBJ_FLAG_HIDDEN);
+          for (int i = 0; i < 8; i++)  if (texts[i])  lv_obj_add_flag(texts[i], LV_OBJ_FLAG_HIDDEN);
+
+          const std::string spec = id(canvas_spec).state;
+          int ns = 0, nt = 0;
+          size_t at = 0;
+          while (at <= spec.size()) {
+            const size_t bar = spec.find('|', at);
+            const std::string item = spec.substr(at, bar == std::string::npos ? std::string::npos : bar - at);
+            const size_t next_at = (bar == std::string::npos) ? spec.size() + 1 : bar + 1;
+
+            const size_t c0 = item.find(',');
+            if (c0 == std::string::npos) { at = next_at; continue; }
+            const std::string type = item.substr(0, c0);
+            size_t pos = c0 + 1;
+
+            // Reads one comma-delimited field and advances pos past it.
+            auto field = [&]() -> std::string {
+              const size_t c = item.find(',', pos);
+              const std::string v = item.substr(pos, c == std::string::npos ? std::string::npos : c - pos);
+              pos = (c == std::string::npos) ? item.size() : c + 1;
+              return v;
+            };
+
+            if (type == "rect" && ns < 16) {
+              const int x = atoi(field().c_str());
+              const int y = atoi(field().c_str());
+              const int w = atoi(field().c_str());
+              const int h = atoi(field().c_str());
+              const int r = atoi(field().c_str());
+              const uint32_t col = (uint32_t) strtol(field().c_str(), nullptr, 16);
+              lv_obj_t *o = shapes[ns++];
+              if (o) {
+                lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_align(o, LV_ALIGN_TOP_LEFT, x, y);
+                lv_obj_set_size(o, w > 0 ? w : 1, h > 0 ? h : 1);
+                lv_obj_set_style_radius(o, r, 0);
+                lv_obj_set_style_bg_color(o, lv_color_hex(col), 0);
+              }
+            } else if (type == "text" && nt < 8) {
+              const int x = atoi(field().c_str());
+              const int y = atoi(field().c_str());
+              const int sz = atoi(field().c_str());
+              const uint32_t col = (uint32_t) strtol(field().c_str(), nullptr, 16);
+              const std::string label = item.substr(pos);   // rest of the item
+              lv_obj_t *o = texts[nt++];
+              if (o) {
+                lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_align(o, LV_ALIGN_TOP_LEFT, x, y);
+                const lv_font_t *f = sz >= 2 ? id(font_canvas_lg)->get_lv_font()
+                                   : sz == 1 ? id(font_canvas_med)->get_lv_font()
+                                             : id(font_body)->get_lv_font();
+                lv_obj_set_style_text_font(o, f, 0);
+                lv_obj_set_style_text_color(o, lv_color_hex(col), 0);
+                lv_label_set_text(o, label.c_str());
+              }
+            }
+            at = next_at;
+          }
+
+          // Only a non-empty spec claims the screen - writing "" clears the
+          // drawing without yanking whoever is looking at another page onto
+          // a suddenly-blank one. The snapshot is taken only on the
+          // transition INTO the drawing, so redrawing while already showing
+          // it does not overwrite "what to go back to" with itself.
+          if (!spec.empty()) {
+            if (!id(canvas_active)) {
+              id(canvas_prev_pos) = id(idle_pos);
+              id(canvas_prev_idx) = id(idle_page_idx);
+              id(canvas_prev_alt) = id(idle_alt);
+              id(canvas_active) = true;
+            }
+            id(idle_pos) = 0;
+            id(idle_page_idx) = (int) id(page_canvas)->index;
+          }
+      - if:
+          condition:
+            lambda: return !id(canvas_spec).state.empty();
+          then:
+            - script.execute: show_phase_page
+
+  # Tap or swipe while the drawing is on screen: hand the idle screen back to
+  # whatever canvas_redraw snapshotted, exactly, not just the next carousel
+  # stop. No-ops if the drawing is not what is currently claiming the screen.
+  - id: canvas_dismiss
+    then:
+      - lambda: |-
+          if (!id(canvas_active)) return;
+          id(canvas_active) = false;
+          id(idle_pos) = id(canvas_prev_pos);
+          id(idle_page_idx) = id(canvas_prev_idx);
+          id(idle_alt) = id(canvas_prev_alt);
+      - script.execute: show_phase_page
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/canvas.yaml (\"Draw on screen\" text entity)"
+    # Build the shape/text pool once, after LVGL is up - same trick as
+    # home-styles.yaml's Dashboard widgets.
+    - priority: -190
+      then:
+        - lambda: |-
+            if (id(canvas_ready)) return;
+            id(canvas_ready) = true;
+            lv_obj_t *p = id(page_canvas)->obj;
+            auto shape = [&](){ lv_obj_t *o = lv_obj_create(p);
+              lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
+              lv_obj_set_style_border_width(o, 0, 0);
+              lv_obj_set_style_pad_all(o, 0, 0);
+              lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
+            id(canvas_shape_0) = shape();  id(canvas_shape_1) = shape();
+            id(canvas_shape_2) = shape();  id(canvas_shape_3) = shape();
+            id(canvas_shape_4) = shape();  id(canvas_shape_5) = shape();
+            id(canvas_shape_6) = shape();  id(canvas_shape_7) = shape();
+            id(canvas_shape_8) = shape();  id(canvas_shape_9) = shape();
+            id(canvas_shape_10) = shape(); id(canvas_shape_11) = shape();
+            id(canvas_shape_12) = shape(); id(canvas_shape_13) = shape();
+            id(canvas_shape_14) = shape(); id(canvas_shape_15) = shape();
+            auto txt = [&](){ lv_obj_t *o = lv_label_create(p);
+              lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
+            id(canvas_text_0) = txt(); id(canvas_text_1) = txt();
+            id(canvas_text_2) = txt(); id(canvas_text_3) = txt();
+            id(canvas_text_4) = txt(); id(canvas_text_5) = txt();
+            id(canvas_text_6) = txt(); id(canvas_text_7) = txt();
+
+lvgl:
+  pages:
+    - id: page_canvas
+      skip: true                   # not a carousel stop - only Home Assistant can put you here
+      bg_color: ${canvas_bg_color}
+      scrollbar_mode: "OFF"
+      # Neither direction steps the carousel - both dismiss, same as a tap.
+      # A drawing is not a stop on the ring, so "next" or "previous" would
+      # not mean anything useful here; what the person wants is just "gone".
+      on_swipe_left:
+        - script.execute: canvas_dismiss
+      on_swipe_right:
+        - script.execute: canvas_dismiss
+      widgets:
+        # Underneath the shapes, so a tap or a swipe anywhere on the drawing
+        # reaches this button.
+        - button:
+            width: 100%
+            height: 100%
+            bg_opa: TRANSP
+            border_width: 0
+            shadow_width: 0
+            gesture_bubble: true
+            on_click:
+              - script.execute: canvas_dismiss

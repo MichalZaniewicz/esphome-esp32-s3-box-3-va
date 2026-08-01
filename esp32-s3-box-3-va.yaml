@@ -97,9 +97,12 @@ packages:
     # - base/screens/climate.yaml     # optional: the thermostat, next along
     # - base/screens/home-styles.yaml # optional: 40 looks for the home screen,
     #                                 #   switched live from Home Assistant
-    # - base/screens/show-screen.yaml # optional: a "Show screen" select Assist
-    #                                 #   can operate by voice; needs home,
+    # - base/screens/show-screen.yaml # optional: four "Show ... screen" buttons
+    #                                 #   Assist can press by voice; needs home,
     #                                 #   weather, climate AND media all above
+    # - base/screens/canvas.yaml      # optional: a "Draw on screen" text entity -
+    #                                 #   Home Assistant draws shapes/text on the
+    #                                 #   idle screen; needs nothing else
       - base/faces/${assistant}.yaml  # the assistant; it pulls in what it needs
     # - base/faces/picker.yaml        # optional: switch character from HA, see above
       - base/lang/${language}.yaml    # keep the language last
