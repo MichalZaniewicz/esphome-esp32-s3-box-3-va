@@ -220,6 +220,24 @@ globals:
     type: std::string
     restore_value: false
 
+# Lets Home Assistant (a voice command, an automation, a dashboard tile) jump
+# the idle screen straight to home. Sets the same two globals a horizontal
+# swipe would leave behind, then asks the core's own phase router to act on
+# them - immediately if the device is already idle, or the next time a
+# conversation ends if it is not. See base/screens/weather.yaml for the sibling
+# button and the same trick applied to a carousel screen instead of home.
+button:
+  - platform: template
+    id: show_home_btn
+    name: "Show home screen"
+    icon: "mdi:home"
+    on_press:
+      - lambda: |-
+          id(idle_pos) = 0;
+          id(idle_alt) = false;
+          id(idle_page_idx) = (int) id(page_home)->index;
+      - script.execute: show_phase_page
+
 # Paint once at boot so the screen is not blank before the first tick or the
 # first Home Assistant value arrives.
 esphome:
