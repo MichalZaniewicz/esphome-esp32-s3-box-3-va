@@ -472,6 +472,15 @@ their alarm, the touchscreen, the home screen and the animated character.
   its divider, which freezes one frame of the same idle line `aura.yaml` breathes
   on the character screen. Reuses Dashboard's three widgets and its 20-second,
   visibility-gated refresh rather than adding a second set of sensors.
+- **`base/screens/show-screen.yaml`**: a "Show screen" `select` so Assist can
+  change the idle screen by voice ("show weather") with no custom sentence -
+  a `select` is a domain Assist already knows how to operate once the entity
+  is exposed to it. Picking an option sets the same `idle_pos`/`idle_page_idx`
+  globals a horizontal swipe leaves behind and calls the core's own phase
+  router, so it never interrupts an active conversation and lands on the right
+  screen the moment one ends. Needs home, weather, climate and media all
+  installed, because unlike `home-styles.yaml` this file has to name pages
+  that live in someone else's optional package.
 - **Performance instrumentation**, all `disabled_by_default` so it costs nothing
   until you switch it on in Home Assistant: `loop_time`, free heap, largest free
   block and free PSRAM. The reason it exists: the only signal this project had

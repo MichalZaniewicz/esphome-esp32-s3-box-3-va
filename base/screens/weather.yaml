@@ -344,25 +344,6 @@ script:
             }
           }
 
-# Lets Home Assistant (a voice command, an automation, a dashboard tile) jump
-# the idle screen straight here. `idle_page_idx` is the same global a
-# horizontal swipe leaves behind - the core cannot name a page from outside
-# its own file, which is why this button lives here rather than in core.yaml -
-# and `show_phase_page` is the core's own phase router, already guarded
-# against interrupting an active conversation: called mid-phase it just
-# re-confirms the current phase page, and the idle_pos/idle_page_idx staged
-# here take over the moment the conversation actually ends.
-button:
-  - platform: template
-    id: show_weather_btn
-    name: "Show weather screen"
-    icon: "mdi:weather-partly-cloudy"
-    on_press:
-      - lambda: |-
-          id(idle_pos) = 0;
-          id(idle_page_idx) = (int) id(page_weather)->index;
-      - script.execute: show_phase_page
-
 esphome:
   on_boot:
     - priority: 800

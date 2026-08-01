@@ -35,6 +35,12 @@ substitutions:
   station_indoor_label: "Inside"
   station_humidity_label: "Humidity"
 
+  # --- "Show screen" selector (base/screens/show-screen.yaml) --------------
+  show_screen_text_home: "Home"
+  show_screen_text_weather: "Weather"
+  show_screen_text_climate: "Thermostat"
+  show_screen_text_media: "Media"
+
   # --- Bare-core status screens (shown when no character package claims a phase)
   text_starting: "Starting..."
   text_no_wifi: "No Wi-Fi"

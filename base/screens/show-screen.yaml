@@ -1,0 +1,83 @@
+###############################################################################
+# "Show screen": one Home Assistant `select` that jumps the idle screen to
+# whichever carousel stop you pick. Point Assist at it - expose the entity and
+# say "set show screen to weather" (or whatever your language's built-in
+# select-entity phrasing is) - and it works with no custom sentence, because a
+# `select` is something Assist already knows how to operate.
+#
+# NEEDS ALL FOUR SCREENS INSTALLED: home.yaml, weather.yaml, climate.yaml and
+# media.yaml, in any order, all BEFORE this file. It is a single select rather
+# than one button per screen (an earlier draft of this) because the core
+# cannot name a page that lives in someone else's optional package - so unlike
+# home-styles.yaml, which only ever touches widgets home.yaml itself declares,
+# this file has to name page_weather / page_climate / page_media directly, and
+# can only do that by requiring the files that declare them.
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/screens/weather.yaml
+#         - base/screens/climate.yaml
+#         - base/screens/media.yaml
+#         - base/screens/show-screen.yaml   # <- after all four
+#
+# Picking an option sets the same two globals a horizontal swipe leaves behind
+# (idle_pos, idle_page_idx - see core.yaml's CAROUSEL comment), then calls the
+# core's own show_phase_page: immediately, if the device is already idle, or
+# the moment the current conversation ends, if it is not. Nothing here
+# interrupts an active listen/think/reply.
+###############################################################################
+
+substitutions:
+  # What Assist has to hear, and what shows in the picker - the same word does
+  # both jobs, so it has to be whatever this house actually calls each screen.
+  # A language package overrides these the way it overrides every other label.
+  show_screen_text_home: "Home"
+  show_screen_text_weather: "Weather"
+  show_screen_text_climate: "Thermostat"
+  show_screen_text_media: "Media"
+
+select:
+  - platform: template
+    id: show_screen_select
+    name: "Show screen"
+    icon: "mdi:monitor-dashboard"
+    optimistic: true
+    options:
+      - ${show_screen_text_home}
+      - ${show_screen_text_weather}
+      - ${show_screen_text_climate}
+      - ${show_screen_text_media}
+    on_value:
+      - script.execute: apply_show_screen
+
+script:
+  - id: apply_show_screen
+    then:
+      - lambda: |-
+          const std::string s = id(show_screen_select).current_option();
+          int idx = -1;
+          bool is_home = false;
+          if (s == "${show_screen_text_home}")         { idx = (int) id(page_home)->index;    is_home = true; }
+          else if (s == "${show_screen_text_weather}") { idx = (int) id(page_weather)->index; }
+          else if (s == "${show_screen_text_climate}") { idx = (int) id(page_climate)->index; }
+          else if (s == "${show_screen_text_media}")   { idx = (int) id(page_media)->index;   }
+          if (idx < 0) return;
+
+          id(idle_pos) = 0;
+          // Home's tap toggle switches between the clock and the character;
+          // picking "Home" here means the clock, the same way a fresh swipe
+          // onto the home stop always would.
+          if (is_home) id(idle_alt) = false;
+          id(idle_page_idx) = idx;
+      - script.execute: show_phase_page
+
+esphome:
+  on_boot:
+    - priority: 800
+      then:
+        - logger.log:
+            level: INFO
+            format: "package: screens/show-screen.yaml (live \"Show screen\" selector)"

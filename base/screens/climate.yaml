@@ -374,20 +374,6 @@ script:
           data_template:
             temperature: !lambda return to_string(id(climate_local));
 
-# Jump the idle screen straight here from Home Assistant. See the identical
-# button in base/screens/weather.yaml for why it lives in this file and not
-# core.yaml, and how it stays out of the way of an active conversation.
-button:
-  - platform: template
-    id: show_climate_btn
-    name: "Show thermostat screen"
-    icon: "mdi:thermostat"
-    on_press:
-      - lambda: |-
-          id(idle_pos) = 0;
-          id(idle_page_idx) = (int) id(page_climate)->index;
-      - script.execute: show_phase_page
-
 esphome:
   on_boot:
     - priority: 800

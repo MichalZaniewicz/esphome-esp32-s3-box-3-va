@@ -29,6 +29,14 @@ substitutions:
   station_indoor_label: "W domu"
   station_humidity_label: "Wilgotność"
 
+  # --- Selektor "Show screen" (base/screens/show-screen.yaml) --------------
+  # To są słowa, które Assist musi usłyszeć, więc mają być takie, jak się
+  # faktycznie mówi o tych ekranach, nie dosłowne tłumaczenie z angielskiego.
+  show_screen_text_home: "Dom"
+  show_screen_text_weather: "Pogoda"
+  show_screen_text_climate: "Termostat"
+  show_screen_text_media: "Odtwarzacz"
+
   # --- Ekrany statusu gołego rdzenia (gdy żaden pakiet postaci nie przejmie fazy)
   text_starting: "Uruchamianie..."
   text_no_wifi: "Brak Wi-Fi"
