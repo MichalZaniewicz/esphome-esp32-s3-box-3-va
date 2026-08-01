@@ -111,17 +111,28 @@ font:
       - "\U000F050F"   # thermometer
       - "\U000F058E"   # water-percent (humidity)
       - "\U000F0590"   # weather-cloudy (outdoor)
+  # The same cloud, bigger, for Station's hero - w_io's font is switched
+  # between this and font_home_mdi depending on style, same trick as the
+  # value labels below.
+  - id: font_station_icon
+    file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    size: 52
+    bpp: 4
+    glyphs:
+      - "\U000F0590"   # weather-cloudy (outdoor)
   # Station's big outdoor number and its smaller indoor pair. Digits only, like
   # the weather and climate screens - a full glyphset at hero size would cost
-  # more than everything else this style adds put together.
+  # more than everything else this style adds put together. The period is not
+  # decorative: "%.1f" prints one, and a glyph missing from a bitmap font
+  # draws as a tofu box, not nothing.
   - id: font_station_hero
     file: { type: gfonts, family: "${font_family}", weight: 500 }
     size: 56
-    glyphs: "-0123456789°"
+    glyphs: "-.0123456789°"
   - id: font_station_val
     file: { type: gfonts, family: "${font_family}", weight: 500 }
     size: 26
-    glyphs: "-0123456789°%"
+    glyphs: "-.0123456789°%"
 
 # Runtime-created widgets, so home.yaml stays a clean home screen and all the
 # style machinery lives here. Pointers are kept in globals; the widgets are
@@ -402,6 +413,10 @@ script:
             for (int i=0;i<3;i++){
               if(!ic[i]) continue;
               show(ic[i]); lv_obj_align(ic[i], LV_ALIGN_CENTER, dx[i], 30);
+              // Reset from Station's bigger cloud: only w_io's font ever
+              // changes, but resetting all three costs nothing and does not
+              // need to know which one it was.
+              lv_obj_set_style_text_font(ic[i], id(font_home_mdi)->get_lv_font(), 0);
               lv_obj_set_style_text_color(ic[i], lv_color_hex(0x3AFAE6), 0);
               show(vl[i]); lv_obj_align(vl[i], LV_ALIGN_CENTER, dx[i], 66);
               // Reset from Station's bigger font: the two styles share these
@@ -433,54 +448,59 @@ script:
             lv_obj_align(clock, LV_ALIGN_TOP_MID, 0, 8);
 
             if (id(w_io)) {
-              show(id(w_io)); lv_obj_align(id(w_io), LV_ALIGN_TOP_LEFT, 76, 44);
+              show(id(w_io));
+              lv_obj_set_style_text_font(id(w_io), id(font_station_icon)->get_lv_font(), 0);
+              lv_obj_align(id(w_io), LV_ALIGN_TOP_LEFT, 66, 38);
               lv_obj_set_style_text_color(id(w_io), lv_color_hex(hn), 0);
             }
             if (id(w_vo)) {
               show(id(w_vo));
               lv_obj_set_style_text_font(id(w_vo), id(font_station_hero)->get_lv_font(), 0);
               lv_obj_set_style_text_align(id(w_vo), LV_TEXT_ALIGN_LEFT, 0);
-              lv_obj_align(id(w_vo), LV_ALIGN_TOP_LEFT, 130, 36);
+              lv_obj_align(id(w_vo), LV_ALIGN_TOP_LEFT, 136, 36);
               lv_obj_set_style_text_color(id(w_vo), lv_color_hex(ck), 0);
             }
             if (id(station_out_lbl)) {
               show(id(station_out_lbl));
               lv_obj_set_style_text_color(id(station_out_lbl), lv_color_hex(cl), 0);
-              lv_obj_align(id(station_out_lbl), LV_ALIGN_TOP_MID, 0, 108);
+              lv_obj_align(id(station_out_lbl), LV_ALIGN_TOP_MID, 0, 112);
             }
 
-            if (id(w_it)) {
-              show(id(w_it)); lv_obj_align(id(w_it), LV_ALIGN_TOP_LEFT, 34, 164);
-              lv_obj_set_style_text_color(id(w_it), lv_color_hex(dt), 0);
-            }
-            if (id(w_vt)) {
-              show(id(w_vt));
-              lv_obj_set_style_text_font(id(w_vt), id(font_station_val)->get_lv_font(), 0);
-              lv_obj_set_style_text_align(id(w_vt), LV_TEXT_ALIGN_LEFT, 0);
-              lv_obj_align(id(w_vt), LV_ALIGN_TOP_LEFT, 62, 160);
-              lv_obj_set_style_text_color(id(w_vt), lv_color_hex(ck), 0);
-            }
-            if (id(station_in_lbl)) {
-              show(id(station_in_lbl));
-              lv_obj_set_style_text_color(id(station_in_lbl), lv_color_hex(cl), 0);
-              lv_obj_align(id(station_in_lbl), LV_ALIGN_TOP_LEFT, 34, 198);
-            }
-
-            if (id(w_ih)) {
-              show(id(w_ih)); lv_obj_align(id(w_ih), LV_ALIGN_TOP_LEFT, 184, 164);
-              lv_obj_set_style_text_color(id(w_ih), lv_color_hex(dt), 0);
-            }
-            if (id(w_vh)) {
-              show(id(w_vh));
-              lv_obj_set_style_text_font(id(w_vh), id(font_station_val)->get_lv_font(), 0);
-              lv_obj_set_style_text_align(id(w_vh), LV_TEXT_ALIGN_LEFT, 0);
-              lv_obj_align(id(w_vh), LV_ALIGN_TOP_LEFT, 212, 160);
-              lv_obj_set_style_text_color(id(w_vh), lv_color_hex(ck), 0);
-            }
-            if (id(station_hum_lbl)) {
-              show(id(station_hum_lbl));
-              lv_obj_set_style_text_color(id(station_hum_lbl), lv_color_hex(cl), 0);
-              lv_obj_align(id(station_hum_lbl), LV_ALIGN_TOP_LEFT, 184, 198);
+            // Indoor strip: icon then value, left-anchored - unchanged from
+            // before, and deliberately NOT given an explicit width, because
+            // w_it/w_ih/w_vt/w_vh are the same widgets Dashboard uses and an
+            // LV_ALIGN_CENTER box in that layout would shift if this one left
+            // it a different width. Only the two captions below are Station's
+            // own widgets, so only they are safe to size and centre - on the
+            // estimated middle of the icon+value pair above them, since a
+            // real centre would have to know the value's rendered width and
+            // this does not measure text. Y is +4 from the icon's top: the
+            // icon glyph (34 px) is taller than the value font (26 px), so the
+            // value needs to sit a little lower for their centres to meet.
+            static const int ICON_X[2] = {34, 184};
+            lv_obj_t *sic[2] = {id(w_it), id(w_ih)};
+            lv_obj_t *sval[2] = {id(w_vt), id(w_vh)};
+            lv_obj_t *slbl[2] = {id(station_in_lbl), id(station_hum_lbl)};
+            for (int i = 0; i < 2; i++) {
+              if (sic[i]) {
+                show(sic[i]);
+                lv_obj_align(sic[i], LV_ALIGN_TOP_LEFT, ICON_X[i], 164);
+                lv_obj_set_style_text_color(sic[i], lv_color_hex(dt), 0);
+              }
+              if (sval[i]) {
+                show(sval[i]);
+                lv_obj_set_style_text_font(sval[i], id(font_station_val)->get_lv_font(), 0);
+                lv_obj_set_style_text_align(sval[i], LV_TEXT_ALIGN_LEFT, 0);
+                lv_obj_align(sval[i], LV_ALIGN_TOP_LEFT, ICON_X[i] + 28, 168);
+                lv_obj_set_style_text_color(sval[i], lv_color_hex(ck), 0);
+              }
+              if (slbl[i]) {
+                show(slbl[i]);
+                lv_obj_set_width(slbl[i], 120);
+                lv_obj_set_style_text_align(slbl[i], LV_TEXT_ALIGN_CENTER, 0);
+                lv_obj_align(slbl[i], LV_ALIGN_TOP_LEFT, ICON_X[i] - 20, 198);
+                lv_obj_set_style_text_color(slbl[i], lv_color_hex(cl), 0);
+              }
             }
 
             // The divider, or - only for Station Aura - nine bars frozen in the
