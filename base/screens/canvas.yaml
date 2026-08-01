@@ -328,7 +328,12 @@ text:
     mode: text
     optimistic: true
     min_length: 0
-    max_length: 600
+    # 255, not a rounder number: Home Assistant caps every entity state at
+    # 255 characters (the same limit weather.yaml's own header runs into),
+    # and this text entity's value IS the state. In practice that is 8-12
+    # short elements, well under any of the pools below - the pools were
+    # never going to be the tighter limit.
+    max_length: 255
     on_value:
       - script.execute: canvas_redraw
 
