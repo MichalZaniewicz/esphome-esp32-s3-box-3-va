@@ -327,7 +327,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `media.yaml` | What is playing on any Home Assistant media player - title, artist, a progress bar and previous / play-pause / next as tap buttons. A **carousel screen**: one swipe left or right from home. It follows `external_media_player_id` on its own, so a room with one speaker names it once; set `media_entity` only when the screen should watch something else - a TV, another room, or the box's own player, `media_player.<name>_<friendly_name>` slugified. Where Music Assistant and the Cast integration both publish a speaker, pick the Music Assistant one: the raw Cast entity offers no previous/next and no track length. The bar advances locally between Home Assistant's occasional position updates, and only while the page is on screen. |
 | `weather.yaml` | Current conditions big - icon, temperature, humidity and wind - over a forecast row of up to seven days, each with its own icon and high/low. A **carousel screen**: one swipe sideways from home. Current conditions come straight from a `weather` entity; the forecast needs a small helper in Home Assistant, because since 2024.4 a forecast lives only in a service response and a device cannot read one. The screen draws a column per day it is given and centres them, so a five-day integration and a ten-day one both look deliberate. |
 | `climate.yaml` | A thermostat: the target temperature large, the room's own below it, a flame that lights only while the device is actually heating, two arrows and a row of mode buttons. A **carousel screen**: one swipe sideways from home. Needs nothing in Home Assistant - the step, the limits and the list of modes are all attributes, so the row has three buttons on a TRV and six on an air conditioner without being told. Taps move the number at once and call Home Assistant after, because a thermostat is tapped in bursts. |
-| `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 32 looks for the home screen (fonts, colours, gradient backgrounds, layouts and a temperature/humidity dashboard) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
+| `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 40 looks for the home screen (fonts, colours, gradient backgrounds, layouts, a temperature/humidity dashboard, and a big-outdoor-reading "Station" family in eight palettes) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 
 The **settings screen** is **one swipe down** from home - the device's own switches
 as tap tiles (microphone, wake sound, and where replies come out) plus a volume
@@ -406,9 +406,10 @@ reboot. Only the home screen is restyled; nothing else moves.
     - base/screens/home-styles.yaml   # the selector
 ```
 
-The 32 styles, at the device's native 320x240 - layouts (Default, Big, Terminal,
-Stack, **Dashboard** with temperature/humidity icons, RightCol, Corner), fonts and
-palettes, vertical and horizontal gradient backgrounds, and light themes:
+The 40 styles, at the device's native 320x240 - layouts (Default, Big, Terminal,
+Stack, **Dashboard** with temperature/humidity icons, RightCol, Corner, **Station**
+with a big outdoor reading over a small indoor strip), fonts and palettes,
+vertical and horizontal gradient backgrounds, and light themes:
 
 <table>
 <tr>
@@ -463,6 +464,17 @@ palettes, vertical and horizontal gradient backgrounds, and light themes:
 
 <sub>Previews rendered at 320x240 with the device's own fonts; the panel itself
 looks the same bar minor anti-aliasing.</sub>
+
+Eight more aren't in the gallery above yet, but are already in the selector: the
+**Station** family - `Station`, `Station Aura`, `Station Neon`, `Station Amber`,
+`Station Fire`, `Station Ice`, `Station Forest`, `Station Paper`. Same three
+sensors as the small row under Dashboard's clock, drawn bigger and split
+differently: a big outdoor reading up top, a small indoor temperature/humidity
+strip below a divider. Each borrows its palette from the matching style above
+it - `Station Neon` is `Neon`'s cyan and magenta, `Station Paper` is `Paper`'s
+cream and ink - except `Station Aura`, which matches the `aura` character
+instead: its divider freezes a single frame of the same line `aura.yaml`
+breathes on the character screen.
 
 `home.yaml` is parameterised, so the Default look is unchanged and any single
 value - a colour, the clock font - can also be pinned at compile time by setting

@@ -15,9 +15,19 @@
 #
 # A style is: PALETTE + FONT + BACKGROUND + LAYOUT. Most styles keep the default
 # layout and differ by paint; Big / Terminal / Stack rearrange it; Dashboard adds
-# temperature / humidity / outdoor icons with values. The small text keeps the
-# main UI font so Central European accents still render.
+# temperature / humidity / outdoor icons with values. The Station family (eight
+# styles, one per finished palette below) is the same three sensors again, drawn
+# as a big outdoor reading over a small indoor strip instead of Dashboard's three
+# equal tiles - see the layout == 7 branch below. The small text keeps the main
+# UI font so Central European accents still render.
 ###############################################################################
+
+substitutions:
+  # Station family captions. English by default; a language package overrides
+  # them the same way it overrides home_indoor_label/home_outdoor_label.
+  station_outdoor_label: "Outside"
+  station_indoor_label: "Inside"
+  station_humidity_label: "Humidity"
 
 font:
   # Clock fonts - digits and a colon only. `font_clock` (Default) is in home.yaml.
@@ -91,6 +101,8 @@ font:
     glyphs: "0123456789:-"
   # Material Design Icons for the Dashboard style. Just the three glyphs it uses -
   # thermometer, water-percent and a cloud - verified against the v7.4.47 webfont.
+  # The Station family reuses the very same three widgets, so no second icon
+  # font is needed for it.
   - id: font_home_mdi
     file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
     size: 34
@@ -99,10 +111,21 @@ font:
       - "\U000F050F"   # thermometer
       - "\U000F058E"   # water-percent (humidity)
       - "\U000F0590"   # weather-cloudy (outdoor)
+  # Station's big outdoor number and its smaller indoor pair. Digits only, like
+  # the weather and climate screens - a full glyphset at hero size would cost
+  # more than everything else this style adds put together.
+  - id: font_station_hero
+    file: { type: gfonts, family: "${font_family}", weight: 500 }
+    size: 56
+    glyphs: "-0123456789°"
+  - id: font_station_val
+    file: { type: gfonts, family: "${font_family}", weight: 500 }
+    size: 26
+    glyphs: "-0123456789°%"
 
-# Runtime-created widgets for the Dashboard style, so home.yaml stays a clean
-# home screen and all the style machinery lives here. Pointers are kept in
-# globals; the widgets are children of page_home, hidden until Dashboard shows them.
+# Runtime-created widgets, so home.yaml stays a clean home screen and all the
+# style machinery lives here. Pointers are kept in globals; the widgets are
+# children of page_home, hidden until a style that uses them is picked.
 globals:
   - id: dash_ready
     type: bool
@@ -129,6 +152,61 @@ globals:
     restore_value: false
     initial_value: "nullptr"
   - id: w_vo
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  # Station family: three captions, a divider line, and nine small bars that
+  # stand in for the divider on "Station Aura" - a frozen frame of the same
+  # idle line base/faces/aura.yaml draws on the character screen.
+  - id: station_out_lbl
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_in_lbl
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_hum_lbl
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_div
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_0
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_1
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_2
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_3
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_4
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_5
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_6
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_7
+    type: lv_obj_t*
+    restore_value: false
+    initial_value: "nullptr"
+  - id: station_bar_8
     type: lv_obj_t*
     restore_value: false
     initial_value: "nullptr"
@@ -174,14 +252,23 @@ select:
       - Blueprint
       - RightCol
       - Corner
+      - Station
+      - Station Aura
+      - Station Neon
+      - Station Amber
+      - Station Fire
+      - Station Ice
+      - Station Forest
+      - Station Paper
     initial_option: Default
     on_value:
       - script.execute: apply_home_style
 
 script:
-  # Fill the Dashboard value labels from the climate sensors. Safe to call any
-  # time - it no-ops until the widgets exist, and setting text on hidden labels
-  # (other styles) costs nothing anyone sees.
+  # Fill the Dashboard/Station value labels from the climate sensors. Safe to
+  # call any time - it no-ops until the widgets exist, and setting text on
+  # hidden labels (any other style) costs nothing anyone sees. Both families
+  # read the same three widgets, so one writer serves both.
   - id: dash_refresh
     then:
       - lambda: |-
@@ -209,7 +296,8 @@ script:
                    cl = ${home_climate_color};
           uint32_t g2 = bg;   // gradient bottom; == bg means solid
           int grad = 0;       // 0 solid, 1 vertical gradient
-          int layout = 0;     // 0 default, 1 big, 2 terminal, 3 stack, 4 dashboard
+          int layout = 0;     // 0 default, 1 big, 2 terminal, 3 stack, 4 dashboard, 7 station
+          bool station_aura = false;   // Station's one layout variant: bars instead of a line
 
           if (s == "CRT")            { f = id(font_clock_crt);     bg = 0x040A04; ck = 0x4DFF7A; dt = 0x2AAE4C; hn = 0x1C8038; cl = 0x38D661; }
           else if (s == "Neon")      { f = id(font_clock_neon);    bg = 0x050014; ck = 0x00E5FF; dt = 0xFF3DDA; hn = 0x6E33FF; cl = 0x00E5FF; }
@@ -242,6 +330,18 @@ script:
           else if (s == "Blueprint") { f = id(font_clock_blueprint); bg = 0xD8E6F2; ck = 0x113A66; dt = 0x3A6A96; hn = 0x6A8AAE; cl = 0x224A76; }
           else if (s == "RightCol")  { f = id(font_clock);          bg = 0x0A0700; ck = 0xFFB021; dt = 0xB3760F; hn = 0x7A5008; cl = 0xFFA833; layout = 5; }
           else if (s == "Corner")    { f = id(font_clock_dash);     bg = 0x0B0B0B; ck = 0xF4F4F4; dt = 0x6E6E6E; hn = 0x454545; cl = 0x9C9C9C; layout = 6; }
+          // ---- Station family: same layout, eight of the palettes above. ck is
+          // the big numbers (and the small clock), dt tints the two indoor icons,
+          // hn tints the outdoor icon and the divider. Every hex here is copied
+          // from the matching style above it, not invented.
+          else if (s == "Station")        { f = id(font_home_small); bg = 0x000000; ck = 0xEAF2FF; dt = 0x3AFAE6; hn = 0x8FA6C0; cl = 0x8FA6C0; layout = 7; }
+          else if (s == "Station Aura")   { f = id(font_home_small); bg = 0x000000; ck = 0xFF8A5B; dt = 0xFF8A5B; hn = 0xFF8A5B; cl = 0x4A3A34; layout = 7; station_aura = true; }
+          else if (s == "Station Neon")   { f = id(font_home_small); bg = 0x050014; ck = 0x00E5FF; dt = 0xFF3DDA; hn = 0x6E33FF; cl = 0x00E5FF; layout = 7; }
+          else if (s == "Station Amber")  { f = id(font_home_small); bg = 0x0A0500; ck = 0xFFB021; dt = 0xB3760F; hn = 0x7A5008; cl = 0xFFA833; layout = 7; }
+          else if (s == "Station Fire")   { f = id(font_home_small); bg = 0x1A0603; g2 = 0x7A1A08; grad = 1; ck = 0xFFD24D; dt = 0xFF8A3D; hn = 0xC7663A; cl = 0xFFB86A; layout = 7; }
+          else if (s == "Station Ice")    { f = id(font_home_small); bg = 0x0A1A2E; g2 = 0x2A5A8A; grad = 1; ck = 0xF2FAFF; dt = 0xAFD6F0; hn = 0x6A93B8; cl = 0xD6ECFA; layout = 7; }
+          else if (s == "Station Forest") { f = id(font_home_small); bg = 0x03140A; g2 = 0x0A3A1E; grad = 1; ck = 0xB8F0A8; dt = 0x7FC77A; hn = 0x4A7A44; cl = 0xCDEFC0; layout = 7; }
+          else if (s == "Station Paper")  { f = id(font_home_small); bg = 0xEDEAE2; ck = 0x1A1A1A; dt = 0x555555; hn = 0x8A8A8A; cl = 0x333333; layout = 7; }
 
           lv_obj_t *p = id(page_home)->obj;
           lv_obj_set_style_bg_color(p, lv_color_hex(bg), LV_PART_MAIN);
@@ -264,9 +364,14 @@ script:
           auto hide = [](lv_obj_t *o){ if(o) lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); };
           auto talign = [](lv_obj_t *o, lv_text_align_t a){ lv_obj_set_style_text_align(o, a, 0); };
 
-          // Dashboard widgets are hidden for every layout, then shown by Dashboard.
+          // Dashboard/Station widgets are hidden for every layout, then shown by
+          // whichever of the two uses them.
           lv_obj_t *dashw[6] = {id(w_it),id(w_ih),id(w_io),id(w_vt),id(w_vh),id(w_vo)};
           for (int i=0;i<6;i++) hide(dashw[i]);
+          lv_obj_t *stw[13] = {id(station_out_lbl),id(station_in_lbl),id(station_hum_lbl),id(station_div),
+                               id(station_bar_0),id(station_bar_1),id(station_bar_2),id(station_bar_3),
+                               id(station_bar_4),id(station_bar_5),id(station_bar_6),id(station_bar_7),id(station_bar_8)};
+          for (int i=0;i<13;i++) hide(stw[i]);
 
           if (layout == 1) {                 // BIG: just the clock, centred
             show(clock); hide(date); hide(hint); hide(ind); hide(out);
@@ -299,6 +404,9 @@ script:
               show(ic[i]); lv_obj_align(ic[i], LV_ALIGN_CENTER, dx[i], 30);
               lv_obj_set_style_text_color(ic[i], lv_color_hex(0x3AFAE6), 0);
               show(vl[i]); lv_obj_align(vl[i], LV_ALIGN_CENTER, dx[i], 66);
+              // Reset from Station's bigger font: the two styles share these
+              // labels, and only Station ever changes their size.
+              lv_obj_set_style_text_font(vl[i], id(font_home_small)->get_lv_font(), 0);
               lv_obj_set_style_text_align(vl[i], LV_TEXT_ALIGN_CENTER, 0);
               lv_obj_set_style_text_color(vl[i], lv_color_hex(cl), 0);
             }
@@ -318,6 +426,83 @@ script:
             lv_obj_align(date,  LV_ALIGN_TOP_LEFT, 16, 64);
             lv_obj_align(ind,   LV_ALIGN_BOTTOM_LEFT, 14, -46);
             lv_obj_align(out,   LV_ALIGN_BOTTOM_LEFT, 14, -22);
+          } else if (layout == 7) {          // STATION: small clock, big outdoor
+                                              // hero, small indoor strip below
+            show(clock); hide(date); hide(hint); hide(ind); hide(out);
+            talign(clock, LV_TEXT_ALIGN_CENTER);
+            lv_obj_align(clock, LV_ALIGN_TOP_MID, 0, 8);
+
+            if (id(w_io)) {
+              show(id(w_io)); lv_obj_align(id(w_io), LV_ALIGN_TOP_LEFT, 76, 44);
+              lv_obj_set_style_text_color(id(w_io), lv_color_hex(hn), 0);
+            }
+            if (id(w_vo)) {
+              show(id(w_vo));
+              lv_obj_set_style_text_font(id(w_vo), id(font_station_hero)->get_lv_font(), 0);
+              lv_obj_set_style_text_align(id(w_vo), LV_TEXT_ALIGN_LEFT, 0);
+              lv_obj_align(id(w_vo), LV_ALIGN_TOP_LEFT, 130, 36);
+              lv_obj_set_style_text_color(id(w_vo), lv_color_hex(ck), 0);
+            }
+            if (id(station_out_lbl)) {
+              show(id(station_out_lbl));
+              lv_obj_set_style_text_color(id(station_out_lbl), lv_color_hex(cl), 0);
+              lv_obj_align(id(station_out_lbl), LV_ALIGN_TOP_MID, 0, 108);
+            }
+
+            if (id(w_it)) {
+              show(id(w_it)); lv_obj_align(id(w_it), LV_ALIGN_TOP_LEFT, 34, 164);
+              lv_obj_set_style_text_color(id(w_it), lv_color_hex(dt), 0);
+            }
+            if (id(w_vt)) {
+              show(id(w_vt));
+              lv_obj_set_style_text_font(id(w_vt), id(font_station_val)->get_lv_font(), 0);
+              lv_obj_set_style_text_align(id(w_vt), LV_TEXT_ALIGN_LEFT, 0);
+              lv_obj_align(id(w_vt), LV_ALIGN_TOP_LEFT, 62, 160);
+              lv_obj_set_style_text_color(id(w_vt), lv_color_hex(ck), 0);
+            }
+            if (id(station_in_lbl)) {
+              show(id(station_in_lbl));
+              lv_obj_set_style_text_color(id(station_in_lbl), lv_color_hex(cl), 0);
+              lv_obj_align(id(station_in_lbl), LV_ALIGN_TOP_LEFT, 34, 198);
+            }
+
+            if (id(w_ih)) {
+              show(id(w_ih)); lv_obj_align(id(w_ih), LV_ALIGN_TOP_LEFT, 184, 164);
+              lv_obj_set_style_text_color(id(w_ih), lv_color_hex(dt), 0);
+            }
+            if (id(w_vh)) {
+              show(id(w_vh));
+              lv_obj_set_style_text_font(id(w_vh), id(font_station_val)->get_lv_font(), 0);
+              lv_obj_set_style_text_align(id(w_vh), LV_TEXT_ALIGN_LEFT, 0);
+              lv_obj_align(id(w_vh), LV_ALIGN_TOP_LEFT, 212, 160);
+              lv_obj_set_style_text_color(id(w_vh), lv_color_hex(ck), 0);
+            }
+            if (id(station_hum_lbl)) {
+              show(id(station_hum_lbl));
+              lv_obj_set_style_text_color(id(station_hum_lbl), lv_color_hex(cl), 0);
+              lv_obj_align(id(station_hum_lbl), LV_ALIGN_TOP_LEFT, 184, 198);
+            }
+
+            // The divider, or - only for Station Aura - nine bars frozen in the
+            // same shape base/faces/aura.yaml breathes on the character screen.
+            if (station_aura) {
+              static const int H[9]  = {4, 7, 10, 13, 16, 13, 10, 7, 4};
+              static const int XO[9] = {-40, -30, -20, -10, 0, 10, 20, 30, 40};
+              lv_obj_t *bars[9] = {id(station_bar_0),id(station_bar_1),id(station_bar_2),id(station_bar_3),
+                                   id(station_bar_4),id(station_bar_5),id(station_bar_6),id(station_bar_7),id(station_bar_8)};
+              for (int i=0;i<9;i++) {
+                if (!bars[i]) continue;
+                show(bars[i]);
+                lv_obj_set_size(bars[i], 6, H[i]);
+                lv_obj_set_style_radius(bars[i], 3, 0);
+                lv_obj_set_style_bg_color(bars[i], lv_color_hex(ck), 0);
+                lv_obj_align(bars[i], LV_ALIGN_CENTER, XO[i], 16);
+              }
+            } else if (id(station_div)) {
+              show(id(station_div));
+              lv_obj_set_style_bg_color(id(station_div), lv_color_hex(hn), 0);
+              lv_obj_align(id(station_div), LV_ALIGN_TOP_LEFT, 24, 136);
+            }
           } else {                           // DEFAULT: the home.yaml layout
             show(clock); show(date); show(hint); show(ind); show(out);
             talign(clock, LV_TEXT_ALIGN_CENTER); talign(date, LV_TEXT_ALIGN_LEFT);
@@ -330,18 +515,22 @@ script:
           }
 
           lv_obj_invalidate(p);
-      # Keep the Dashboard values current on every switch (no-ops elsewhere).
+      # Keep the Dashboard/Station values current on every switch (no-ops
+      # elsewhere).
       - script.execute: dash_refresh
 
-# Refresh the Dashboard values while it is the screen you are looking at. Climate
-# moves slowly, so this is gentle and gated on the page being visible.
+# Refresh the Dashboard/Station values while one of them is the screen you are
+# looking at. Climate moves slowly, so this is gentle and gated on the page
+# being visible.
 interval:
   - interval: 20s
     then:
       - if:
           condition:
             and:
-              - lambda: return id(home_style_select).current_option() == "Dashboard";
+              - lambda: |-
+                  const std::string s = id(home_style_select).current_option();
+                  return s == "Dashboard" || s.rfind("Station", 0) == 0;
               - lvgl.page.is_showing: page_home
           then:
             - script.execute: dash_refresh
@@ -353,8 +542,9 @@ esphome:
         - logger.log:
             level: INFO
             format: "package: screens/home-styles.yaml (live Home style selector)"
-    # Build the Dashboard widgets once, after LVGL is up. Runs BEFORE the style
-    # apply below (higher priority = earlier), so the pointers exist by then.
+    # Build the Dashboard/Station widgets once, after LVGL is up. Runs BEFORE
+    # the style apply below (higher priority = earlier), so the pointers exist
+    # by then.
     - priority: -190
       then:
         - lambda: |-
@@ -369,6 +559,30 @@ esphome:
               lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
             id(w_it) = ico("\U000F050F"); id(w_ih) = ico("\U000F058E"); id(w_io) = ico("\U000F0590");
             id(w_vt) = val(); id(w_vh) = val(); id(w_vo) = val();
+
+            auto cap = [&](const char *t){ lv_obj_t *o = lv_label_create(p);
+              lv_obj_set_style_text_font(o, id(font_home_small)->get_lv_font(), 0);
+              lv_label_set_text(o, t); lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
+            id(station_out_lbl) = cap("${station_outdoor_label}");
+            id(station_in_lbl)  = cap("${station_indoor_label}");
+            id(station_hum_lbl) = cap("${station_humidity_label}");
+
+            lv_obj_t *div = lv_obj_create(p);
+            lv_obj_set_size(div, 272, 1);
+            lv_obj_set_style_bg_opa(div, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_width(div, 0, 0);
+            lv_obj_set_style_pad_all(div, 0, 0);
+            lv_obj_add_flag(div, LV_OBJ_FLAG_HIDDEN);
+            id(station_div) = div;
+
+            auto bar = [&](){ lv_obj_t *o = lv_obj_create(p);
+              lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
+              lv_obj_set_style_border_width(o, 0, 0);
+              lv_obj_set_style_pad_all(o, 0, 0);
+              lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
+            id(station_bar_0) = bar(); id(station_bar_1) = bar(); id(station_bar_2) = bar();
+            id(station_bar_3) = bar(); id(station_bar_4) = bar(); id(station_bar_5) = bar();
+            id(station_bar_6) = bar(); id(station_bar_7) = bar(); id(station_bar_8) = bar();
     # Apply the restored style. A template select restores its value but does not
     # fire its on_value at boot, so this does the first paint.
     - priority: -200

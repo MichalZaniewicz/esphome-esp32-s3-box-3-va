@@ -95,7 +95,7 @@ packages:
     # - base/screens/media.yaml       # optional: what is playing, one swipe sideways
     # - base/screens/weather.yaml     # optional: now and the week, next along
     # - base/screens/climate.yaml     # optional: the thermostat, next along
-    # - base/screens/home-styles.yaml # optional: 32 looks for the home screen,
+    # - base/screens/home-styles.yaml # optional: 40 looks for the home screen,
     #                                 #   switched live from Home Assistant
       - base/faces/${assistant}.yaml  # the assistant; it pulls in what it needs
     # - base/faces/picker.yaml        # optional: switch character from HA, see above

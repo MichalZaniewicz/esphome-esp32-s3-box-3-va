@@ -24,6 +24,11 @@ substitutions:
   home_indoor_label: "W domu"
   home_outdoor_label: "Na zewnątrz"
 
+  # --- Styl "Station" (base/screens/home-styles.yaml) -----------------------
+  station_outdoor_label: "Na zewnątrz"
+  station_indoor_label: "W domu"
+  station_humidity_label: "Wilgotność"
+
   # --- Ekrany statusu gołego rdzenia (gdy żaden pakiet postaci nie przejmie fazy)
   text_starting: "Uruchamianie..."
   text_no_wifi: "Brak Wi-Fi"

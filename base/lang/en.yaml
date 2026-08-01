@@ -30,6 +30,11 @@ substitutions:
   home_indoor_label: "Inside"
   home_outdoor_label: "Outside"
 
+  # --- "Station" home style (base/screens/home-styles.yaml) ----------------
+  station_outdoor_label: "Outside"
+  station_indoor_label: "Inside"
+  station_humidity_label: "Humidity"
+
   # --- Bare-core status screens (shown when no character package claims a phase)
   text_starting: "Starting..."
   text_no_wifi: "No Wi-Fi"

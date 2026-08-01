@@ -453,7 +453,7 @@ their alarm, the touchscreen, the home screen and the animated character.
   now, across the same five phases.
 - **A live "Home style" selector** (`base/screens/home-styles.yaml`) - a Home
   Assistant `select` that restyles the home screen at runtime, no rebuild, choice
-  restored across a reboot. 32 looks: palettes and fonts (CRT, Neon, Minecraft,
+  restored across a reboot. 40 looks: palettes and fonts (CRT, Neon, Minecraft,
   Vaporwave, Amber, Minimal, Bold, Glitch, Pixel, Stencil, Racer, Zen, Cyber,
   Mono), layouts (Big, Terminal, Stack, RightCol, Corner), a temperature /
   humidity **Dashboard** with icons, vertical and horizontal gradients (Sunset,
@@ -462,6 +462,16 @@ their alarm, the touchscreen, the home screen and the animated character.
   and any value can also be pinned at compile time; each clock font is a Google
   Font compiled as digits and a colon only, so the whole set is a few KB. Only the
   home screen is touched.
+- **A "Station" family, eight more Home styles** riding on the same selector: the
+  same three sensors as Dashboard's small icon row, redrawn big enough to read
+  from across the kitchen - a big outdoor reading over a divider, a small indoor
+  temperature/humidity strip below it. `Station`, `Station Neon`, `Station Amber`,
+  `Station Fire`, `Station Ice`, `Station Forest` and `Station Paper` each borrow
+  their palette from the matching style already in the list, so nothing new was
+  invented; `Station Aura` matches the `aura` character instead, right down to
+  its divider, which freezes one frame of the same idle line `aura.yaml` breathes
+  on the character screen. Reuses Dashboard's three widgets and its 20-second,
+  visibility-gated refresh rather than adding a second set of sensors.
 - **Performance instrumentation**, all `disabled_by_default` so it costs nothing
   until you switch it on in Home Assistant: `loop_time`, free heap, largest free
   block and free PSRAM. The reason it exists: the only signal this project had
