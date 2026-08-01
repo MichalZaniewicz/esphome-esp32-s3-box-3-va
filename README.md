@@ -329,7 +329,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `climate.yaml` | A thermostat: the target temperature large, the room's own below it, a flame that lights only while the device is actually heating, two arrows and a row of mode buttons. A **carousel screen**: one swipe sideways from home. Needs nothing in Home Assistant - the step, the limits and the list of modes are all attributes, so the row has three buttons on a TRV and six on an air conditioner without being told. Taps move the number at once and call Home Assistant after, because a thermostat is tapped in bursts. |
 | `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 40 looks for the home screen (fonts, colours, gradient backgrounds, layouts, a temperature/humidity dashboard, and a big-outdoor-reading "Station" family in eight palettes) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 | `show-screen.yaml` | Four Home Assistant buttons - **"Show home/weather/thermostat/media screen"** - that jump the display to whichever one is pressed, meant for Assist ("Alexa, pokaż pogodę"). Needs `home.yaml`, `weather.yaml`, `climate.yaml` and `media.yaml` all installed, since it has to name each one's page directly. See [Voice control](#voice-control) below. |
-| `canvas.yaml` | A screen only Home Assistant can reach - never a swipe, never a button on the Box. Write a small text spec (rectangles, circles, text and Material Design icons) to a native API service and the device draws it and switches to it on its own. Needs nothing else. See [Voice control](#voice-control) below. |
+| `canvas.yaml` | Lets Assist **draw whatever it wants on the screen** - "Alexa, narysuj słońce" - rectangles, circles, text and Material Design icons, on a blank page it switches to on its own. Only reachable from Home Assistant: never a swipe, never a button on the Box. Needs nothing else. See [Voice control](#voice-control) below. |
 
 The **settings screen** is **one swipe down** from home - the device's own switches
 as tap tiles (microphone, wake sound, and where replies come out) plus a volume
@@ -610,29 +610,69 @@ in one spec.
 
 ### Example Assist instructions
 
-Paste something like this into your conversation agent's instructions
-(wherever your Assist pipeline's LLM integration takes a system prompt) to
-put both of the above in reach of "Alexa, ...":
+This is the full text, not a summary - paste it as-is into your
+conversation agent's instructions (wherever your Assist pipeline's LLM
+integration takes a system prompt) and both features are ready to use, no
+filling in blanks:
 
 ```
-You can change what the kitchen screen shows and draw on it.
+You control a kitchen display. You can switch what it shows and draw on it.
 
-- To switch screens, press one of the four "Show ... screen" buttons.
-- To draw something, call the "Draw on screen" script with a `spec` field.
-  The canvas is exactly 320x240 pixels and nothing is auto-corrected, so
-  compute every coordinate to fit inside those bounds yourself before
-  calling it. Format: rect,X,Y,W,H,RADIUS,RRGGBB | circle,CX,CY,R,RRGGBB |
-  text,X,Y,SIZE,RRGGBB,label | icon,X,Y,SIZE,RRGGBB,name - elements
-  separated by |, one line of text never wraps.
+SWITCHING SCREENS: press one of the four buttons - "Show home screen",
+"Show weather screen", "Show thermostat screen", "Show media screen".
+Each one only ever does the one thing its name says.
+
+DRAWING: call the "Draw on screen" script with a `spec` field. The canvas
+is EXACTLY 320x240 pixels, (0,0) is the top-left corner, and NOTHING is
+auto-corrected - you must compute every coordinate yourself so each
+element fits entirely inside 0..320 (X) and 0..240 (Y) before calling the
+script. An element that runs past an edge is simply invisible past that
+edge, not shrunk or moved back into view.
+
+Format: elements separated by "|", fields within one element separated by
+",". Four element types:
+
+  rect,X,Y,W,H,RADIUS,RRGGBB
+    A filled rectangle (RADIUS 0 = square corners). Keep X+W<=320 and
+    Y+H<=240.
+
+  circle,CX,CY,R,RRGGBB
+    A filled circle, centre and radius. Keep CX-R>=0, CX+R<=320,
+    CY-R>=0, CY+R<=240.
+
+  text,X,Y,SIZE,RRGGBB,label text
+    ONE line, it never wraps. SIZE 0 is 16px tall (roughly 8px per
+    character), SIZE 1 is 24px tall (roughly 12px per character), SIZE 2
+    is 40px tall (roughly 20px per character). Keep Y+height<=240 and
+    X+(character count x px/char)<=320 - use SIZE 0 for anything longer
+    than a few words.
+
+  icon,X,Y,SIZE,RRGGBB,name
+    One Material Design icon, drawn as a square. SIZE 0 is 24px, anything
+    else is 48px. Keep X+size<=320 and Y+size<=240. `name` must be one of:
+    sun, cloud, partly-cloudy, rain, pouring, snow, snow-rain, fog, hail,
+    lightning, storm, wind, wind2, night, alert, thermometer, humidity,
+    fire, minus, plus.
+
+Colour is always six hex digits, no "#". A bar chart is just rects of
+different heights, bottom-aligned - there are no diagonal lines.
+
+Example - a small sun over "Sunny":
+  icon,140,70,1,FFD700,sun|text,60,140,1,FFFFFF,Sunny
+
+Example - three bars of a chart with labels underneath:
+  rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|rect,80,90,20,110,0,FF8A3D|text,20,205,0,8FA6C0,6|text,50,205,0,8FA6C0,12|text,80,205,0,8FA6C0,18
 ```
 
-Both work with a plain instruction because they already reduce to the one
-action shape a conversation agent reliably calls - a button, or a script
-with one field - so there is nothing left for the model to get wrong about
-*which* service or option to use. What it still has to get right on its own
-is the arithmetic: the script's own field description above carries the
-same bounds, so the model has them even if this system-prompt text is
-trimmed or forgotten.
+Both features work from a plain instruction because they already reduce
+to the one action shape a conversation agent reliably calls - a button, or
+a script with one field - so there is nothing left for the model to get
+wrong about *which* service or option to use. Drawing still asks the model
+to get coordinates right on its own (nothing here auto-corrects a mistake,
+by design - see above), which is why this text spells out the exact pixel
+budget instead of leaving it implied. The script's own field description
+carries the identical bounds, so they still apply even if this
+system-prompt text gets trimmed or forgotten later.
 
 ## Claude Code skill
 
