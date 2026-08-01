@@ -328,6 +328,8 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `weather.yaml` | Current conditions big - icon, temperature, humidity and wind - over a forecast row of up to seven days, each with its own icon and high/low. A **carousel screen**: one swipe sideways from home. Current conditions come straight from a `weather` entity; the forecast needs a small helper in Home Assistant, because since 2024.4 a forecast lives only in a service response and a device cannot read one. The screen draws a column per day it is given and centres them, so a five-day integration and a ten-day one both look deliberate. |
 | `climate.yaml` | A thermostat: the target temperature large, the room's own below it, a flame that lights only while the device is actually heating, two arrows and a row of mode buttons. A **carousel screen**: one swipe sideways from home. Needs nothing in Home Assistant - the step, the limits and the list of modes are all attributes, so the row has three buttons on a TRV and six on an air conditioner without being told. Taps move the number at once and call Home Assistant after, because a thermostat is tapped in bursts. |
 | `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 40 looks for the home screen (fonts, colours, gradient backgrounds, layouts, a temperature/humidity dashboard, and a big-outdoor-reading "Station" family in eight palettes) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
+| `show-screen.yaml` | Four Home Assistant buttons - **"Show home/weather/thermostat/media screen"** - that jump the display to whichever one is pressed, meant for Assist ("Alexa, pokaż pogodę"). Needs `home.yaml`, `weather.yaml`, `climate.yaml` and `media.yaml` all installed, since it has to name each one's page directly. See [Voice control](#voice-control) below. |
+| `canvas.yaml` | A screen only Home Assistant can reach - never a swipe, never a button on the Box. Write a small text spec (rectangles, circles, text and Material Design icons) to a native API service and the device draws it and switches to it on its own. Needs nothing else. See [Voice control](#voice-control) below. |
 
 The **settings screen** is **one swipe down** from home - the device's own switches
 as tap tiles (microphone, wake sound, and where replies come out) plus a volume
@@ -481,6 +483,156 @@ value - a colour, the clock font - can also be pinned at compile time by setting
 its `home_*` substitution. Each style's clock font is a Google Font compiled in as
 digits and a colon only, so the whole set adds a few KB. To add your own: a font,
 a select option, and a branch in `apply_home_style`.
+
+## Voice control
+
+Two packages give Home Assistant's Assist (or any conversation agent) direct
+control of the screen. Both are entities you press or call - nothing here is a
+custom sentence or automation, on purpose.
+
+### Switch screens by voice
+
+Add `base/screens/show-screen.yaml` after `home.yaml`, `weather.yaml`,
+`climate.yaml` and `media.yaml` (in any order, but after all four) and four
+buttons appear in Home Assistant:
+
+```yaml
+  files:
+    - base/core.yaml
+    - base/screens/home.yaml
+    - base/screens/weather.yaml
+    - base/screens/climate.yaml
+    - base/screens/media.yaml
+    - base/screens/show-screen.yaml   # after all four
+```
+
+Expose **Show home screen**, **Show weather screen**, **Show thermostat
+screen** and **Show media screen** to your Assist pipeline's conversation
+agent and "Alexa, pokaż pogodę" jumps the display straight there.
+
+**Four buttons, not one select.** An earlier version was a single "Show
+screen" select with four options - simpler to expose, but Home Assistant's
+OpenAI Conversation integration kept reaching for the generic `turn_on`
+intent instead of `select.select_option`, which a select does not support,
+and every call failed. A button only ever does one thing - press it - so
+there is no service name or option value left for the model to get wrong.
+This is the general lesson behind everything in this section: reduce the
+action to the one shape a conversation agent reliably reaches for.
+
+### Draw on screen
+
+Add `base/screens/canvas.yaml` (needs nothing else) and Home Assistant can
+draw rectangles, circles, text and Material Design icons on a blank
+320x240 page, which the device switches to on its own. It is unreachable
+any other way - no button, no swipe - on purpose: nothing on the Box names
+it, so only Home Assistant can put it there.
+
+```yaml
+  files:
+    - base/core.yaml
+    - base/screens/canvas.yaml
+```
+
+The spec is a small pipe-delimited format, not JSON - elements separated by
+`|`, fields within one element by `,`:
+
+```
+rect,X,Y,W,H,RADIUS,RRGGBB
+circle,CX,CY,R,RRGGBB
+text,X,Y,SIZE,RRGGBB,label text
+icon,X,Y,SIZE,RRGGBB,name
+```
+
+SIZE for text is 0 (16px), 1 (24px) or 2 (40px); for icon, 0 (24px) or
+anything else (48px). Colour is six hex digits, no `#`. Icon names: `sun
+cloud partly-cloudy rain pouring snow snow-rain fog hail lightning storm
+wind wind2 night alert thermometer humidity fire minus plus`. A bar chart
+is just rects of different heights:
+`rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|text,20,205,0,8FA6C0,6`
+
+**Nothing is auto-corrected - every coordinate has to land inside 320x240
+yourself.** An element placed off-panel is simply invisible past the edge,
+not shrunk, wrapped or moved back on screen; text in particular is a single
+line that never wraps. This was a deliberate choice over having the engine
+silently reposition anything: it keeps what a model computes and what
+actually gets drawn identical, at the cost of the model needing the exact
+bounds up front - which is what the script below gives it.
+
+**Voice needs a script wrapper, and this one is required, not optional.**
+Calling the entity or the service directly from Assist fails the same way
+the screen-switching select did. Create this in Home Assistant (Settings ->
+Automations & Scenes -> Scripts -> Add Script -> Edit in YAML), with your
+own device's service name in place of the example one (check Developer
+tools -> Actions, domain `esphome`, once `canvas.yaml` is flashed):
+
+```yaml
+alias: Draw on screen
+description: >-
+  Draws on the kitchen Box's screen. Canvas is exactly 320x240px, (0,0) top
+  left. Nothing is auto-corrected - every element has to fit on its own.
+fields:
+  spec:
+    name: Spec
+    description: >-
+      Canvas is EXACTLY 320x240px, (0,0) top-left. Nothing is auto-corrected -
+      compute coordinates so every element fits inside 0..320 (X) and 0..240
+      (Y) yourself. Elements separated by |, fields by comma.
+      rect,X,Y,W,H,RADIUS,RRGGBB - keep X+W<=320 and Y+H<=240.
+      circle,CX,CY,R,RRGGBB - keep CX-R>=0, CX+R<=320, CY-R>=0, CY+R<=240.
+      text,X,Y,SIZE,RRGGBB,label - ONE line, never wraps; SIZE 0=16px tall
+      (~8px/char), 1=24px (~12px/char), 2=40px (~20px/char) - keep
+      Y+height<=240 and X+estimated width<=320, use SIZE 0 for long text.
+      icon,X,Y,SIZE,RRGGBB,name - square, SIZE 0=24px or 1=48px - keep
+      X+size<=320 and Y+size<=240. Icon names: sun cloud partly-cloudy rain
+      pouring snow snow-rain fog hail lightning storm wind wind2 night alert
+      thermometer humidity fire minus plus.
+      Example: icon,140,70,1,FFD700,sun|text,60,140,1,FFFFFF,Sunny
+    required: true
+    selector:
+      text:
+sequence:
+  - action: esphome.esp32_s3_box_3_va_draw_on_screen   # <- your device's service
+    data:
+      spec: "{{ spec }}"
+mode: single
+```
+
+Expose this **script** (never the raw entity or service) to your Assist
+pipeline's conversation agent.
+
+There is also a plain `text` entity, "Draw on screen", for testing from the
+Home Assistant UI without a script - it runs through the same drawing code,
+but Home Assistant caps any entity's state at 255 characters, good for
+roughly 8-12 short elements. The script above goes through the native API
+service instead of an entity, so it has no such cap - the real ceiling
+there is the widget pool, 30 elements (16 rect/circle + 8 text + 6 icon)
+in one spec.
+
+### Example Assist instructions
+
+Paste something like this into your conversation agent's instructions
+(wherever your Assist pipeline's LLM integration takes a system prompt) to
+put both of the above in reach of "Alexa, ...":
+
+```
+You can change what the kitchen screen shows and draw on it.
+
+- To switch screens, press one of the four "Show ... screen" buttons.
+- To draw something, call the "Draw on screen" script with a `spec` field.
+  The canvas is exactly 320x240 pixels and nothing is auto-corrected, so
+  compute every coordinate to fit inside those bounds yourself before
+  calling it. Format: rect,X,Y,W,H,RADIUS,RRGGBB | circle,CX,CY,R,RRGGBB |
+  text,X,Y,SIZE,RRGGBB,label | icon,X,Y,SIZE,RRGGBB,name - elements
+  separated by |, one line of text never wraps.
+```
+
+Both work with a plain instruction because they already reduce to the one
+action shape a conversation agent reliably calls - a button, or a script
+with one field - so there is nothing left for the model to get wrong about
+*which* service or option to use. What it still has to get right on its own
+is the arithmetic: the script's own field description above carries the
+same bounds, so the model has them even if this system-prompt text is
+trimmed or forgotten.
 
 ## Claude Code skill
 
