@@ -463,7 +463,7 @@ script:
             if (id(station_out_lbl)) {
               show(id(station_out_lbl));
               lv_obj_set_style_text_color(id(station_out_lbl), lv_color_hex(cl), 0);
-              lv_obj_align(id(station_out_lbl), LV_ALIGN_TOP_MID, 0, 112);
+              lv_obj_align(id(station_out_lbl), LV_ALIGN_TOP_MID, 0, 96);
             }
 
             // Indoor strip: icon then value, left-anchored - unchanged from
