@@ -604,6 +604,7 @@ fields:
       text,X,Y,SIZE,RRGGBB,label - ONE line, never wraps; SIZE 0=16px tall
       (~8px/char), 1=24px (~12px/char), 2=40px (~20px/char) - keep
       Y+height<=240 and X+estimated width<=320, use SIZE 0 for long text.
+      Always write numbers as digits ("20.3°C"), never spelled out in words.
       icon,X,Y,SIZE,RRGGBB,name - square, SIZE 0=24px or 1=48px - keep
       X+size<=320 and Y+size<=240. Icon names: sun cloud partly-cloudy rain
       pouring snow snow-rain fog hail lightning storm wind wind2 night alert
@@ -667,7 +668,8 @@ Format: elements separated by "|", fields within one element separated by
     character), SIZE 1 is 24px tall (roughly 12px per character), SIZE 2
     is 40px tall (roughly 20px per character). Keep Y+height<=240 and
     X+(character count x px/char)<=320 - use SIZE 0 for anything longer
-    than a few words.
+    than a few words. Always write numbers as digits ("20.3°C"), never
+    spelled out in words.
 
   icon,X,Y,SIZE,RRGGBB,name
     One Material Design icon, drawn as a square. SIZE 0 is 24px, anything
