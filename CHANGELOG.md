@@ -486,10 +486,12 @@ their alarm, the touchscreen, the home screen and the animated character.
   because unlike `home-styles.yaml` this file has to name pages that live in
   someone else's optional package.
 - **`base/screens/canvas.yaml`**: a "Draw on screen" `text` entity Home
-  Assistant writes a small shape spec to (rect, circle, line, text and a
-  20-icon Material Design set - a hand-parsed `type,x,y,...|type,...`
-  format, not JSON, the same choice `weather.yaml` and `climate.yaml` already
-  made) and the device draws it on a blank page it switches to on its own -
+  Assistant writes a small shape spec to (rect, circle, text and a 20-icon
+  Material Design set - a hand-parsed `type,x,y,...|type,...` format, not
+  JSON, the same choice `weather.yaml` and `climate.yaml` already made; no
+  diagonal lines - `lv_line` turned out not to be compiled into this build's
+  LVGL at all, confirmed on hardware, and a rect covers anything axis-aligned)
+  and the device draws it on a blank page it switches to on its own -
   no button, no swipe, no way to reach it from the Box itself, only from
   Home Assistant setting the entity. A bar chart is just rects of different
   heights, which is what "draw the next 24h of temperature" actually needs;

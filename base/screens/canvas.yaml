@@ -24,7 +24,6 @@
 #
 #   rect,X,Y,W,H,RADIUS,RRGGBB
 #   circle,CX,CY,R,RRGGBB
-#   line,X1,Y1,X2,Y2,RRGGBB
 #   text,X,Y,SIZE,RRGGBB,label text
 #   icon,X,Y,SIZE,RRGGBB,name
 #
@@ -32,13 +31,15 @@
 # LVGL (the trick base/faces/iris.yaml's sclera already uses) - it exists as
 # its own word because centre+radius is what a person (or a model) reaches
 # for, not top-left-corner-of-the-bounding-box maths. Both share one pool, so
-# a spec with rects AND circles still only gets 16 of them combined. LINE is
-# its own kind - real LVGL lines, not thin rects, so they run at any angle -
-# with a separate budget of 6. SIZE for text is 0 (small, 16px), 1 (medium,
-# 24px) or 2 (large, 40px). Colour is six hex digits, no "#". Every
-# coordinate is pixels on the device's native 320x240. A shape past its pool
-# (16 rect/circle, 6 line, 8 text, 6 icon) in one spec is dropped, not
-# queued - the pools are fixed at boot, never reallocated per draw.
+# a spec with rects AND circles still only gets 16 of them combined. NO
+# DIAGONAL LINES: `lv_line` is not compiled into this build's LVGL at all
+# (confirmed on hardware - "lv_line_create was not declared in this scope"),
+# and a rect substitutes fine for anything axis-aligned. SIZE for text is 0
+# (small, 16px), 1 (medium, 24px) or 2 (large, 40px). Colour is six hex
+# digits, no "#". Every coordinate is pixels on the device's native 320x240.
+# A shape past its pool (16 rect/circle, 8 text, 6 icon) in one spec is
+# dropped, not queued - the pools are fixed at boot, never reallocated per
+# draw.
 #
 # ICON draws one Material Design glyph. `name` is one of a small, fixed list -
 # every codepoint here is one already shipped and confirmed drawing correctly
@@ -210,59 +211,6 @@ globals:
     type: lv_obj_t*
     restore_value: false
     initial_value: "nullptr"
-  # Lines need a point ARRAY, not just a widget - lv_line_set_points() keeps
-  # only a pointer to whatever it is given, so that storage has to outlive
-  # the call, which is exactly what a global is for. The array-typed global
-  # itself (type: sometype[N]) is the same trick base/faces/aura.yaml already
-  # uses for its nine bar heights, just with lv_point_t instead of int.
-  - id: canvas_line_0
-    type: lv_obj_t*
-    restore_value: false
-    initial_value: "nullptr"
-  - id: canvas_line_1
-    type: lv_obj_t*
-    restore_value: false
-    initial_value: "nullptr"
-  - id: canvas_line_2
-    type: lv_obj_t*
-    restore_value: false
-    initial_value: "nullptr"
-  - id: canvas_line_3
-    type: lv_obj_t*
-    restore_value: false
-    initial_value: "nullptr"
-  - id: canvas_line_4
-    type: lv_obj_t*
-    restore_value: false
-    initial_value: "nullptr"
-  - id: canvas_line_5
-    type: lv_obj_t*
-    restore_value: false
-    initial_value: "nullptr"
-  - id: canvas_pts_0
-    type: lv_point_t[2]
-    restore_value: false
-    initial_value: "{{0,0},{0,0}}"
-  - id: canvas_pts_1
-    type: lv_point_t[2]
-    restore_value: false
-    initial_value: "{{0,0},{0,0}}"
-  - id: canvas_pts_2
-    type: lv_point_t[2]
-    restore_value: false
-    initial_value: "{{0,0},{0,0}}"
-  - id: canvas_pts_3
-    type: lv_point_t[2]
-    restore_value: false
-    initial_value: "{{0,0},{0,0}}"
-  - id: canvas_pts_4
-    type: lv_point_t[2]
-    restore_value: false
-    initial_value: "{{0,0},{0,0}}"
-  - id: canvas_pts_5
-    type: lv_point_t[2]
-    restore_value: false
-    initial_value: "{{0,0},{0,0}}"
   - id: canvas_icon_0
     type: lv_obj_t*
     restore_value: false
@@ -346,16 +294,11 @@ script:
                                   id(canvas_shape_4),id(canvas_shape_5),id(canvas_shape_6),id(canvas_shape_7),
                                   id(canvas_shape_8),id(canvas_shape_9),id(canvas_shape_10),id(canvas_shape_11),
                                   id(canvas_shape_12),id(canvas_shape_13),id(canvas_shape_14),id(canvas_shape_15)};
-          lv_obj_t *lines[6] = {id(canvas_line_0),id(canvas_line_1),id(canvas_line_2),
-                                id(canvas_line_3),id(canvas_line_4),id(canvas_line_5)};
-          lv_point_t *pts[6] = {id(canvas_pts_0),id(canvas_pts_1),id(canvas_pts_2),
-                                id(canvas_pts_3),id(canvas_pts_4),id(canvas_pts_5)};
           lv_obj_t *texts[8] = {id(canvas_text_0),id(canvas_text_1),id(canvas_text_2),id(canvas_text_3),
                                 id(canvas_text_4),id(canvas_text_5),id(canvas_text_6),id(canvas_text_7)};
           lv_obj_t *icons[6] = {id(canvas_icon_0),id(canvas_icon_1),id(canvas_icon_2),
                                 id(canvas_icon_3),id(canvas_icon_4),id(canvas_icon_5)};
           for (int i = 0; i < 16; i++) if (shapes[i]) lv_obj_add_flag(shapes[i], LV_OBJ_FLAG_HIDDEN);
-          for (int i = 0; i < 6; i++)  if (lines[i])  lv_obj_add_flag(lines[i], LV_OBJ_FLAG_HIDDEN);
           for (int i = 0; i < 8; i++)  if (texts[i])  lv_obj_add_flag(texts[i], LV_OBJ_FLAG_HIDDEN);
           for (int i = 0; i < 6; i++)  if (icons[i])  lv_obj_add_flag(icons[i], LV_OBJ_FLAG_HIDDEN);
 
@@ -370,7 +313,7 @@ script:
           };
 
           const std::string spec = id(canvas_spec).state;
-          int ns = 0, nl = 0, nt = 0, ni = 0;
+          int ns = 0, nt = 0, ni = 0;
           size_t at = 0;
           while (at <= spec.size()) {
             const size_t bar = spec.find('|', at);
@@ -418,22 +361,6 @@ script:
                 lv_obj_set_size(o, d, d);
                 lv_obj_set_style_radius(o, 999, 0);
                 lv_obj_set_style_bg_color(o, lv_color_hex(col), 0);
-              }
-            } else if (type == "line" && nl < 6) {
-              const int x1 = atoi(field().c_str());
-              const int y1 = atoi(field().c_str());
-              const int x2 = atoi(field().c_str());
-              const int y2 = atoi(field().c_str());
-              const uint32_t col = (uint32_t) strtol(field().c_str(), nullptr, 16);
-              lv_obj_t *o = lines[nl];
-              lv_point_t *pp = pts[nl];
-              nl++;
-              if (o && pp) {
-                pp[0].x = x1; pp[0].y = y1;
-                pp[1].x = x2; pp[1].y = y2;
-                lv_line_set_points(o, pp, 2);
-                lv_obj_set_style_line_color(o, lv_color_hex(col), 0);
-                lv_obj_clear_flag(o, LV_OBJ_FLAG_HIDDEN);
               }
             } else if (type == "text" && nt < 8) {
               const int x = atoi(field().c_str());
@@ -535,13 +462,6 @@ esphome:
             id(canvas_shape_10) = shape(); id(canvas_shape_11) = shape();
             id(canvas_shape_12) = shape(); id(canvas_shape_13) = shape();
             id(canvas_shape_14) = shape(); id(canvas_shape_15) = shape();
-            auto ln = [&](){ lv_obj_t *o = lv_line_create(p);
-              lv_obj_set_style_line_width(o, 3, 0);
-              lv_obj_set_style_line_rounded(o, true, 0);
-              lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
-            id(canvas_line_0) = ln(); id(canvas_line_1) = ln();
-            id(canvas_line_2) = ln(); id(canvas_line_3) = ln();
-            id(canvas_line_4) = ln(); id(canvas_line_5) = ln();
             auto txt = [&](){ lv_obj_t *o = lv_label_create(p);
               lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
             id(canvas_text_0) = txt(); id(canvas_text_1) = txt();
