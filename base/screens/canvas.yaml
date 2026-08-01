@@ -449,10 +449,17 @@ esphome:
             if (id(canvas_ready)) return;
             id(canvas_ready) = true;
             lv_obj_t *p = id(page_canvas)->obj;
+            // CLICKABLE cleared on every one of these: lv_obj_create() defaults
+            // to clickable, and a tap landing on a drawn shape - which is most
+            // of the screen, once something is drawn - would be swallowed
+            // right there instead of reaching the dismiss button underneath.
+            // Confirmed on hardware 2026-08-01: swipe worked, tap did not,
+            // until this was added.
             auto shape = [&](){ lv_obj_t *o = lv_obj_create(p);
               lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
               lv_obj_set_style_border_width(o, 0, 0);
               lv_obj_set_style_pad_all(o, 0, 0);
+              lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
               lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
             id(canvas_shape_0) = shape();  id(canvas_shape_1) = shape();
             id(canvas_shape_2) = shape();  id(canvas_shape_3) = shape();
@@ -463,12 +470,14 @@ esphome:
             id(canvas_shape_12) = shape(); id(canvas_shape_13) = shape();
             id(canvas_shape_14) = shape(); id(canvas_shape_15) = shape();
             auto txt = [&](){ lv_obj_t *o = lv_label_create(p);
+              lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
               lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
             id(canvas_text_0) = txt(); id(canvas_text_1) = txt();
             id(canvas_text_2) = txt(); id(canvas_text_3) = txt();
             id(canvas_text_4) = txt(); id(canvas_text_5) = txt();
             id(canvas_text_6) = txt(); id(canvas_text_7) = txt();
             auto ic = [&](){ lv_obj_t *o = lv_label_create(p);
+              lv_obj_clear_flag(o, LV_OBJ_FLAG_CLICKABLE);
               lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN); return o; };
             id(canvas_icon_0) = ic(); id(canvas_icon_1) = ic();
             id(canvas_icon_2) = ic(); id(canvas_icon_3) = ic();
