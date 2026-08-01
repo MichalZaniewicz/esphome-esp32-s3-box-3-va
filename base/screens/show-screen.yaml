@@ -1,17 +1,21 @@
 ###############################################################################
-# "Show screen": one Home Assistant `select` that jumps the idle screen to
-# whichever carousel stop you pick. Point Assist at it - expose the entity and
-# say "set show screen to weather" (or whatever your language's built-in
-# select-entity phrasing is) - and it works with no custom sentence, because a
-# `select` is something Assist already knows how to operate.
+# "Show screen": four Home Assistant buttons, one per idle screen, that jump
+# the display to whichever one you press.
+#
+# Was a single `select` (four options, one entity) - simpler to expose, but an
+# LLM conversation agent (tested: Home Assistant's OpenAI Conversation
+# integration) kept reaching for the generic `turn_on` intent instead of
+# `select.select_option`, which a select does not support, and failed. A
+# `button` only ever does one thing - press it - so there is no service name
+# or option value for the model to get wrong. Four buttons cost four widgets
+# instead of one, which is the trade.
 #
 # NEEDS ALL FOUR SCREENS INSTALLED: home.yaml, weather.yaml, climate.yaml and
-# media.yaml, in any order, all BEFORE this file. It is a single select rather
-# than one button per screen (an earlier draft of this) because the core
-# cannot name a page that lives in someone else's optional package - so unlike
-# home-styles.yaml, which only ever touches widgets home.yaml itself declares,
-# this file has to name page_weather / page_climate / page_media directly, and
-# can only do that by requiring the files that declare them.
+# media.yaml, in any order, all BEFORE this file. It is not narrowly scoped to
+# one of them, unlike home-styles.yaml, because unlike that file - which only
+# ever touches widgets home.yaml itself declares - this one has to name
+# page_weather / page_climate / page_media directly, and can only do that by
+# requiring the files that declare them.
 #
 #   packages:
 #     core:
@@ -23,55 +27,53 @@
 #         - base/screens/media.yaml
 #         - base/screens/show-screen.yaml   # <- after all four
 #
-# Picking an option sets the same two globals a horizontal swipe leaves behind
+# Pressing a button sets the same two globals a horizontal swipe leaves behind
 # (idle_pos, idle_page_idx - see core.yaml's CAROUSEL comment), then calls the
 # core's own show_phase_page: immediately, if the device is already idle, or
 # the moment the current conversation ends, if it is not. Nothing here
 # interrupts an active listen/think/reply.
 ###############################################################################
 
-substitutions:
-  # What Assist has to hear, and what shows in the picker - the same word does
-  # both jobs, so it has to be whatever this house actually calls each screen.
-  # A language package overrides these the way it overrides every other label.
-  show_screen_text_home: "Home"
-  show_screen_text_weather: "Weather"
-  show_screen_text_climate: "Thermostat"
-  show_screen_text_media: "Media"
-
-select:
+button:
   - platform: template
-    id: show_screen_select
-    name: "Show screen"
-    icon: "mdi:monitor-dashboard"
-    optimistic: true
-    options:
-      - ${show_screen_text_home}
-      - ${show_screen_text_weather}
-      - ${show_screen_text_climate}
-      - ${show_screen_text_media}
-    on_value:
-      - script.execute: apply_show_screen
-
-script:
-  - id: apply_show_screen
-    then:
+    id: show_home_btn
+    name: "Show home screen"
+    icon: "mdi:home"
+    on_press:
       - lambda: |-
-          const std::string s = id(show_screen_select).current_option();
-          int idx = -1;
-          bool is_home = false;
-          if (s == "${show_screen_text_home}")         { idx = (int) id(page_home)->index;    is_home = true; }
-          else if (s == "${show_screen_text_weather}") { idx = (int) id(page_weather)->index; }
-          else if (s == "${show_screen_text_climate}") { idx = (int) id(page_climate)->index; }
-          else if (s == "${show_screen_text_media}")   { idx = (int) id(page_media)->index;   }
-          if (idx < 0) return;
-
           id(idle_pos) = 0;
           // Home's tap toggle switches between the clock and the character;
-          // picking "Home" here means the clock, the same way a fresh swipe
-          // onto the home stop always would.
-          if (is_home) id(idle_alt) = false;
-          id(idle_page_idx) = idx;
+          // this button means the clock, the same way a fresh swipe onto the
+          // home stop always would.
+          id(idle_alt) = false;
+          id(idle_page_idx) = (int) id(page_home)->index;
+      - script.execute: show_phase_page
+  - platform: template
+    id: show_weather_btn
+    name: "Show weather screen"
+    icon: "mdi:weather-partly-cloudy"
+    on_press:
+      - lambda: |-
+          id(idle_pos) = 0;
+          id(idle_page_idx) = (int) id(page_weather)->index;
+      - script.execute: show_phase_page
+  - platform: template
+    id: show_climate_btn
+    name: "Show thermostat screen"
+    icon: "mdi:thermostat"
+    on_press:
+      - lambda: |-
+          id(idle_pos) = 0;
+          id(idle_page_idx) = (int) id(page_climate)->index;
+      - script.execute: show_phase_page
+  - platform: template
+    id: show_media_btn
+    name: "Show media screen"
+    icon: "mdi:play-circle"
+    on_press:
+      - lambda: |-
+          id(idle_pos) = 0;
+          id(idle_page_idx) = (int) id(page_media)->index;
       - script.execute: show_phase_page
 
 esphome:
@@ -80,4 +82,4 @@ esphome:
       then:
         - logger.log:
             level: INFO
-            format: "package: screens/show-screen.yaml (live \"Show screen\" selector)"
+            format: "package: screens/show-screen.yaml (four \"Show ... screen\" buttons)"
