@@ -578,31 +578,6 @@ rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|rect,80,90,20,110,0,FF8A3D
 
 <p align="center"><img src="base/assets/canvas-example.png" width="300" alt="Canvas screen showing the bar chart example spec above"></p>
 
-**Or skip the layout maths with a template.** Nine more element types, each
-its own word at the top level, that expand into rect/text/icon for you - the
-model supplies data (a title, some numbers, a label), the template supplies
-the positions:
-
-```
-bar_chart,title,subtitle,unit,RRGGBB,v1;v2;v3;...   up to 8 bars, auto-scaled
-list,title,icon:label;icon:label;...                up to 8 rows
-forecast,title,icon:day:temp;icon:day:temp;...       up to 4 columns
-gauge,title,label:pct;label:pct;...                  up to 4 bars, pct 0-100
-stat,icon,value,label,sub                            one big number
-status,title,label:RRGGBB:state;...                  up to 4 rows, 2 columns
-compare,title,name_a,name_b,label:va:vb;...          up to 4 paired bars
-banner,icon,message,sub                               centred automatically
-grid,title,icon:value;icon:value;...                  up to 4 tiles, 2x2
-```
-
-A template's own entry list is `;`-separated, and an entry's own sub-values
-are `:`-separated - neither collides with the `|` the template itself sits
-inside at the top level. Any `title`/`subtitle`/`icon`/`sub` argument can be
-`""` to skip it. `bar_chart` covers a rainfall chart too - it is the same
-word with a blue `RRGGBB`, not a separate template. Full grammar and an
-example per template: the header comment in
-[`canvas.yaml`](base/screens/canvas.yaml).
-
 **Nothing is auto-corrected - every coordinate has to land inside 320x240
 yourself.** An element placed off-panel is simply invisible past the edge,
 not shrunk, wrapped or moved back on screen; text in particular is a single
@@ -641,10 +616,6 @@ fields:
       pouring snow snow-rain fog hail lightning storm wind wind2 night alert
       thermometer humidity fire minus plus.
       Example: icon,140,70,1,FFD700,sun|text,60,140,1,FFFFFF,Sunny
-      Prefer a template over hand-placed shapes whenever one fits - it does
-      the layout maths for you: bar_chart, list, forecast, gauge, stat,
-      status, compare, banner, grid. Full grammar and an example for each is
-      in canvas.yaml's header comment.
     required: true
     selector:
       text:
@@ -721,67 +692,6 @@ Example - a small sun over "Sunny":
 
 Example - three bars of a chart with labels underneath:
   rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|rect,80,90,20,110,0,FF8A3D|text,20,205,0,8FA6C0,6|text,50,205,0,8FA6C0,12|text,80,205,0,8FA6C0,18
-
-TEMPLATES: prefer these over hand-placed shapes whenever one fits - they do
-the layout maths for you, you only supply data. Each is its own element type
-at the top level (still "|"-separated from its neighbours); a template's own
-field list is comma-separated same as any element. Where a template needs a
-variable-length list of entries, that list is the LAST field and uses ";"
-between entries and ":" between one entry's own sub-values - neither
-character collides with the "|" the template itself sits inside. Any
-title/subtitle/icon/sub argument can be "" to skip it. Numbers you give a
-template are raw values, not pixels - it scales them itself. Past a
-template's own entry cap, extra entries are silently dropped.
-
-  bar_chart,title,subtitle,unit,RRGGBB,v1;v2;v3;...
-    Up to 8 bars, auto-scaled between the values' own min and max - give the
-    numbers, not heights. unit is appended after each number above its bar
-    ("12" + "°" -> "12°"). One flat colour for every bar, so a rainfall
-    chart is this same word with a blue colour, not a separate template.
-    bar_chart,Temperatura (°C),6:00-18:00 co 3h,°,FF8A3D,12;15;19;18;14
-
-  list,title,icon:label;icon:label;...
-    Up to 8 rows. icon is optional ("" for none); label already carries its
-    own value ("Salon 21°C") - this only handles row spacing.
-    list,W domu,thermometer:Salon 21°C;thermometer:Kuchnia 23°C
-
-  forecast,title,icon:day:temp;icon:day:temp;...
-    Up to 4 day-columns (3 with a title, 4 without - 8 text slots is the
-    hard ceiling either way).
-    forecast,Prognoza,sun:Pon:18°/9°;rain:Wt:14°/7°;partly-cloudy:Sr:16°/8°
-
-  gauge,title,label:pct;label:pct;...
-    Up to 4 filled-bar gauges for a 0-100 value with context (humidity,
-    battery, volume) instead of a bare number. pct is clamped to 0..100.
-    gauge,Czujniki,Wilgotnosc:65;Bateria czujnika:40
-
-  stat,icon,value,label,sub
-    One big number/short string, for when that is the whole answer ("jaka
-    temperatura na zewnatrz"). icon and sub can both be "".
-    stat,partly-cloudy,8°,Na zewnatrz,Wiatr 12 km/h
-
-  status,title,label:RRGGBB:state;label:RRGGBB:state;...
-    Up to 4 rows, two columns (name, then state). Colour is explicit per
-    row, same as every other element - pick it yourself, it is not guessed
-    from the state word.
-    status,Czujniki drzwi,Drzwi wejsciowe:6FD08A:Zamkniete;Okno kuchnia:FF8A3D:Otwarte
-
-  compare,title,name_a,name_b,label:va:vb;label:va:vb;...
-    Up to 4 paired bars, both series scaled together off one shared min/max
-    so they stay comparable. Series A is always the accent colour, series B
-    is always the secondary blue-grey.
-    compare,Zuzycie energii,Dzis,Wczoraj,Rano:40:55;Popol:70:50;Wiecz:90:100
-
-  banner,icon,message,sub
-    A short message with nothing else to say ("napisz ze pranie sie
-    skonczylo") - centred automatically, so you do not need to guess an X
-    for it. icon and sub can both be "".
-    banner,alert,Pranie skonczone,Kuchnia - przed chwila
-
-  grid,title,icon:value;icon:value;icon:value;icon:value
-    Up to 4 tiles in a 2x2 quick-glance layout, for more than one topic at
-    once (climate + heating together) instead of a vertical list.
-    grid,Salon - teraz,thermometer:21°C;humidity:48%;wind:12 km/h;fire:Piec ON
 ```
 
 Both features work from a plain instruction because they already reduce
