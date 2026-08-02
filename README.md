@@ -567,16 +567,19 @@ icon,X,Y,SIZE,RRGGBB,name
 SIZE for text is 0 (16px), 1 (24px) or 2 (40px); for icon, 0 (24px) or
 anything else (48px). Colour is six hex digits, no `#`. Icon names: `sun
 cloud partly-cloudy rain pouring snow snow-rain fog hail lightning storm
-wind wind2 night alert thermometer humidity fire minus plus`. A bar chart
-is just rects of different heights, which is what "narysuj wykres
-temperatury" actually needs - no diagonal lines anywhere in this file's
-vocabulary, and a bar chart never wanted one:
+wind wind2 night alert thermometer humidity fire minus plus`. It does not
+have to be data - "Alexa, draw something to cheer me up" is just circles
+and a line of text, no diagonal lines needed here either:
 
 ```
-rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|rect,80,90,20,110,0,FF8A3D|text,20,205,0,8FA6C0,6|text,50,205,0,8FA6C0,12|text,80,205,0,8FA6C0,18
+circle,160,100,70,FFD700|circle,138,85,9,1B1F27|circle,182,85,9,1B1F27|circle,122,130,5,1B1F27|circle,135,142,5,1B1F27|circle,148,148,5,1B1F27|circle,160,150,5,1B1F27|circle,172,148,5,1B1F27|circle,185,142,5,1B1F27|circle,198,130,5,1B1F27|text,90,195,1,FFFFFF,A smile for you
 ```
 
-<p align="center"><img src="base/assets/canvas-example.png" width="300" alt="Canvas screen showing the bar chart example spec above"></p>
+<p align="center"><img src="base/assets/canvas-example.png" width="300" alt="Canvas screen showing a smiley face and the caption A smile for you"></p>
+
+A bar chart works the same way, just rects of different heights,
+bottom-aligned - see the [example Assist
+instructions](#example-assist-instructions) below for that one.
 
 **Nothing is auto-corrected - every coordinate has to land inside 320x240
 yourself.** An element placed off-panel is simply invisible past the edge,

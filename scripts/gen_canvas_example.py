@@ -1,6 +1,6 @@
 """Rysuje przykladowy zrzut base/screens/canvas.yaml do
 base/assets/canvas-example.png - dokladnie ten sam spec, ktory README i
-wiki juz drukuja jako kod (wykres slupkowy), zeby obok tekstu bylo widac
+wiki juz drukuja jako kod (usmiechnieta buzia), zeby obok tekstu bylo widac
 efekt.
 
 Off-device podglad, tak samo jak gen_weather.py/gen_media.py/gen_climate.py:
@@ -26,11 +26,17 @@ OUT = os.path.join(REPO, "base", "assets", "canvas-example.png")
 W, H = 320, 240
 BG = 0x000000
 
-# The exact bar-chart example already printed in README.md and wiki's
-# Configuration.md - keep those three in sync if this ever changes.
-SPEC = ("rect,20,140,20,60,0,FF8A3D|rect,50,120,20,80,0,FF8A3D|"
-        "rect,80,90,20,110,0,FF8A3D|text,20,205,0,8FA6C0,6|"
-        "text,50,205,0,8FA6C0,12|text,80,205,0,8FA6C0,18")
+# The exact smiley example already printed in README.md and wiki's
+# Configuration.md - keep those three in sync if this ever changes. Just
+# circle (face, eyes, seven small dots tracing a smile) and text - the
+# same four-word vocabulary as the bar chart this replaced, no diagonal
+# lines needed here either.
+SPEC = ("circle,160,100,70,FFD700|circle,138,85,9,1B1F27|"
+        "circle,182,85,9,1B1F27|circle,122,130,5,1B1F27|"
+        "circle,135,142,5,1B1F27|circle,148,148,5,1B1F27|"
+        "circle,160,150,5,1B1F27|circle,172,148,5,1B1F27|"
+        "circle,185,142,5,1B1F27|circle,198,130,5,1B1F27|"
+        "text,90,195,1,FFFFFF,A smile for you")
 
 # Same 20-name list as canvas.yaml's ICONS[] table.
 ICON_GLYPH = {
