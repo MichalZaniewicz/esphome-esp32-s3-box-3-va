@@ -612,13 +612,13 @@ light:
 
 external_components:
   - source: github://n-IA-hane/esphome-audio-stack@v2026.7.0
-    components: [esp_audio_stack, esp_afe]
-    # SPIKE (esp-afe-spike branch, not beta/main): swapped esp_aec for esp_afe
-    # to answer a GH comment asking whether esp_afe was tried. This is a
-    # compile/boot check only - every false-wake and hit-rate number in
-    # DO-SPRAWDZENIA.md is measured against esp_aec, and switching processors
-    # changes the spectral features the wake word model sees. Do not merge
-    # into beta without a full re-measurement pass.
+    components: [esp_audio_stack, esp_aec]
+    # esp_afe (the fuller ESP-SR front end - noise suppression, AGC, VAD) is
+    # deliberately not pulled in. Every false-wake and hit-rate number this
+    # project has measured is against the lighter esp_aec (echo cancellation
+    # only); switching processors risks changing the spectral features the wake
+    # word model sees, and would invalidate all of it. A future esp_afe
+    # experiment needs its own full re-measurement pass, not a silent swap here.
 
 esp_audio_stack:
   id: audio_stack
@@ -662,32 +662,14 @@ esp_audio_stack:
     output:
       type: es8311
       address: 0x18
-  processor_id: afe_processor
+  processor_id: aec_processor
 
-# SPIKE: esp_afe in place of esp_aec, single-mic (mic_num defaults to 1) since
-# this board only wires one TDM mic slot (tdm_mic_slot: 0 above) - the
-# mic_num: 2 / se_enabled dual-mic path from the GH suggestion needs a second
-# mic slot this hardware config does not have. type/mode follow the
-# component's own guidance for a Voice Assistant + wake-word target: "sr +
-# low_cost ... usually preserves wake-word features best".
-#
-# ns_enabled/agc_enabled explicitly OFF (both default true). First hardware
-# attempt (both on) crashed the whole device ~2 minutes into normal use
-# (assist_satellite AND media_player both went `unavailable` for ~40s, a full
-# reboot) and left the External-player reply stuck in the talking phase.
-# This board is already proven to run out of contiguous internal/DMA RAM on
-# the lighter esp_aec (see the buffers_in_psram/dma_desc_num comments on
-# esp_audio_stack above) - NS+AGC are extra WebRTC engine state on top of
-# that, and the component's own troubleshooting section says to drop them
-# first. AEC is the one feature actually being evaluated here; NS/AGC are not
-# what the GH comment or this project's tuning care about.
-esp_afe:
-  id: afe_processor
-  type: sr
-  mode: low_cost
-  aec_filter_length: 4
-  ns_enabled: false
-  agc_enabled: false
+esp_aec:
+  id: aec_processor
+  mode: ${aec_mode_default}
+  filter_length: 4
+  # sample_rate is NOT set here: the component hard-clamps it to exactly 16000
+  # (cv.int_range(min=16000, max=16000)) and rejects any other value.
 
 microphone:
   - platform: esp_audio_stack
@@ -2602,10 +2584,33 @@ switch:
             - script.execute: draw_display
 
 select:
-  # SPIKE: this select drives esp_aec.set_mode against the `aec_processor` id,
-  # which does not exist while this branch runs esp_afe instead. Disabled for
-  # the esp-afe-spike compile/boot check; restore verbatim when back on
-  # esp_aec. See git history on this branch for the original block.
+  # Live esp_aec mode switch - reconfigures the canceller without a rebuild.
+  # `sr_low_cost` is the proven, safe default; see `aec_mode_default` up top for
+  # why the other two are not. Measured on 2026-07-29: all three gave identical
+  # false-wake counts and identical 10/10 hit rates in the same kitchen, so
+  # there is no evidence swapping modes buys anything - this exists for anyone
+  # who wants to re-check that on their own kitchen.
+  # NOT persistent, on purpose: it always comes back on `aec_mode_default` after
+  # a reboot. Restoring it would mean re-initialising the canceller at boot, and
+  # that allocation is exactly what was measured refusing on a fragmented heap.
+  # Nothing is lost - all three modes measured identical on 2026-07-29, so this
+  # is a diagnostic knob, not a setting anyone needs to keep.
+  - platform: template
+    id: aec_mode
+    name: AEC mode
+    icon: "mdi:waveform"
+    entity_category: config
+    optimistic: true
+    restore_value: false
+    options:
+      - sr_low_cost
+      - sr_high_perf
+      - fd_low_cost
+    initial_option: ${aec_mode_default}
+    on_value:
+      - esp_aec.set_mode:
+          id: aec_processor
+          mode: !lambda return x;
 
   - platform: template
     id: wake_word_engine_location
