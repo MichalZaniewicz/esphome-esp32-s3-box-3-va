@@ -670,13 +670,24 @@ esp_audio_stack:
 # mic slot this hardware config does not have. type/mode follow the
 # component's own guidance for a Voice Assistant + wake-word target: "sr +
 # low_cost ... usually preserves wake-word features best".
+#
+# ns_enabled/agc_enabled explicitly OFF (both default true). First hardware
+# attempt (both on) crashed the whole device ~2 minutes into normal use
+# (assist_satellite AND media_player both went `unavailable` for ~40s, a full
+# reboot) and left the External-player reply stuck in the talking phase.
+# This board is already proven to run out of contiguous internal/DMA RAM on
+# the lighter esp_aec (see the buffers_in_psram/dma_desc_num comments on
+# esp_audio_stack above) - NS+AGC are extra WebRTC engine state on top of
+# that, and the component's own troubleshooting section says to drop them
+# first. AEC is the one feature actually being evaluated here; NS/AGC are not
+# what the GH comment or this project's tuning care about.
 esp_afe:
   id: afe_processor
   type: sr
   mode: low_cost
   aec_filter_length: 4
-  # ns_enabled/agc_enabled/aec_enabled default to true; left unset here on
-  # purpose, matching the component README's minimal-config guidance.
+  ns_enabled: false
+  agc_enabled: false
 
 microphone:
   - platform: esp_audio_stack
