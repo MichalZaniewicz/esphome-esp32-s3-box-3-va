@@ -688,6 +688,17 @@ esp_afe:
   aec_filter_length: 4
   ns_enabled: false
   agc_enabled: false
+  # USB debug session 2026-08-05: the RX TDM channel failed to init with
+  # ESP_ERR_NO_MEM the instant TTS started (mic restart for full duplex),
+  # confirmed live: internal_free=43651 but largest_dma=13312, and the DMA
+  # ring needs ~15360 contiguous bytes once esp_audio_stack raises desc 4->5
+  # for this processor's frame size. esp_afe's own feed/fetch scratch (these
+  # three, ~16KB combined) defaults to internal RAM on top of that - move it
+  # to PSRAM, same principle as buffers_in_psram above, to leave that 15KB
+  # gap fillable.
+  feed_buf_in_psram: true
+  feed_ring_in_psram: true
+  fetch_ring_in_psram: true
 
 microphone:
   - platform: esp_audio_stack
