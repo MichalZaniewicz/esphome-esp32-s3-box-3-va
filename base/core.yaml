@@ -613,12 +613,13 @@ light:
 external_components:
   - source: github://n-IA-hane/esphome-audio-stack@v2026.7.0
     components: [esp_audio_stack, esp_afe]
-    # SPIKE (esp-afe-spike branch, not beta/main): swapped esp_aec for esp_afe
-    # to answer a GH comment asking whether esp_afe was tried. This is a
-    # compile/boot check only - every false-wake and hit-rate number in
-    # DO-SPRAWDZENIA.md is measured against esp_aec, and switching processors
-    # changes the spectral features the wake word model sees. Do not merge
-    # into beta without a full re-measurement pass.
+    # esp_afe in place of esp_aec, on beta by Michal's call 2026-08-05 (answers
+    # a GH comment asking whether esp_afe was tried). Hardware-confirmed for
+    # basic operation (4/4 clean wake-to-reply cycles including full duplex,
+    # see [[esp-afe-experiment-paused]] in memory) but NOT yet re-measured for
+    # false-wake rate or hit rate - every number in DO-SPRAWDZENIA.md is still
+    # against esp_aec, and switching processors changes the spectral features
+    # the wake word model sees. Do not promote to main without that pass.
 
 esp_audio_stack:
   id: audio_stack
