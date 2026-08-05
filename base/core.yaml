@@ -2613,11 +2613,53 @@ switch:
             - script.execute: set_idle_or_mute_phase
             - script.execute: draw_display
 
+  # Live knobs for the esp_afe processor (added 2026-08-05, same session that
+  # found and fixed the DMA/PSRAM hang - see [[esp-afe-experiment-paused]] in
+  # memory). Both go through the component's own `enable_*`/`disable_*` path
+  # (a safe live rebuild), not a raw setter, so toggling these does not need a
+  # reflash and does not risk the DMA allocation that setter alone would skip.
+  - platform: esp_afe
+    esp_afe_id: afe_processor
+    ns:
+      name: AFE noise suppression
+    agc:
+      name: AFE gain control
+
 select:
-  # SPIKE: this select drives esp_aec.set_mode against the `aec_processor` id,
-  # which does not exist while this branch runs esp_afe instead. Disabled for
-  # the esp-afe-spike compile/boot check; restore verbatim when back on
-  # esp_aec. See git history on this branch for the original block.
+  # `esp_aec.set_mode` drove this while the box ran esp_aec; disabled while on
+  # esp_afe (`aec_processor` id does not exist) - see git history before
+  # 6d44f63 for the original block, restore verbatim when back on esp_aec.
+  #
+  # Its esp_afe equivalent, `esp_afe.set_mode`, is a plain automation action
+  # (no native select platform in the component - see switch.py vs the
+  # absence of a select.py in .esphome/external_components), so this is a
+  # template select driving that action, same shape as the old one.
+  # `restore_value: false` for the same reason as the old select: a mode
+  # change reallocates buffers, and doing that unattended at boot on a board
+  # already tight on contiguous internal RAM is asking for the failure this
+  # session just fixed, by a different route.
+  - platform: template
+    id: afe_mode
+    name: AFE mode
+    icon: "mdi:waveform"
+    entity_category: config
+    optimistic: true
+    restore_value: false
+    # `esp_afe.set_mode` takes a NAMED PRESET (type_mode), not the plain
+    # low_cost/high_perf from this component's own `mode:` config key -
+    # `reinit_by_name()` matches against `AFE_MODE_PRESETS` in the component's
+    # own esp_afe.cpp, which only knows sr_low_cost/sr_high_perf/fd_low_cost/
+    # fd_high_perf/voip_low_cost/voip_high_perf. Sending "low_cost" logs
+    # "Unknown AFE mode: low_cost" and does nothing - caught on hardware at
+    # boot 2026-08-05, since the initial_option applies this on startup.
+    options:
+      - sr_low_cost
+      - sr_high_perf
+    initial_option: sr_low_cost
+    on_value:
+      - esp_afe.set_mode:
+          id: afe_processor
+          mode: !lambda return x;
 
   - platform: template
     id: wake_word_engine_location
