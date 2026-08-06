@@ -73,9 +73,15 @@ substitutions:
   # ---------------------------------------------------------------------------
   hidden_ssid: 'false'      # true = fast_connect, required for a hidden SSID
 
-  # Media player volume clamps for the onboard speaker.
+  # Media player volume clamps for the onboard speaker. volume_max was 0.8 since
+  # the initial commit, never tuned - esp_audio_stack maps 0..1 linearly in dB
+  # between the -49dB floor and 0dB, so 0.8 topped out at -9.8dB (~1/3 of true
+  # full scale), audibly quiet. Raised to 1.0 on 2026-08-05 after Michal reported
+  # the internal speaker sounded too quiet at "100%". Listen for clipping/
+  # distortion at max volume before keeping this - if it clips, back off to
+  # something between 0.8 and 1.0 rather than reverting all the way.
   volume_min: '0.5'
-  volume_max: '0.8'
+  volume_max: '1.0'
 
   # The timer alarm. Fetched at COMPILE time and baked into flash as a byte
   # array, so it needs no network at ring time and always comes out of the box's
@@ -2426,6 +2432,19 @@ button:
   - platform: factory_reset
     id: factory_reset_btn
     internal: true
+
+  # Added 2026-08-05 after a real incident: esp_afe's NS+AGC combo latched
+  # audio_stack into an unrecoverable I2S error state (see
+  # [[esp-afe-experiment-paused]] in memory) and there was no way to recover the
+  # Box short of physical USB access, because nothing like this existed. WiFi/API
+  # stayed healthy throughout that lockup, so a plain software restart from HA
+  # would have fixed it in one tap instead of needing someone at the box with a
+  # USB cable.
+  - platform: restart
+    id: restart_btn
+    name: Restart
+    icon: mdi:restart
+    entity_category: config
 
 number:
   # Live mic sensitivity, in dB, post-AEC. See `mic_gain_default` up top for what
