@@ -476,6 +476,26 @@ esp32:
       # instead of failing outright. DMA buffers are unaffected - they request
       # MALLOC_CAP_DMA explicitly, which this setting does not change.
       CONFIG_SPIRAM_USE_MALLOC: "y"
+      # 2026-08-06: the box hard-panicked twice overnight (LoadProhibited,
+      # decoded backtrace bottoming out in lwIP's own periodic TCP timer doing
+      # a routine small heap allocation). That call is completely ordinary and
+      # happens continuously as background upkeep, so the leading theory is
+      # heap metadata or lock-state corruption from something else entirely,
+      # not that allocation itself running out of room - free heap has also
+      # sat abnormally low (25-27KB, versus a ~65KB fresh-boot baseline) for
+      # days without recovering, which fits a leak or corruption better than
+      # ordinary fragmentation.
+      #
+      # Light poisoning adds a canary before and after every internal-RAM
+      # allocation and checks it on free, so a buffer overrun gets caught at
+      # the point and by the code that actually wrote past its bounds, instead
+      # of however much later some unrelated allocation (like lwIP's) happens
+      # to trip over the damage. Minimal CPU cost; COMPREHENSIVE mode (which
+      # also poisons freed memory and validates the whole heap on every call)
+      # was skipped since this board is already internal-RAM constrained - see
+      # CONFIG_SPIRAM_USE_MALLOC above - and that mode's overhead is much
+      # larger.
+      CONFIG_HEAP_POISONING_LIGHT: "y"
     # ONE esp-dsp FOR TWO CALLERS THAT DISAGREE. `esp_aec` pulls esp-sr 2.4.x,
     # which requires esp-dsp 1.8.0 exactly. ESPHome's own `runtime_image` pins
     # esp-dsp to 1.7.1 for the SIMD paths in its JPEG decoder - and that is what
@@ -2833,6 +2853,23 @@ sensor:
       name: "Diag: free PSRAM"
       entity_category: diagnostic
       disabled_by_default: true
+  # "Diag: free heap" above is a live snapshot and can recover between polls,
+  # which hides whether a drop is transient fragmentation or a real leak. This
+  # is ESP-IDF's own historic low-water mark (heap_caps_get_minimum_free_size)
+  # for internal RAM specifically, matching the same cap the debug sensors
+  # above track: it only ever goes down, so a value that keeps falling with no
+  # reboot in between means something really is leaking, not just fragmenting.
+  # Added alongside CONFIG_HEAP_POISONING_LIGHT while chasing the 2026-08-06
+  # lwIP heap panics.
+  - platform: template
+    name: "Diag: min free heap since boot"
+    id: diag_min_free_heap
+    lambda: return heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+    update_interval: 60s
+    unit_of_measurement: B
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    disabled_by_default: true
 
 ###############################################################################
 # ASSETS
