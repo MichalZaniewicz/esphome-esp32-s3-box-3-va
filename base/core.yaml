@@ -383,6 +383,13 @@ esphome:
   # use that syntax, and the old one is removed in 2027.1.0.
   min_version: 2026.7.0
   name_add_mac_suffix: false
+  # ESP-IDF's own heap tracing API, not exposed by any ESPHome component - see
+  # the "Heap trace: recording" switch below for why. Path is project-root-
+  # relative (confirmed empirically: `includes:` resolves against the entry
+  # config's directory, not core.yaml's own repo/base/), matching where
+  # scripts/flash.py's local build actually looks.
+  includes:
+    - repo/base/esp_heap_trace.h
   # List form, not a bare mapping: screen packages add their own on_boot, and
   # ESPHome appends lists while two mappings under one key would collide.
   on_boot:
@@ -476,6 +483,17 @@ esp32:
       # instead of failing outright. DMA buffers are unaffected - they request
       # MALLOC_CAP_DMA explicitly, which this setting does not change.
       CONFIG_SPIRAM_USE_MALLOC: "y"
+      # 2026-08-09: still chasing the lwIP heap panics (see
+      # CONFIG_HEAP_POISONING_LIGHT's own attempt and revert, same evening, in
+      # project memory) - LIGHT poisoning caught nothing before it had to be
+      # pulled for costing too much internal RAM on its own. Heap tracing is
+      # the cheaper alternative: unlike poisoning, its per-allocation hook is a
+      # flag check, not extra bytes on every allocation, and its one real cost
+      # (the record buffer) is a single fixed allocation that lives in PSRAM
+      # instead - see the "heap_trace_buf" global and the "Heap trace:
+      # recording" switch below. Enabling this option alone costs nothing
+      # until that switch is actually turned on.
+      CONFIG_HEAP_TRACING_STANDALONE: "y"
     # ONE esp-dsp FOR TWO CALLERS THAT DISAGREE. `esp_aec` pulls esp-sr 2.4.x,
     # which requires esp-dsp 1.8.0 exactly. ESPHome's own `runtime_image` pins
     # esp-dsp to 1.7.1 for the SIMD paths in its JPEG decoder - and that is what
@@ -1264,6 +1282,21 @@ voice_assistant:
 ###############################################################################
 
 globals:
+  # Backing buffer for the "Heap trace: recording" switch, allocated from PSRAM
+  # the first time the switch turns on (see its turn_on_action) rather than at
+  # boot unconditionally, so a factory-reset or disabled switch never pays for
+  # it. Left as a raw pointer, not a fixed-size array, because
+  # heap_caps_malloc(..., MALLOC_CAP_SPIRAM) is the only way to keep this
+  # entirely off internal RAM - a plain global array would not be.
+  # Typed void*, not heap_trace_record_t* - ESPHome emits this global's
+  # declaration in main.cpp BEFORE the `includes:` line that makes
+  # heap_trace_record_t visible (confirmed by compiler error, not guessed),
+  # and that ordering isn't configurable. Cast to the real type inside the
+  # switch's lambdas below, which do compile after the include.
+  - id: heap_trace_buf
+    type: void *
+    restore_value: false
+    initial_value: "nullptr"
   - id: init_in_progress
     type: bool
     restore_value: false
@@ -2446,6 +2479,19 @@ button:
     icon: mdi:restart
     entity_category: config
 
+  # Prints whatever the "Heap trace: recording" switch (see switch: below) has
+  # captured so far, without needing to stop the trace first - LEAKS mode
+  # only keeps allocations that are STILL outstanding, so a dump mid-trace is
+  # a meaningful snapshot, not a truncated one. Output goes through the normal
+  # logger like everything else, so it reaches the same API log subscription
+  # already used to chase this - see [[overnight-lwip-heap-crash]].
+  - platform: template
+    name: "Heap trace: dump now"
+    icon: mdi:memory
+    entity_category: diagnostic
+    on_press:
+      - lambda: heap_trace_dump();
+
 number:
   # Live mic sensitivity, in dB, post-AEC. See `mic_gain_default` up top for what
   # this actually moves and its effect on the wake word. Kept as a template
@@ -2513,6 +2559,48 @@ number:
           id(mww_mic_src)->set_gain_factor((uint8_t) x);
 
 switch:
+  # ESP-IDF heap tracing (see CONFIG_HEAP_TRACING_STANDALONE above), chasing
+  # the same lwIP heap-corruption theory that CONFIG_HEAP_POISONING_LIGHT was
+  # tried and reverted for the same evening - poisoning cost too much internal
+  # RAM to leave running, this doesn't. `ALWAYS_ON` (not a restored value) so
+  # it starts tracing on every boot regardless of NVS state, the same fix
+  # already used for the esp_afe NS/AGC switches' restore-fights-default bug.
+  #
+  # LEAKS mode, not ALL: ALL keeps every alloc/free pair until the record
+  # buffer fills, which at this device's allocation rate would happen in
+  # well under a minute of real use. LEAKS only keeps allocations that are
+  # STILL outstanding - properly paired allocs/frees clear themselves out -
+  # so a healthy system stays well under the 400-record buffer indefinitely,
+  # and it is exactly what heap_trace_dump() from the button above needs: a
+  # meaningful snapshot at any moment, not a firehose that already overflowed.
+  # It also still flags an invalid free() the instant one happens, which is
+  # the actual thing being hunted here - that check does not depend on mode.
+  #
+  # The buffer itself is allocated once, from PSRAM (MALLOC_CAP_SPIRAM), the
+  # first time this turns on - see heap_trace_buf under globals: for why not
+  # a plain fixed-size array. Documented trade-off of a PSRAM buffer: it
+  # cannot record allocations made from an ISR. Accepted, because the crash
+  # this is chasing (see [[overnight-lwip-heap-crash]]) faults inside
+  # lwIP's tcpip_thread, an ordinary FreeRTOS task, not an ISR.
+  - platform: template
+    name: "Heap trace: recording"
+    icon: mdi:radar
+    entity_category: diagnostic
+    optimistic: true
+    restore_mode: ALWAYS_ON
+    turn_on_action:
+      - lambda: |-
+          static const size_t HT_NUM_RECORDS = 400;
+          if (id(heap_trace_buf) == nullptr) {
+            id(heap_trace_buf) = heap_caps_malloc(
+                HT_NUM_RECORDS * sizeof(heap_trace_record_t), MALLOC_CAP_SPIRAM);
+            heap_trace_init_standalone(
+                (heap_trace_record_t *) id(heap_trace_buf), HT_NUM_RECORDS);
+          }
+          heap_trace_start(HEAP_TRACE_LEAKS);
+    turn_off_action:
+      - lambda: heap_trace_stop();
+
   - platform: gpio
     id: speaker_enable
     name: Speaker enable
