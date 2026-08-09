@@ -2482,15 +2482,40 @@ button:
   # Prints whatever the "Heap trace: recording" switch (see switch: below) has
   # captured so far, without needing to stop the trace first - LEAKS mode
   # only keeps allocations that are STILL outstanding, so a dump mid-trace is
-  # a meaningful snapshot, not a truncated one. Output goes through the normal
-  # logger like everything else, so it reaches the same API log subscription
-  # already used to chase this - see [[overnight-lwip-heap-crash]].
+  # a meaningful snapshot, not a truncated one.
+  #
+  # Deliberately NOT heap_trace_dump() - tested live 2026-08-09 and confirmed
+  # its output never reaches the API log stream (zero lines seen at
+  # LOG_LEVEL_VERY_VERBOSE over a 10s window after pressing it), most likely
+  # because it writes straight to the UART rather than through esp_log_write,
+  # which would make this diagnostic silently need physical USB to actually
+  # read - the opposite of the point. Walking the records by hand through
+  # ESP_LOGI instead uses the exact path already proven all evening to reach
+  # the API log subscription (the crash-reporter lines, the AFE lines, all of
+  # it) - see [[overnight-lwip-heap-crash]].
   - platform: template
     name: "Heap trace: dump now"
     icon: mdi:memory
     entity_category: diagnostic
     on_press:
-      - lambda: heap_trace_dump();
+      - lambda: |-
+          size_t n = heap_trace_get_count();
+          ESP_LOGI("heap_trace", "%u outstanding record(s)", (unsigned) n);
+          for (size_t i = 0; i < n; i++) {
+            heap_trace_record_t rec;
+            if (heap_trace_get(i, &rec) == ESP_OK) {
+              ESP_LOGI("heap_trace", "  #%u: %u bytes @ %p, freed=%d",
+                       (unsigned) i, (unsigned) rec.size, rec.address, (int) rec.freed);
+            }
+          }
+          heap_trace_summary_t sum;
+          if (heap_trace_summary(&sum) == ESP_OK) {
+            ESP_LOGI("heap_trace",
+                     "allocs=%u frees=%u count=%u capacity=%u high_water=%u overflowed=%u",
+                     (unsigned) sum.total_allocations, (unsigned) sum.total_frees,
+                     (unsigned) sum.count, (unsigned) sum.capacity,
+                     (unsigned) sum.high_water_mark, (unsigned) sum.has_overflowed);
+          }
 
 number:
   # Live mic sensitivity, in dB, post-AEC. See `mic_gain_default` up top for what
