@@ -518,6 +518,47 @@ psram:
 
 logger:
   hardware_uart: USB_SERIAL_JTAG
+  # Makes the crash-reporter's own ESP_LOGE lines (tag "esp32.crash", printed
+  # by ESPHome's built-in crash_handler_log() - see esp32/crash_handler.cpp)
+  # persistent and remotely readable without needing an active API log
+  # subscription at the exact moment they're printed. This is the same data
+  # already being read by eye all through [[overnight-lwip-heap-crash]] - the
+  # difference is WHERE it ends up: an HA entity with real state history,
+  # instead of requiring Michal's PC to be on and connected at the right
+  # second, which cost us the full detail on at least one crash already.
+  #
+  # crash_handler_log() is called from two places (checked in ESPHome's own
+  # source, not guessed): once during the logger component's OWN setup(),
+  # and again every time any API client connects, for as long as this boot's
+  # crash data stays valid. The first call may run before this listener is
+  # wired up; the second is what actually makes this reliable - Home
+  # Assistant's own native integration connects as an API client on every
+  # boot, which re-fires it well after logger/network setup has finished.
+  on_message:
+    level: ERROR
+    then:
+      - lambda: |-
+          if (strcmp(tag, "esp32.crash") != 0)
+            return;
+          std::string msg(message);
+          if (msg.find("CRASH DETECTED") != std::string::npos) {
+            id(crash_count) += 1;
+            id(last_crash_summary) = "";
+          } else if (msg.find("Reason:") != std::string::npos ||
+                     msg.find("Crashed core:") != std::string::npos ||
+                     msg.find("PC:") != std::string::npos) {
+            // Deliberately only these three lines, not the BTn/addr2line-hint
+            // ones - the full backtrace only means anything decoded against a
+            // matching firmware.elf anyway, which needs the laptop regardless,
+            // so it stays in the live log/monitor. This is the compact part
+            // that answers "did it crash, and roughly how" from HA alone, and
+            // has to fit Home Assistant's 255-char text state limit.
+            if (!id(last_crash_summary).empty())
+              id(last_crash_summary) += "; ";
+            id(last_crash_summary) += msg;
+          }
+          id(diag_crash_count)->publish_state(id(crash_count));
+          id(diag_last_crash_reason)->publish_state(id(last_crash_summary));
 
 api:
   on_client_connected:
@@ -1297,6 +1338,24 @@ globals:
     type: void *
     restore_value: false
     initial_value: "nullptr"
+  # Persistent crash log, readable from Home Assistant without any laptop
+  # having to be awake and connected at the exact moment - see "Diag: crashes
+  # since flash" / "Diag: last crash reason" below and
+  # [[overnight-lwip-heap-crash]]. crash_count survives reboots
+  # (restore_value: true, plain int - safe to memcpy to/from flash).
+  # last_crash_summary deliberately does NOT (std::string isn't safely
+  # restorable that way - it's a pointer/size/capacity triple, not POD) - it
+  # resets to empty on every normal boot and gets refilled only on the boot
+  # right after a real crash. That is fine: Home Assistant's own state
+  # history keeps the value from that boot even after it reverts to empty on
+  # the next one, which is exactly the point.
+  - id: crash_count
+    type: int
+    restore_value: true
+    initial_value: "0"
+  - id: last_crash_summary
+    type: std::string
+    restore_value: false
   - id: init_in_progress
     type: bool
     restore_value: false
@@ -2881,6 +2940,17 @@ text_sensor:
     id: text_response
     internal: true
 
+  # Set by the logger's on_message hook above, not polled - see
+  # [[overnight-lwip-heap-crash]]. Empty on a normal boot; holds the compact
+  # Reason/Crashed-core/PC summary only on the boot right after a real crash.
+  # Check this entity's HISTORY in HA, not just its current state, since a
+  # later crash-free reboot clears the live value back to empty.
+  - platform: template
+    name: "Diag: last crash reason"
+    id: diag_last_crash_reason
+    entity_category: diagnostic
+    disabled_by_default: true
+
 # Instrumentacja wydajnosci. Wszystko `disabled_by_default`, wiec domyslnie nie
 # kosztuje nic poza kilkoma bajtami RAM - wlaczasz encje w HA tylko wtedy, gdy
 # cos mierzysz.
@@ -2960,6 +3030,18 @@ sensor:
     lambda: return heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
     update_interval: 60s
     unit_of_measurement: B
+    accuracy_decimals: 0
+    entity_category: diagnostic
+    disabled_by_default: true
+
+  # Running total across reboots (restore_value: true on the backing global) -
+  # answers "has this crashed since I last checked, how many times" from HA
+  # alone. Set by the logger's on_message hook, not polled - see
+  # [[overnight-lwip-heap-crash]] and "Diag: last crash reason" below.
+  - platform: template
+    name: "Diag: crashes since flash"
+    id: diag_crash_count
+    lambda: return id(crash_count);
     accuracy_decimals: 0
     entity_category: diagnostic
     disabled_by_default: true
