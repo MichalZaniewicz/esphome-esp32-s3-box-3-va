@@ -203,6 +203,12 @@ substitutions:
   external_media_player_id: media_player.none
   tts_output_default: "This device"
 
+  # media_player.play_media's `announce: true` (below, in on_tts_end) is how
+  # most external players duck/prioritise a reply, but some accept the flag
+  # and then play silence - reported on Sonos, issue #3. Set this to "false"
+  # to send `enqueue: play` instead, which those players do honour.
+  external_media_player_use_announce: "true"
+
   # When TTS plays on an external speaker the box hands over a URL and hears
   # nothing back, so it has no idea how long the reply lasts - the pipeline ends
   # in about half a second while the speaker talks on. Anything driven by the
@@ -985,13 +991,25 @@ voice_assistant:
         condition:
           lambda: return id(tts_output).current_option() != "This device";
         then:
-          - homeassistant.service:
-              service: media_player.play_media
-              data:
-                entity_id: ${external_media_player_id}
-                media_content_id: !lambda 'return x;'
-                media_content_type: music
-                announce: "true"
+          - if:
+              condition:
+                lambda: return ${external_media_player_use_announce};
+              then:
+                - homeassistant.service:
+                    service: media_player.play_media
+                    data:
+                      entity_id: ${external_media_player_id}
+                      media_content_id: !lambda 'return x;'
+                      media_content_type: music
+                      announce: "true"
+              else:
+                - homeassistant.service:
+                    service: media_player.play_media
+                    data:
+                      entity_id: ${external_media_player_id}
+                      media_content_id: !lambda 'return x;'
+                      media_content_type: music
+                      enqueue: play
     - if:
         condition:
           lambda: return id(tts_output).current_option() == "External player";

@@ -312,6 +312,7 @@ among them: Home Assistant supplies the time zone along with the time.
 | `name` / `friendly_name` | `esp32-s3-box-3-va` / `S3 Box 3 Voice` | Device name. Changing `name` re-creates every entity in Home Assistant. |
 | `external_media_player_id` | `media_player.none` | The speaker this room has besides the box. Where the reply goes when `TTS output` is `External player` or `Both`, and what `media.yaml` watches unless told otherwise. The default is not a real entity: it means there is no such speaker, everything stays on the box, and nothing has to be set. |
 | `tts_output_default` | `This device` | Boot default of that select. Leave it here when there is no external speaker. |
+| `external_media_player_use_announce` | `true` | Set to `false` if your external speaker accepts HA's `announce` flag but plays silence (reported on Sonos) - sends `enqueue: play` instead. |
 
 Everything else has a working default: wake word tuning, sounds, fonts, screen
 pages, the boot animation, pins. All of it is in the
