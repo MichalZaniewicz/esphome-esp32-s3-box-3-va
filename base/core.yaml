@@ -494,6 +494,25 @@ esp32:
       # recording" switch below. Enabling this option alone costs nothing
       # until that switch is actually turned on.
       CONFIG_HEAP_TRACING_STANDALONE: "y"
+      # TEMP DIAGNOSTIC 2026-09-23: today, on completely unmodified firmware
+      # (confirmed via full erase_flash + reflash), boot consistently loses
+      # ~65-90KB of internal RAM right at wifi_init/scan time - internal_free
+      # goes from ~70-96KB (healthy, matches the historical audio/AFE setup
+      # baseline) down to ~2-4KB, versus the historical ~30-45KB cost of this
+      # same step. Everything downstream (display SPI DMA, mic/speaker I2S,
+      # an audio_stack effects buffer) then fails to allocate.
+      #
+      # Static Wi-Fi RX buffers and AMPDU block-ack reordering buffers are
+      # both allocated from internal RAM right when esp_wifi_init() runs -
+      # this reduces both, trading a little throughput (irrelevant for a
+      # voice-assistant's small API/TTS traffic) for internal RAM headroom.
+      # This does not explain WHY today differs from history - it is a
+      # mitigation attempt, not a diagnosis. Revert if it does not help.
+      CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM: "4"
+      CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM: "16"
+      CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM: "16"
+      CONFIG_ESP_WIFI_AMPDU_RX_ENABLED: "n"
+      CONFIG_ESP_WIFI_AMPDU_TX_ENABLED: "n"
     # ONE esp-dsp FOR TWO CALLERS THAT DISAGREE. `esp_aec` pulls esp-sr 2.4.x,
     # which requires esp-dsp 1.8.0 exactly. ESPHome's own `runtime_image` pins
     # esp-dsp to 1.7.1 for the SIMD paths in its JPEG decoder - and that is what
@@ -573,12 +592,7 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-  # TEMP DIAGNOSTIC 2026-09-23, forced true instead of ${hidden_ssid}: testing
-  # whether skipping the full network scan avoids the ~68KB internal-RAM
-  # collapse seen today at wifi_init/scan time (healthy ~72KB before, ~4KB
-  # after - far worse than the historical ~45KB cost of this same step).
-  # Revert to `${hidden_ssid}` once this is confirmed one way or the other.
-  fast_connect: true
+  fast_connect: ${hidden_ssid}
   ap:
   on_connect:
     - script.execute: draw_display
