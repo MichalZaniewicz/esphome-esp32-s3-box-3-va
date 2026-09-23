@@ -508,11 +508,18 @@ esp32:
       # voice-assistant's small API/TTS traffic) for internal RAM headroom.
       # This does not explain WHY today differs from history - it is a
       # mitigation attempt, not a diagnosis. Revert if it does not help.
-      CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM: "4"
-      CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM: "16"
-      CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM: "16"
+      # 2026-09-23, round 2: the round-1 numbers below (4/16/16) helped a lot
+      # (free heap 2-4KB -> 14399) but not enough - largest contiguous block
+      # was still only 7680, and the display's SPI DMA transaction buffer
+      # (`spi_master: setup_dma_priv_buffer`, allocated fresh per transfer,
+      # not persistent) kept failing continuously, so the screen stayed
+      # black. Pushing further, toward ESP-IDF's practical minimums.
+      CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM: "2"
+      CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM: "8"
+      CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM: "8"
       CONFIG_ESP_WIFI_AMPDU_RX_ENABLED: "n"
       CONFIG_ESP_WIFI_AMPDU_TX_ENABLED: "n"
+      CONFIG_ESP_WIFI_MGMT_SBUF_NUM: "6"
     # ONE esp-dsp FOR TWO CALLERS THAT DISAGREE. `esp_aec` pulls esp-sr 2.4.x,
     # which requires esp-dsp 1.8.0 exactly. ESPHome's own `runtime_image` pins
     # esp-dsp to 1.7.1 for the SIMD paths in its JPEG decoder - and that is what
