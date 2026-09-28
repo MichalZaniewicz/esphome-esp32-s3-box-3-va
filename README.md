@@ -8,17 +8,6 @@ touchscreen** instead of the static full-screen images the stock config paints.
 Pure ESPHome, no custom C firmware: an always-on core you pull as a package, plus
 one thin config file you actually edit.
 
-> **Status: running on an ESP32-S3-BOX-3.** Wake word, the full Assist pipeline,
-> full duplex audio with barge-in, voice timers with their alarm, the
-> touchscreen, the animated character, the home, settings, media, weather and
-> thermostat screens are all confirmed on device with ESPHome 2026.7.1. The
-> shipped thin config - core plus one character - measures **flash 27.0%, RAM
-> 41.3%**, up from 25.3%/39.9% before the full-duplex migration; the
-> four-characters-plus-every-optional-screen figure predates that migration
-> and has not been remeasured yet. Artwork is what costs: 150 KB per
-> character. [CHANGELOG.md](CHANGELOG.md) has the detail, including what
-> turned out to be wrong along the way.
-
 > [!TIP]
 > ⭐ **Enjoying this project?** Every star is real motivation for me to keep
 > developing it :)
@@ -30,6 +19,17 @@ GitHub alert into <ha-alert> and drops every child whose textContent is empty,
 which silently removes any <img> placed inside it. -->
 
 [![Star this repo](https://img.shields.io/github/stars/MichalZaniewicz/esphome-esp32-s3-box-3-va?style=for-the-badge&logo=github&label=STAR%20THIS%20REPO&labelColor=555555&color=ffc107)](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va) [![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
+
+> **Status: running on an ESP32-S3-BOX-3.** Wake word, the full Assist pipeline,
+> full duplex audio with barge-in, voice timers with their alarm, the
+> touchscreen, the animated character, the home, settings, media, weather and
+> thermostat screens are all confirmed on device with ESPHome 2026.7.1. The
+> shipped thin config - core plus one character - measures **flash 27.0%, RAM
+> 41.3%**, up from 25.3%/39.9% before the full-duplex migration; the
+> four-characters-plus-every-optional-screen figure predates that migration
+> and has not been remeasured yet. Artwork is what costs: 150 KB per
+> character. [CHANGELOG.md](CHANGELOG.md) has the detail, including what
+> turned out to be wrong along the way.
 
 ## What it does
 
