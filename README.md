@@ -22,6 +22,10 @@ one thin config file you actually edit.
 > [!TIP]
 > ⭐ **Enjoying this project?** Every star is real motivation for me to keep
 > developing it :)
+>
+> ☕ Want to say thanks another way? You can [buy me a coffee](https://buymeacoffee.com/zanula).
+
+[![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
 
 ## What it does
 
