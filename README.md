@@ -25,7 +25,11 @@ one thin config file you actually edit.
 >
 > ☕ Want to say thanks another way? You can [buy me a coffee](https://buymeacoffee.com/zanula).
 
-[![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
+<!-- The badges live OUTSIDE the alert on purpose: Home Assistant rewrites a
+GitHub alert into <ha-alert> and drops every child whose textContent is empty,
+which silently removes any <img> placed inside it. -->
+
+[![Star this repo](https://img.shields.io/github/stars/MichalZaniewicz/esphome-esp32-s3-box-3-va?style=for-the-badge&logo=github&label=STAR%20THIS%20REPO&labelColor=555555&color=ffc107)](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va) [![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
 
 ## What it does
 
