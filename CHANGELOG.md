@@ -43,6 +43,11 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Fixed
 
+- **The onboard speaker was quiet at "100%".** `volume_max` had sat at `0.8`
+  since the first commit, and esp_audio_stack maps the slider linearly in dB
+  between -49 dB and 0 dB, so the top of the slider was really -9.8 dB. It is
+  now `1.0`, true full scale, checked on hardware for clipping.
+
 - **Every boot downloaded and decoded a cover for a player that was not
   playing.** Home Assistant hands out `entity_picture` whatever the state, so a
   box starting up next to a stopped speaker fetched the last track's artwork
@@ -290,6 +295,10 @@ their alarm, the touchscreen, the home screen and the animated character.
   is a second of the user's sentence lost.
 
 ### Added
+
+- **A Restart button** in Home Assistant (config category). The audio stack can
+  latch into an I2S error state it does not leave on its own while WiFi and the
+  API stay healthy; a reboot from HA now recovers the box without a USB cable.
 
 - **A thermostat screen** (`base/screens/climate.yaml`): the target temperature
   large, the room's own under it, a flame that lights only while `hvac_action`

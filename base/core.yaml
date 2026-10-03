@@ -73,9 +73,12 @@ substitutions:
   # ---------------------------------------------------------------------------
   hidden_ssid: 'false'      # true = fast_connect, required for a hidden SSID
 
-  # Media player volume clamps for the onboard speaker.
+  # Media player volume clamps for the onboard speaker. esp_audio_stack maps the
+  # 0..1 slider linearly in dB between a -49 dB floor and 0 dB, so a ceiling of
+  # 0.8 tops out at -9.8 dB, audibly quiet at "100%". 1.0 is true full scale and
+  # was checked on hardware for clipping; if yours distorts, back off towards 0.8.
   volume_min: '0.5'
-  volume_max: '0.8'
+  volume_max: '1.0'
 
   # The timer alarm. Fetched at COMPILE time and baked into flash as a byte
   # array, so it needs no network at ring time and always comes out of the box's
@@ -2393,6 +2396,15 @@ button:
   - platform: factory_reset
     id: factory_reset_btn
     internal: true
+
+  # A plain reboot from Home Assistant. Worth having because the audio stack can
+  # latch into an I2S error state it does not recover from on its own while WiFi
+  # and the API stay up, and this gets the box back without a USB cable.
+  - platform: restart
+    id: restart_btn
+    name: Restart
+    icon: mdi:restart
+    entity_category: config
 
 number:
   # Live mic sensitivity, in dB, post-AEC. See `mic_gain_default` up top for what
