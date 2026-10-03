@@ -37,7 +37,7 @@ doc = f'''######################################################################
 #
 # A thin header bar (cart icon, title, a count in a pill), and under it a
 # rounded card with what is still to buy on `shopping_entity`, one row per item,
-# each with a ring in the accent colour and a hairline under it. Past five rows
+# each with a small dot in the accent colour and a hairline under it. Past five rows
 # the card scrolls with a finger; a thin accent scrollbar runs down its right
 # edge and a chevron at the bottom says there is more, until you get there.
 # Adding and ticking off stays in Home Assistant (Assist already does "add milk
@@ -65,7 +65,7 @@ doc = f'''######################################################################
 # button, not a select, for the reason given there.
 #
 # ROWS ARE A FIXED POOL of {N} labels made at compile time, one widget per row:
-# the ring and the name share one label through recolor markup, and the
+# the dot and the name share one label through recolor markup, and the
 # hairline is that label's bottom border. Unused rows are hidden, and a hidden
 # child does not count towards the card's scroll height, so the card scrolls
 # exactly as far as the list goes. Nothing is created or freed at run time -
@@ -93,12 +93,12 @@ substitutions:
   shopping_title_color: '0xFFFFFF'
   shopping_muted_color: '0x8A8A8E'
   shopping_item_color: '0xFFFFFF'
-  shopping_accent_color: ${{accent_color}}   # icon, ring, pill, scrollbar
+  shopping_accent_color: ${{accent_color}}   # icon, dot, pill, scrollbar
   shopping_font_size: '20'
 
 font:
   # Item text, with the three icons it uses folded in, so a row can be one
-  # label: the ring before each item, the cart in the header, the chevron.
+  # label: the dot before each item, the cart in the header, the chevron.
   - id: font_shopping
     file:
       type: gfonts
@@ -115,7 +115,7 @@ font:
         glyphs: ${{extra_glyphs}}
       - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
         glyphs:
-          - "\\U000F0130"   # checkbox-blank-circle-outline, the ring per row
+          - "\\U000F09DF"   # circle-small, the dot before each row
           - "\\U000F0110"   # cart, in the header
           - "\\U000F0140"   # chevron-down, "more below"
   # The empty state's one big icon.
@@ -170,10 +170,10 @@ script:
                 auto &drawn = id(shopping_drawn);
                 if (drawn.size() != {N} + 1) drawn.assign({N} + 1, std::string("\\x01"));
 
-                // "#RRGGBB text#" colours just the ring; the substitution is
+                // "#RRGGBB text#" colours just the dot; the substitution is
                 // 0xRRGGBB, so the prefix comes off.
-                const std::string ring = std::string("#") + std::string("${{shopping_accent_color}}").substr(2) +
-                                         " \\U000F0130#  ";
+                const std::string dot = std::string("#") + std::string("${{shopping_accent_color}}").substr(2) +
+                                         " \\U000F09DF#  ";
                 // Home Assistant wraps every action response as {{"response": ...}},
                 // and the device hands that wrapper over as-is.
                 JsonArrayConst items =
@@ -185,7 +185,7 @@ script:
                     std::string name = items[i]["summary"] | "";
                     // A '#' would end or start a recolor run mid-name.
                     for (char &ch : name) if (ch == '#') ch = ' ';
-                    text = ring + name;
+                    text = dot + name;
                   }} else if (i == {N} - 1 && total > {N}) {{
                     text = std::string("#") + std::string("${{shopping_muted_color}}").substr(2) + " +" +
                            std::to_string(total - ({N} - 1)) + " ${{shopping_more}}#";

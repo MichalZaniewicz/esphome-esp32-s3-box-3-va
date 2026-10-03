@@ -315,7 +315,7 @@ their alarm, the touchscreen, the home screen and the animated character.
   open items on a carousel stop: a header bar (cart, title, count pill) over a
   rounded card that scrolls vertically only, so sideways swipes still step the
   carousel, with an accent scrollbar and a "more below" chevron. Rows are a
-  fixed pool of 20 labels made at compile time (ring and name in one label via
+  fixed pool of 20 labels made at compile time (dot and name in one label via
   recolor, the hairline its bottom border), hidden when unused and rewritten
   only when their text changes; about 2 KB of internal heap. The box fetches
   the items itself with `todo.get_items` and `capture_response`, when the
