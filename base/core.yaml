@@ -632,6 +632,12 @@ light:
     # remember being switched off.
     restore_mode: ${screen_restore_mode}
     default_transition_length: 250ms
+    # Night mode re-checks the moment the screen comes on. Something else
+    # turning it on (a motion automation, the HA app) brings back the LAST
+    # brightness, which after a night is the night level; without this the
+    # morning screen stayed dim until the next once-a-minute clock check.
+    on_turn_on:
+      - script.execute: night_apply
 
 # When night mode dims the screen. Local time from Home Assistant; a start later
 # than the end means the window crosses midnight. See NIGHT MODE.

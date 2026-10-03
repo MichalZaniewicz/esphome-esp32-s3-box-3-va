@@ -548,6 +548,10 @@ Expose **Show home screen**, **Show weather screen**, **Show thermostat
 screen** and **Show media screen** to your Assist pipeline's conversation
 agent and "Alexa, pokaż pogodę" jumps the display straight there.
 
+`shopping.yaml` brings its own **Show shopping list** button, so it needs
+neither this file nor the other three screens: expose it the same way and
+"Alexa, show the shopping list" works too.
+
 **Four buttons, not one select.** An earlier version was a single "Show
 screen" select with four options - simpler to expose, but Home Assistant's
 OpenAI Conversation integration kept reaching for the generic `turn_on`
@@ -667,9 +671,11 @@ filling in blanks:
 ```
 You control a kitchen display. You can switch what it shows and draw on it.
 
-SWITCHING SCREENS: press one of the four buttons - "Show home screen",
-"Show weather screen", "Show thermostat screen", "Show media screen".
-Each one only ever does the one thing its name says.
+SWITCHING SCREENS: press one of the buttons - "Show home screen",
+"Show weather screen", "Show thermostat screen", "Show media screen",
+"Show shopping list". Each one only ever does the one thing its name says.
+To add something to the shopping list, use the shopping list itself, not a
+button; the display updates on its own.
 
 DRAWING: call the "Draw on screen" script with a `spec` field. The canvas
 is EXACTLY 320x240 pixels, (0,0) is the top-left corner, and NOTHING is

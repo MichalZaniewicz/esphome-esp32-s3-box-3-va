@@ -20,6 +20,11 @@
 # dimmed screen up for as long as it shows (capped at a minute for one that
 # waits for a tap), the same way a touch does.
 #
+# It never switches the screen on. If something turns the backlight off when
+# the room is empty (a motion automation, say), a short notification can come
+# and go unseen; use `seconds: 0` for anything that must be read, and it will
+# be waiting when the screen comes back.
+#
 # It is silent on purpose. Sound belongs to Home Assistant, which already knows
 # how to announce on this box or any speaker in the house; this only shows.
 #
