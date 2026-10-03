@@ -99,6 +99,11 @@ substitutions:
   # and the assistant hearing anything.
   wake_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/wake.wav
 
+  # Played once, when the box is first ready after a boot, if the "Boot sound"
+  # switch is on. 0.6 s, two soft bell tones. Skipped while night mode has the
+  # screen dimmed, so a power cut at 3 am does not chime the house awake.
+  boot_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/boot.wav
+
   # Input gain for the wake word only (1-64). See the micro_wake_word block for
   # why this exists and why it is not 1.
   mww_gain_factor: '4'
@@ -249,6 +254,14 @@ substitutions:
   # Backlight behaviour at boot - see the `Screen` light below.
   screen_restore_mode: ALWAYS_ON
 
+  # Night mode defaults - see NIGHT MODE below. All three are live entities in
+  # Home Assistant; these are only what a fresh flash starts with. The level is
+  # a percentage of the Screen light's brightness, which is gamma corrected, so
+  # 30% is already dim and much below 10% is effectively off.
+  night_start_default: '22:00:00'
+  night_end_default: '06:30:00'
+  night_level_default: '30'
+
   # Boot dot colours. Any number of 0xRRGGBB entries; the animation cross-fades
   # between consecutive ones and wraps around, and each dot starts at a different
   # point in the cycle so they are never the same colour at once.
@@ -256,6 +269,14 @@ substitutions:
   boot_fade_steps: '6'     # ticks per colour; 6 x boot_tick = 900 ms per hue
 
   text_starting: "Starting..."
+  # The hello screen, shown for a few seconds once the box is ready after a
+  # boot. The greeting follows the clock; `text_hello` is for when the clock is
+  # not known yet.
+  text_hello: "Hello"
+  text_hello_morning: "Good morning"
+  text_hello_afternoon: "Good afternoon"
+  text_hello_evening: "Good evening"
+  text_hello_sub: "How can I help?"
   text_no_wifi: "No Wi-Fi"
   text_no_ha: "No Home Assistant"
   status_idle: "Ready"
@@ -529,6 +550,14 @@ captive_portal:
 time:
   - platform: homeassistant
     id: ha_time
+    # Night mode is a clock check, so it re-runs once a minute and as soon as
+    # the clock first becomes valid (boot, or HA coming back).
+    on_time_sync:
+      - script.execute: night_apply
+    on_time:
+      - seconds: 0
+        then:
+          - script.execute: night_apply
 
 ###############################################################################
 # DISPLAY + TOUCH
@@ -573,6 +602,14 @@ touchscreen:
     interrupt_pin:
       number: ${touch_int}
       ignore_strapping_warning: true
+    # A touch on a night-dimmed screen brings it up for a while. The touch still
+    # reaches LVGL as usual; this only adds brightness.
+    on_touch:
+      - lambda: |-
+          if (id(night_dimmed)) {
+            id(night_wake_until) = millis() + 15000;
+            id(night_apply).execute();
+          }
 
 output:
   - platform: ledc
@@ -594,6 +631,32 @@ light:
     # remember being switched off.
     restore_mode: ${screen_restore_mode}
     default_transition_length: 250ms
+
+# When night mode dims the screen. Local time from Home Assistant; a start later
+# than the end means the window crosses midnight. See NIGHT MODE.
+datetime:
+  - platform: template
+    id: night_start
+    type: time
+    name: Night mode start
+    icon: mdi:weather-sunset-down
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_value: "${night_start_default}"
+    on_value:
+      - script.execute: night_apply
+  - platform: template
+    id: night_end
+    type: time
+    name: Night mode end
+    icon: mdi:weather-sunset-up
+    entity_category: config
+    optimistic: true
+    restore_value: true
+    initial_value: "${night_end_default}"
+    on_value:
+      - script.execute: night_apply
 
 ###############################################################################
 # AUDIO
@@ -704,6 +767,8 @@ media_player:
         file: ${timer_finished_sound_file}
       - id: wake_sound
         file: ${wake_sound_file}
+      - id: boot_sound
+        file: ${boot_sound_file}
     on_announcement:
       # No pipeline running means this is user- or HA-initiated playback, not a
       # reply: show the muted (blank) page while it plays. A ringing timer is the
@@ -717,6 +782,7 @@ media_player:
               - switch.is_off: timer_ringing
               - lambda: return !id(wake_sound_active);
               - lambda: return !id(tts_reply_active);
+              - lambda: return !id(hello_active);   # the boot chime
           then:
             - lambda: id(voice_assistant_phase) = ${voice_assist_muted_phase_id};
             - script.execute: draw_display
@@ -1202,6 +1268,14 @@ voice_assistant:
     - lambda: id(init_in_progress) = false;
     - script.execute: start_wake_word
     - script.execute: set_idle_or_mute_phase
+    # Once per boot, not on every reconnect: HA restarting is not the box
+    # waking up, and nobody wants a greeting for it.
+    - if:
+        condition:
+          lambda: return !id(hello_done);
+        then:
+          - lambda: id(hello_done) = true;
+          - script.execute: hello_show
     - script.execute: draw_display
   on_client_disconnected:
     - script.execute: stop_wake_word
@@ -1392,6 +1466,34 @@ globals:
     type: uint32_t
     restore_value: false
     initial_value: "0"
+  # NIGHT MODE state. `night_dimmed` is true while night mode owns the
+  # backlight, and `night_day_level` is the brightness it found when it took
+  # over, handed back in the morning. Both survive a reboot, so a box restarted
+  # at 3 am still knows what to restore to.
+  - id: night_dimmed
+    type: bool
+    restore_value: true
+    initial_value: "false"
+  - id: night_day_level
+    type: float
+    restore_value: true
+    initial_value: "1.0"
+  # Keep the screen up until this millis() - a touch, or the tail of a
+  # conversation, so the reply is still readable after the phase drops to idle.
+  - id: night_wake_until
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  # The hello screen: shown once per boot (`hello_done`), for as long as
+  # `hello_active` holds. Neither is restored, which is the point.
+  - id: hello_done
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: hello_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
 
 script:
   # Boot dots: the lit one grows and goes fully opaque, the others sit back, and
@@ -1702,7 +1804,22 @@ script:
                             then:
                               - lvgl.page.show: page_no_ha
                       else:
-                        - script.execute: show_phase_page
+                        # The hello screen stands in for the idle page only:
+                        # a wake word during it goes straight to listening.
+                        - if:
+                            condition:
+                              lambda: |-
+                                return id(hello_active) &&
+                                       id(voice_assistant_phase) == ${voice_assist_idle_phase_id};
+                            then:
+                              - if:
+                                  condition:
+                                    not:
+                                      lvgl.page.is_showing: page_hello
+                                  then:
+                                    - lvgl.page.show: page_hello
+                            else:
+                              - script.execute: show_phase_page
       # AFTER the page work, and only if the status page is the one on screen.
       # These three labels live on page_status alone, which a character package
       # claims for no phase at all - so with any assistant installed this was
@@ -1713,6 +1830,100 @@ script:
             lvgl.page.is_showing: page_status
           then:
             - script.execute: sync_text
+      # Every phase change lands here, so this is where night mode notices a
+      # conversation starting or a timer ringing. It is a few integer compares
+      # and returns before touching the light unless the level must change.
+      - script.execute: night_apply
+
+  # NIGHT MODE. Dims the backlight between `Night mode start` and `Night mode
+  # end`, and brings it back to the daytime level while the assistant is doing
+  # anything (listening, thinking, replying, a ringing timer, an error) and for
+  # a while after a touch or the end of a reply.
+  #
+  # Hands off when the Screen light is switched off: off is a decision someone
+  # made, and night mode never turns the screen on by itself. During the night
+  # it does win over the Screen brightness slider; switch night mode off to
+  # override it.
+  - id: night_apply
+    then:
+      - lambda: |-
+          auto *bl = id(backlight);
+          if (!bl->remote_values.is_on()) return;
+          const float cur = bl->remote_values.get_brightness();
+
+          bool night = false;
+          const auto now = id(ha_time).now();
+          if (id(night_mode).state && now.is_valid()) {
+            const int m = now.hour * 60 + now.minute;
+            const int s = id(night_start).hour * 60 + id(night_start).minute;
+            const int e = id(night_end).hour * 60 + id(night_end).minute;
+            // A window that crosses midnight (22:00-06:30) wraps.
+            night = s <= e ? (m >= s && m < e) : (m >= s || m < e);
+          }
+
+          if (id(voice_assistant_phase) != ${voice_assist_idle_phase_id})
+            id(night_wake_until) = millis() + 10000;
+          const bool awake = (int32_t) (id(night_wake_until) - millis()) > 0;
+
+          float target;
+          if (night && !awake) {
+            if (!id(night_dimmed)) {
+              id(night_day_level) = cur;
+              id(night_dimmed) = true;
+            }
+            target = id(night_level).state / 100.0f;
+          } else if (id(night_dimmed)) {
+            target = id(night_day_level);
+            if (!night) id(night_dimmed) = false;
+            else id(night_settle).execute();   // awake for now, dim again later
+          } else {
+            return;   // daytime and never dimmed: the slider is all yours
+          }
+
+          if (fabsf(target - cur) < 0.005f) return;
+          auto call = bl->make_call();
+          call.set_brightness(target);
+          // Down slowly so it is not a jolt in a dark room, up quickly so a
+          // touch or the wake word gets an answer at once.
+          call.set_transition_length(target < cur ? 1500 : 250);
+          call.perform();
+
+  # HELLO. The first thing after "Starting...": a greeting for the time of day
+  # and the boot chime, then the idle screen. Called once per boot from the
+  # first API connection, which is the moment the box is actually usable.
+  - id: hello_show
+    mode: restart
+    then:
+      - lambda: id(hello_active) = true;
+      - lvgl.label.update:
+          id: hello_text
+          text: !lambda |-
+            const auto t = id(ha_time).now();
+            if (!t.is_valid()) return std::string("${text_hello}");
+            if (t.hour >= 5 && t.hour < 12) return std::string("${text_hello_morning}");
+            if (t.hour >= 12 && t.hour < 18) return std::string("${text_hello_afternoon}");
+            return std::string("${text_hello_evening}");
+      - script.execute: draw_display
+      - if:
+          condition:
+            and:
+              - switch.is_on: boot_sound_enabled
+              - lambda: return !id(night_dimmed);
+          then:
+            - media_player.speaker.play_on_device_media_file:
+                media_file: boot_sound
+                announcement: true
+      - delay: 3s
+      - lambda: id(hello_active) = false;
+      - script.execute: draw_display
+
+  # Re-checks once the wake window can have run out. `restart` so a new touch or
+  # a long reply pushes it back instead of stacking checks.
+  - id: night_settle
+    mode: restart
+    then:
+      - delay: 16s
+      - script.execute: night_apply
 
   # Phase -> page. Flat ifs rather than a lambda `switch`, because page changes
   # must go through the LVGL component's own action: it tracks which page is
@@ -2407,6 +2618,23 @@ button:
     entity_category: config
 
 number:
+  # How dim night mode goes, as a Screen brightness percentage. See NIGHT MODE.
+  - platform: template
+    id: night_level
+    name: Night brightness
+    icon: mdi:brightness-4
+    entity_category: config
+    unit_of_measurement: "%"
+    mode: slider
+    min_value: 5
+    max_value: 100
+    step: 5
+    initial_value: ${night_level_default}
+    optimistic: true
+    restore_value: true
+    on_value:
+      - script.execute: night_apply
+
   # Live mic sensitivity, in dB, post-AEC. See `mic_gain_default` up top for what
   # this actually moves and its effect on the wake word. Kept as a template
   # (not the esp_audio_stack platform's own built-in number) because that native
@@ -2473,6 +2701,20 @@ number:
           id(mww_mic_src)->set_gain_factor((uint8_t) x);
 
 switch:
+  # Off on a fresh flash: dimming the screen on a schedule is something to opt
+  # into, not to discover. See NIGHT MODE.
+  - platform: template
+    id: night_mode
+    name: Night mode
+    icon: mdi:weather-night
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - script.execute: night_apply
+    on_turn_off:
+      - script.execute: night_apply
+
   - platform: gpio
     id: speaker_enable
     name: Speaker enable
@@ -2487,6 +2729,14 @@ switch:
     id: wake_sound_enabled
     name: Wake sound
     icon: "mdi:bell-ring"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+
+  - platform: template
+    id: boot_sound_enabled
+    name: Boot sound
+    icon: "mdi:music-note"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
     entity_category: config
@@ -2776,6 +3026,14 @@ sensor:
 ###############################################################################
 
 font:
+  - id: font_hello
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 500
+    size: 34
+    glyphsets:
+      - ${font_glyphsets}
   - id: font_body
     file:
       type: gfonts
@@ -2956,6 +3214,26 @@ lvgl:
             text: "${text_no_ha}"
             text_font: font_body
             text_color: 0xFF4D4D
+
+    # Hello, for three seconds after boot. Same black and accent as the boot
+    # screen it follows, so the two read as one sequence.
+    - id: page_hello
+      skip: true          # system page, never a carousel stop
+      bg_color: 0x000000
+      widgets:
+        - label:
+            id: hello_text
+            align: CENTER
+            y: -14
+            text: "${text_hello}"
+            text_font: font_hello
+            text_color: ${accent_color}
+        - label:
+            align: CENTER
+            y: 28
+            text: "${text_hello_sub}"
+            text_font: font_body
+            text_color: 0x8A8A8A
 
     # Every assistant phase lands here unless a package claims it. It is a
     # carousel stop only when it is also the home screen (bare core, no home

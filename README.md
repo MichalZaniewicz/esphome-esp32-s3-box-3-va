@@ -53,6 +53,13 @@ which silently removes any <img> placed inside it. -->
   settings page one swipe down, by default. Starting the assistant is left to the
   button so that screen taps belong to the UI rather than fighting a full-screen
   tap-to-talk target.
+- **A hello on boot**: after "Starting...", three seconds of "Good morning" (or
+  afternoon, or evening) and a short two-tone chime, then the idle screen. The
+  chime has its own switch and stays quiet at night.
+- **Night mode**: the screen dims on a schedule (22:00 to 06:30 by default,
+  set live from Home Assistant) and comes back up for a conversation, a
+  ringing timer or a touch, then dims again. Off until you switch it on; it
+  never turns on a screen someone switched off.
 - **Timers**: set by voice, with a countdown and a progress strip on LVGL's top
   layer that stays visible across page changes (green while running, blue while
   paused).
@@ -346,6 +353,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `home-styles.yaml` | A live **"Home style"** selector in Home Assistant - 40 looks for the home screen (fonts, colours, gradient backgrounds, layouts, a temperature/humidity dashboard, and a big-outdoor-reading "Station" family in eight palettes) switched at runtime with no rebuild, the choice restored across a reboot. Rides on `home.yaml` and touches only the home screen. See [Home styles](#home-styles) below. |
 | `show-screen.yaml` | Four Home Assistant buttons - **"Show home/weather/thermostat/media screen"** - that jump the display to whichever one is pressed, meant for Assist ("Alexa, pokaż pogodę"). Needs `home.yaml`, `weather.yaml`, `climate.yaml` and `media.yaml` all installed, since it has to name each one's page directly. See [Voice control](#voice-control) below. |
 | `canvas.yaml` | Lets Assist **draw whatever it wants on the screen** - "Alexa, draw a sun" - rectangles, circles, text and Material Design icons, on a blank page it switches to on its own. Only reachable from Home Assistant: never a swipe, never a button on the Box. Needs nothing else. See [Voice control](#voice-control) below. |
+| `notify.yaml` | **Notifications from Home Assistant over any screen**: a white card with the text, shown on LVGL's top layer so it never changes which screen you are on. One action, `esphome.<device>_show_notification`, with `message` and `seconds` (0 = until tapped); a tap dismisses it, and `hide_notification` clears it from an automation. Silent on purpose: sound stays with Home Assistant's own announce. Wakes a night-dimmed screen while it shows. Needs nothing else. |
 
 The **settings screen** is **one swipe down** from home - the device's own switches
 as tap tiles (microphone, wake sound, and where replies come out) plus a volume

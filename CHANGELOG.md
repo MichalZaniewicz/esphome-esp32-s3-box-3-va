@@ -296,6 +296,26 @@ their alarm, the touchscreen, the home screen and the animated character.
 
 ### Added
 
+- **Night mode**, in the core. Between two times set live from Home Assistant
+  (22:00 and 06:30 on a fresh flash) the screen fades to a `Night brightness`
+  level, and comes back up for anything the assistant does, a ringing timer,
+  or a touch, then fades down again. Off until switched on. The daytime level
+  is the one it found and is restored in the morning, through a reboot too; a
+  screen someone switched off stays off. It hangs off `draw_display`, which
+  every phase change already passes through, plus a once-a-minute clock check,
+  and writes the light only when the level actually has to change.
+- **A hello screen and a boot chime.** Once per boot, at the first API
+  connection (the moment the box is actually usable), three seconds of a
+  greeting for the time of day, then the idle screen, with `base/sounds/boot.wav`
+  (0.6 s, two bell tones, generated for this repo) under it. The chime has a
+  `Boot sound` switch and is skipped while night mode has the screen dimmed. HA
+  restarting does not repeat it. The greeting is in the language packages.
+- **Notifications** (`base/screens/notify.yaml`): `show_notification(message,
+  seconds)` puts a card over whatever is on screen, on LVGL's top layer, so the
+  current screen never changes underneath it. `seconds: 0` waits for a tap;
+  `hide_notification` clears it. Silent by design, and it wakes a night-dimmed
+  screen while it shows.
+
 - **A Restart button** in Home Assistant (config category). The audio stack can
   latch into an I2S error state it does not leave on its own while WiFi and the
   API stay healthy; a reboot from HA now recovers the box without a USB cable.

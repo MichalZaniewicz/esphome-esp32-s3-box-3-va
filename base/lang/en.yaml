@@ -37,6 +37,11 @@ substitutions:
 
   # --- Bare-core status screens (shown when no character package claims a phase)
   text_starting: "Starting..."
+  text_hello: "Hello"
+  text_hello_morning: "Good morning"
+  text_hello_afternoon: "Good afternoon"
+  text_hello_evening: "Good evening"
+  text_hello_sub: "How can I help?"
   text_no_wifi: "No Wi-Fi"
   text_no_ha: "No Home Assistant"
   status_idle: "Ready"

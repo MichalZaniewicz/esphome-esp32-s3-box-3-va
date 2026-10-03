@@ -84,6 +84,14 @@ substitutions:
   # its step and limits off the entity, so there is nothing else to set.
   # climate_entity: climate.living_room
 
+  # --- Night mode (in the core, off until switched on in Home Assistant) ------
+  # Dims the screen on a schedule and brings it up for a conversation, a ringing
+  # timer or a touch. These are only the starting values; all three are live
+  # entities in Home Assistant once flashed.
+  # night_start_default: '22:00:00'
+  # night_end_default: '06:30:00'
+  # night_level_default: '30'      # % of Screen brightness (gamma corrected)
+
 packages:
   core:
     url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
@@ -103,6 +111,9 @@ packages:
     # - base/screens/canvas.yaml      # optional: a "Draw on screen" text entity -
     #                                 #   Home Assistant draws shapes/text on the
     #                                 #   idle screen; needs nothing else
+    # - base/screens/notify.yaml      # optional: notifications from Home
+    #                                 #   Assistant over any screen; needs
+    #                                 #   nothing else
       - base/faces/${assistant}.yaml  # the assistant; it pulls in what it needs
     # - base/faces/picker.yaml        # optional: switch character from HA, see above
       - base/lang/${language}.yaml    # keep the language last

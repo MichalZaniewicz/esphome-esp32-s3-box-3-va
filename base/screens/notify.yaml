@@ -1,0 +1,139 @@
+###############################################################################
+# Notify: a message from Home Assistant, shown over whatever is on screen.
+#
+# Not a page. The card sits on LVGL's top layer, the same layer the timer bar
+# lives on, so it appears over the clock, the character, a conversation or any
+# carousel screen without changing which one is current - when it goes away you
+# are exactly where you were.
+#
+# One native API action, `show_notification` (in Home Assistant:
+# `esphome.<your device name>_show_notification`), with two fields:
+#
+#   message   the text. Wraps onto as many lines as it needs; keep it short,
+#             it is read from across a kitchen.
+#   seconds   how long it stays up. 0 keeps it until someone taps it.
+#
+# And `hide_notification`, no fields, for an automation that knows the thing
+# it announced is over (the door was answered, the washer was emptied).
+#
+# A tap on the card dismisses it. With night mode on, a notification brings a
+# dimmed screen up for as long as it shows (capped at a minute for one that
+# waits for a tap), the same way a touch does.
+#
+# It is silent on purpose. Sound belongs to Home Assistant, which already knows
+# how to announce on this box or any speaker in the house; this only shows.
+#
+# NEEDS NOTHING BUT base/core.yaml.
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/notify.yaml
+#
+# Example automation action:
+#
+#   - action: esphome.kitchen_show_notification
+#     data:
+#       message: "Pranie skończone"
+#       seconds: 30
+###############################################################################
+substitutions:
+  notify_font_size: '24'
+  notify_bg_color: '0xFFFFFF'
+  notify_text_color: '0x000000'
+  notify_accent_color: '0xFFB347'   # the strip down the card's left edge
+
+font:
+  - id: font_notify
+    file:
+      type: gfonts
+      family: ${font_family}
+      weight: 500
+    size: ${notify_font_size}
+    glyphsets:
+      - ${font_glyphsets}
+    extras:
+      - file:
+          type: gfonts
+          family: ${font_family}
+          weight: 500
+        glyphs: ${extra_glyphs}
+
+api:
+  services:
+    - service: show_notification
+      variables:
+        message: string
+        seconds: int
+      then:
+        - script.execute:
+            id: notify_show
+            message: !lambda 'return message;'
+            seconds: !lambda 'return seconds;'
+    - service: hide_notification
+      then:
+        - script.stop: notify_show
+        - lvgl.widget.hide: notify_card
+
+script:
+  # `restart`: a second notification replaces the first and gets its own full
+  # time on screen, instead of being cut short by the first one's timer.
+  - id: notify_show
+    mode: restart
+    parameters:
+      message: string
+      seconds: int
+    then:
+      - lvgl.label.update:
+          id: notify_text
+          text: !lambda 'return message;'
+      - lvgl.widget.show: notify_card
+      - lambda: |-
+          // Night mode: keep the screen up while this is showing.
+          const uint32_t ms = seconds > 0 ? (uint32_t) seconds * 1000 : 60000;
+          id(night_wake_until) = millis() + (ms < 60000 ? ms : 60000);
+          id(night_apply).execute();
+      - if:
+          condition:
+            lambda: 'return seconds > 0;'
+          then:
+            - delay: !lambda 'return (uint32_t) seconds * 1000;'
+            - lvgl.widget.hide: notify_card
+
+lvgl:
+  top_layer:
+    widgets:
+      # Declared after the core's timer widgets, so it draws over them.
+      - obj:
+          id: notify_card
+          hidden: true
+          align: CENTER
+          width: 296
+          height: SIZE_CONTENT
+          bg_color: ${notify_bg_color}
+          bg_opa: COVER
+          radius: 14
+          border_side: LEFT
+          border_width: 8
+          border_color: ${notify_accent_color}
+          # No shadow: LVGL renders one as a blurred mask every time the card
+          # redraws, far dearer than the card itself. The accent strip and the
+          # white on a mostly dark UI already separate it.
+          shadow_width: 0
+          pad_all: 16
+          pad_left: 22
+          scrollable: false
+          on_click:
+            - script.stop: notify_show
+            - lvgl.widget.hide: notify_card
+          widgets:
+            - label:
+                id: notify_text
+                align: CENTER
+                width: 100%
+                long_mode: WRAP
+                text_align: CENTER
+                text: ""
+                text_font: font_notify
+                text_color: ${notify_text_color}

@@ -31,6 +31,11 @@ substitutions:
 
   # --- Ekrany statusu gołego rdzenia (gdy żaden pakiet postaci nie przejmie fazy)
   text_starting: "Uruchamianie..."
+  text_hello: "Cześć"
+  text_hello_morning: "Dzień dobry"
+  text_hello_afternoon: "Dzień dobry"
+  text_hello_evening: "Dobry wieczór"
+  text_hello_sub: "W czym mogę pomóc?"
   text_no_wifi: "Brak Wi-Fi"
   text_no_ha: "Brak Home Assistant"
   status_idle: "Gotowy"
