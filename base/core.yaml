@@ -100,9 +100,10 @@ substitutions:
   wake_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/wake.wav
 
   # Played once, when the box is first ready after a boot, if the "Boot sound"
-  # switch is on. 0.6 s, two soft bell tones. Skipped while night mode has the
+  # switch is on. The same 3.5 s chime the Waveshare satellite ships (11 KB
+  # MP3), so a house with both hears one sound. Skipped while night mode has the
   # screen dimmed, so a power cut at 3 am does not chime the house awake.
-  boot_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/boot.wav
+  boot_sound_file: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/raw/main/base/sounds/boot.mp3
 
   # Input gain for the wake word only (1-64). See the micro_wake_word block for
   # why this exists and why it is not 1.
@@ -1904,6 +1905,46 @@ script:
             if (t.hour >= 12 && t.hour < 18) return std::string("${text_hello_afternoon}");
             return std::string("${text_hello_evening}");
       - script.execute: draw_display
+      # The entrance, and the exit at the 3 s mark. LVGL's own animations, so they run
+      # in its timer and only ever redraw the three small widgets they touch:
+      # the greeting fades in rising 12 px, an accent line grows out from the
+      # centre under it, the subtitle follows, and all three fade before the
+      # idle screen takes over, so there is no hard cut. All start at opa 0
+      # (see page_hello) so nothing flashes up before its animation.
+      - lambda: |-
+          auto fade_in  = [](void *o, int32_t v) { lv_obj_set_style_opa((lv_obj_t *) o, (lv_opa_t) v, 0); };
+          // A second callback for the exit, not a reuse of fade_in: LVGL
+          // replaces a running animation that has the same widget AND the
+          // same callback, so a shared one would cancel the entrance. It counts
+          // the other way (0..255 -> opaque..clear) so its body differs too -
+          // two identical functions can be folded into one address by the
+          // linker, which would quietly bring the clash back.
+          auto fade_out = [](void *o, int32_t v) { lv_obj_set_style_opa((lv_obj_t *) o, (lv_opa_t) (255 - v), 0); };
+          auto rise = [](void *o, int32_t v) { lv_obj_set_style_translate_y((lv_obj_t *) o, v, 0); };
+          auto grow = [](void *o, int32_t v) { lv_obj_set_width((lv_obj_t *) o, v); };
+          auto run = [](lv_obj_t *obj, lv_anim_exec_xcb_t cb, int32_t from, int32_t to,
+                        uint32_t ms, uint32_t delay, lv_anim_path_cb_t path) {
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, obj);
+            lv_anim_set_exec_cb(&a, cb);
+            lv_anim_set_values(&a, from, to);
+            lv_anim_set_duration(&a, ms);
+            lv_anim_set_delay(&a, delay);
+            // A delayed animation would otherwise write its START value at
+            // once - the exit's "fully visible" at t=0, flashing the subtitle
+            // up before its own fade-in.
+            lv_anim_set_early_apply(&a, delay == 0);
+            lv_anim_set_path_cb(&a, path);
+            lv_anim_start(&a);
+          };
+          lv_obj_t *text = id(hello_text), *line = id(hello_line), *sub = id(hello_sub);
+          run(text, fade_in, 0, 255, 500, 0,   lv_anim_path_ease_out);
+          run(text, rise,   12,   0, 600, 0,   lv_anim_path_ease_out);
+          run(line, grow,    0, 120, 700, 250, lv_anim_path_ease_out);
+          run(sub,  fade_in, 0, 255, 500, 500, lv_anim_path_ease_out);
+          for (lv_obj_t *o : {text, line, sub})
+            run(o, fade_out, 0, 255, 400, 3000, lv_anim_path_ease_in);
       - if:
           condition:
             and:
@@ -1913,7 +1954,7 @@ script:
             - media_player.speaker.play_on_device_media_file:
                 media_file: boot_sound
                 announcement: true
-      - delay: 3s
+      - delay: 3500ms
       - lambda: id(hello_active) = false;
       - script.execute: draw_display
 
@@ -3215,8 +3256,9 @@ lvgl:
             text_font: font_body
             text_color: 0xFF4D4D
 
-    # Hello, for three seconds after boot. Same black and accent as the boot
-    # screen it follows, so the two read as one sequence.
+    # Hello, for 3.5 seconds after boot. Same black and accent as the boot
+    # screen it follows, so the two read as one sequence. Every widget starts
+    # invisible; hello_show animates them in and out.
     - id: page_hello
       skip: true          # system page, never a carousel stop
       bg_color: 0x000000
@@ -3225,12 +3267,27 @@ lvgl:
             id: hello_text
             align: CENTER
             y: -14
+            opa: TRANSP
             text: "${text_hello}"
             text_font: font_hello
             text_color: ${accent_color}
-        - label:
+        - obj:
+            id: hello_line
             align: CENTER
-            y: 28
+            y: 12
+            width: 0
+            height: 2
+            radius: 1
+            bg_color: ${accent_color}
+            bg_opa: COVER
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+        - label:
+            id: hello_sub
+            align: CENTER
+            y: 32
+            opa: TRANSP
             text: "${text_hello_sub}"
             text_font: font_body
             text_color: 0x8A8A8A

@@ -306,8 +306,9 @@ their alarm, the touchscreen, the home screen and the animated character.
   and writes the light only when the level actually has to change.
 - **A hello screen and a boot chime.** Once per boot, at the first API
   connection (the moment the box is actually usable), three seconds of a
-  greeting for the time of day, then the idle screen, with `base/sounds/boot.wav`
-  (0.6 s, two bell tones, generated for this repo) under it. The chime has a
+  greeting for the time of day that fades in with an accent line growing under
+  it and fades out again, then the idle screen, with `base/sounds/boot.mp3`
+  under it (the 3.5 s chime the Waveshare satellite ships). The chime has a
   `Boot sound` switch and is skipped while night mode has the screen dimmed. HA
   restarting does not repeat it. The greeting is in the language packages.
 - **Notifications** (`base/screens/notify.yaml`): `show_notification(message,

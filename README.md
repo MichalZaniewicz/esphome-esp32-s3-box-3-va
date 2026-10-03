@@ -54,7 +54,7 @@ which silently removes any <img> placed inside it. -->
   button so that screen taps belong to the UI rather than fighting a full-screen
   tap-to-talk target.
 - **A hello on boot**: after "Starting...", three seconds of "Good morning" (or
-  afternoon, or evening) and a short two-tone chime, then the idle screen. The
+  afternoon, or evening) and a short chime, then the idle screen. The
   chime has its own switch and stays quiet at night.
 - **Night mode**: the screen dims on a schedule (22:00 to 06:30 by default,
   set live from Home Assistant) and comes back up for a conversation, a
