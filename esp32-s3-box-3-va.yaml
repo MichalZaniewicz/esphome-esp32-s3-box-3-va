@@ -83,6 +83,10 @@ substitutions:
   # Thermostat: target and current temperature, two arrows, three modes. Reads
   # its step and limits off the entity, so there is nothing else to set.
   # climate_entity: climate.living_room
+  #
+  # Shopping list: what is still to buy on a to-do list, scrolling when long.
+  # Needs "Allow the device to perform Home Assistant actions", like media.
+  # shopping_entity: todo.shopping_list
 
   # --- Night mode (in the core, off until switched on in Home Assistant) ------
   # Dims the screen on a schedule and brings it up for a conversation, a ringing
@@ -103,6 +107,7 @@ packages:
     # - base/screens/media.yaml       # optional: what is playing, one swipe sideways
     # - base/screens/weather.yaml     # optional: now and the week, next along
     # - base/screens/climate.yaml     # optional: the thermostat, next along
+    # - base/screens/shopping.yaml    # optional: the shopping list, next along
     # - base/screens/home-styles.yaml # optional: 40 looks for the home screen,
     #                                 #   switched live from Home Assistant
     # - base/screens/show-screen.yaml # optional: four "Show ... screen" buttons

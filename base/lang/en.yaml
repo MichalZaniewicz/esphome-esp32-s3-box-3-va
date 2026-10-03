@@ -61,3 +61,8 @@ substitutions:
   crt_timer_text: "** TIMER FINISHED **"
   crt_error_text: "** ERROR **"
   crt_think_text: "thinking"
+
+  # --- Shopping list screen (base/screens/shopping.yaml) ---------------------
+  shopping_title: "Shopping list"
+  shopping_empty: "Nothing to buy"
+  shopping_more: "more"

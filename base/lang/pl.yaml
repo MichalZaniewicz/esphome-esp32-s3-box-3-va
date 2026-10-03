@@ -72,3 +72,8 @@ substitutions:
   # Oba napisy wchodzą w miejsce tytułu utworu, więc szerokość ta sama: 292 px.
   media_idle_text: "Nic nie gra"
   media_unknown_title: "Bez tytułu"
+
+  # --- Ekran listy zakupów (base/screens/shopping.yaml) ---------------------
+  shopping_title: "Lista zakupów"
+  shopping_empty: "Nic do kupienia"
+  shopping_more: "więcej"
