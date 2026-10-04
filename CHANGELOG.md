@@ -1,22 +1,5 @@
 # Changelog
 
-## [1.2.0] - 2026-10-04
-
-A Home Assistant blueprint for notifications. Tagged `v1.2.0`; the example
-config now pins this tag. The firmware is unchanged from 1.1.0.
-
-### Added
-
-- **`blueprints/script/box_notification.yaml`**, a script blueprint that sends
-  a report in one call: it shows a full-screen notification on the box and,
-  when speakers and a TTS engine are set, says the same text on them, raising
-  the volume for the message and restoring each speaker's own level after
-  (or a fallback level for speaker groups, such as Google Cast, that do not
-  report one). The text is either the `message` field or written by a
-  conversation agent from a `prompt`. The box step uses `continue_on_error`,
-  so an offline box never stops the spoken part. One-click import from the
-  README. Tested on the kitchen box: agent-written text reached the screen.
-
 ## [1.1.0] - 2026-10-04
 
 Feature release: night mode, full-screen notifications, a shopping list screen

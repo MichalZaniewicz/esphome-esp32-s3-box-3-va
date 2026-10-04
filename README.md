@@ -20,7 +20,7 @@ which silently removes any <img> placed inside it. -->
 
 [![Star this repo](https://img.shields.io/github/stars/MichalZaniewicz/esphome-esp32-s3-box-3-va?style=for-the-badge&logo=github&label=STAR%20THIS%20REPO&labelColor=555555&color=ffc107)](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va) [![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
 
-> **Status: v1.2.0, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
+> **Status: v1.1.0, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
 > pipeline, full duplex audio with barge-in, voice timers with their alarm, the
 > touchscreen, the animated character, the home, settings, media, weather,
 > thermostat and shopping list screens, notifications, night mode and the hello
@@ -317,8 +317,6 @@ scripts/
   gen_canvas_example.py    # redraws base/assets/canvas-example.png from a canvas.yaml spec
   gen_notify_shopping.py   # redraws base/assets/notify.png and shopping.png
   gen_shopping.py          # writes base/screens/shopping.yaml (its 20-row pool)
-blueprints/
-  script/box_notification.yaml  # show a notification on the box and say it on speakers
   esplog.py                # stream device logs over the native API
   flash.py                 # compile + OTA, but refuses to upload if the SSID
                            #   compiled into main.cpp looks like a placeholder
@@ -789,30 +787,6 @@ from an automation that knows the thing is over.
     seconds: -1          # stays until someone has seen it
   continue_on_error: true  # the announcement still plays if the box is offline
 ```
-
-### The blueprint: show it and say it, in one call
-
-[![Import the blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FMichalZaniewicz%2Fesphome-esp32-s3-box-3-va%2Fblob%2Fmain%2Fblueprints%2Fscript%2Fbox_notification.yaml)
-
-[`blueprints/script/box_notification.yaml`](blueprints/script/box_notification.yaml)
-is a script blueprint that does the whole report: it shows the notification on the
-box and, if you give it speakers and a text-to-speech engine, says the same text
-there, raising the volume for the message and putting it back afterwards. Pass a
-`message`, or a `prompt` and let a conversation agent write it:
-
-```yaml
-- action: script.box_notification        # the script you created from the blueprint
-  data:
-    title: "Dishwasher is done"
-    prompt: "Say in one short sentence that the dishwasher has finished."
-    icon: dishwasher
-    seconds: -1
-```
-
-Set up once: the Box's ESPHome name (the part between `esphome.` and
-`_show_notification`), and optionally speakers, a TTS engine and voice, the
-announcement volume, a fallback volume for speaker groups that do not report
-theirs, and the conversation agent.
 
 It is silent on purpose: sound stays with Home Assistant's own announce, so the
 speakers say it and the box shows it. It never switches the screen on, so if
