@@ -1,32 +1,46 @@
 ###############################################################################
-# Notify: a message from Home Assistant, shown over whatever is on screen.
+# Notify: a message from Home Assistant, taking over the whole screen.
 #
-# Not a page. The card sits on LVGL's top layer, the same layer the timer bar
-# lives on, so it appears over the clock, the character, a conversation or any
-# carousel screen without changing which one is current - when it goes away you
-# are exactly where you were.
+# A big icon in the accent colour, a large title, the details under it, and a
+# countdown bar along the bottom edge. It sits on LVGL's top layer, the same
+# layer the timer bar lives on, so the page underneath never changes: when it
+# goes away you are exactly where you were. Readable from across a kitchen.
 #
 # One native API action, `show_notification` (in Home Assistant:
-# `esphome.<your device name>_show_notification`), with two fields:
+# `esphome.<your device name>_show_notification`), with four fields. Home
+# Assistant makes every field of an ESPHome action required, so pass an empty
+# string for the ones you do not need:
 #
-#   message   the text. Wraps onto as many lines as it needs; keep it short,
-#             it is read from across a kitchen.
-#   seconds   how long it stays up. 0 keeps it until someone taps it.
+#   title     the big line. Wraps onto a second line if it has to.
+#   message   the smaller line under it. "" leaves it out.
+#   icon      one of the names below. "" (or a name not on the list) is a bell.
+#   seconds   how long it stays up, with the bar counting it down. 0 uses the
+#             "Notification time" setting (a slider in Home Assistant, 15 s
+#             on a fresh flash). -1 keeps it, without a bar, until someone
+#             taps it - as does a Notification time of 0.
 #
-# And `hide_notification`, no fields, for an automation that knows the thing
-# it announced is over (the door was answered, the washer was emptied).
+#   bell  washer  dryer  dishwasher  stove  food  timer  door  doorbell
+#   package  phone  car  cart  trash  vacuum  leak  rain  thermometer
+#   light  info  alert  check
 #
-# A tap on the card dismisses it. With night mode on, a notification brings a
+# And `hide_notification`, no fields, for an automation that knows the thing it
+# announced is over (the door was answered, the washer was emptied).
+#
+# A tap anywhere dismisses it. With night mode on, a notification brings a
 # dimmed screen up for as long as it shows (capped at a minute for one that
 # waits for a tap), the same way a touch does.
 #
 # It never switches the screen on. If something turns the backlight off when
 # the room is empty (a motion automation, say), a short notification can come
-# and go unseen; use `seconds: 0` for anything that must be read, and it will
+# and go unseen; use `seconds: -1` for anything that must be read, and it will
 # be waiting when the screen comes back.
 #
 # It is silent on purpose. Sound belongs to Home Assistant, which already knows
 # how to announce on this box or any speaker in the house; this only shows.
+#
+# COST. Showing it repaints the whole screen once. After that only the 4 px
+# countdown bar redraws, driven by an LVGL animation, so a 30-second
+# notification is a thin strip being repainted, not the screen.
 #
 # NEEDS NOTHING BUT base/core.yaml.
 #
@@ -40,46 +54,104 @@
 #
 #   - action: esphome.kitchen_show_notification
 #     data:
-#       message: "Pranie skończone"
-#       seconds: 30
+#       title: "Pranie skończone"
+#       message: "Wyjmij je z pralki"
+#       icon: washer
+#       seconds: 0          # the Notification time slider
 ###############################################################################
 substitutions:
-  notify_font_size: '24'
-  notify_bg_color: '0xFFFFFF'
-  notify_text_color: '0x000000'
-  notify_accent_color: '0xFFB347'   # the strip down the card's left edge
+  notify_bg_color: '0x000000'
+  notify_icon_color: ${accent_color}
+  notify_title_color: '0xFFFFFF'
+  notify_message_color: '0xA9A9B0'
+  notify_bar_color: ${accent_color}
+  notify_track_color: '0x1D1D21'
+  notify_seconds_default: '15'   # the "Notification time" slider on a fresh flash
+
+globals:
+  # The duration this notification actually got, after `seconds: 0` has been
+  # resolved against the slider. 0 here means "until tapped".
+  - id: notify_secs
+    type: int
+    restore_value: false
+    initial_value: '0'
+
+number:
+  - platform: template
+    id: notify_time
+    name: Notification time
+    icon: mdi:timer-sand
+    entity_category: config
+    unit_of_measurement: s
+    mode: slider
+    min_value: 0
+    max_value: 120
+    step: 5
+    initial_value: ${notify_seconds_default}
+    optimistic: true
+    restore_value: true
 
 font:
-  - id: font_notify
+  - id: font_notify_title
     file:
       type: gfonts
       family: ${font_family}
-      weight: 500
-    size: ${notify_font_size}
+      weight: 700
+    size: 26
     glyphsets:
       - ${font_glyphsets}
     extras:
       - file:
           type: gfonts
           family: ${font_family}
-          weight: 500
+          weight: 700
         glyphs: ${extra_glyphs}
+  - id: font_notify_icon
+    file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    size: 56
+    bpp: 4
+    glyphs:
+      - "\U000F009C"   # bell-outline
+      - "\U000F072A"   # washing-machine
+      - "\U000F0917"   # tumble-dryer
+      - "\U000F0AAC"   # dishwasher
+      - "\U000F04DE"   # stove
+      - "\U000F025A"   # food
+      - "\U000F051B"   # timer-outline
+      - "\U000F081C"   # door-open
+      - "\U000F12E6"   # doorbell
+      - "\U000F03D7"   # package-variant-closed
+      - "\U000F03F2"   # phone
+      - "\U000F010B"   # car
+      - "\U000F0111"   # cart-outline
+      - "\U000F0A7A"   # trash-can-outline
+      - "\U000F070D"   # robot-vacuum
+      - "\U000F1502"   # water-alert
+      - "\U000F0596"   # weather-pouring
+      - "\U000F050F"   # thermometer
+      - "\U000F0336"   # lightbulb-outline
+      - "\U000F02FD"   # information-outline
+      - "\U000F002A"   # alert-outline
+      - "\U000F05E1"   # check-circle-outline
 
 api:
   services:
     - service: show_notification
       variables:
+        title: string
         message: string
+        icon: string
         seconds: int
       then:
         - script.execute:
             id: notify_show
+            title: !lambda 'return title;'
             message: !lambda 'return message;'
+            icon: !lambda 'return icon;'
             seconds: !lambda 'return seconds;'
     - service: hide_notification
       then:
-        - script.stop: notify_show
-        - lvgl.widget.hide: notify_card
+        - script.execute: notify_hide
 
 script:
   # `restart`: a second notification replaces the first and gets its own full
@@ -87,58 +159,164 @@ script:
   - id: notify_show
     mode: restart
     parameters:
+      title: string
       message: string
+      icon: string
       seconds: int
     then:
-      - lvgl.label.update:
-          id: notify_text
-          text: !lambda 'return message;'
-      - lvgl.widget.show: notify_card
       - lambda: |-
+          // 0 = the slider, negative = until tapped; the slider's own 0 also
+          // means until tapped.
+          int secs = seconds == 0 ? (int) id(notify_time).state : seconds;
+          id(notify_secs) = secs > 0 ? secs : 0;
+          static const struct { const char *name, *glyph; } ICONS[] = {
+            {"bell", "\U000F009C"},       {"washer", "\U000F072A"},   {"dryer", "\U000F0917"},
+            {"dishwasher", "\U000F0AAC"}, {"stove", "\U000F04DE"},    {"food", "\U000F025A"},
+            {"timer", "\U000F051B"},      {"door", "\U000F081C"},     {"doorbell", "\U000F12E6"},
+            {"package", "\U000F03D7"},    {"phone", "\U000F03F2"},    {"car", "\U000F010B"},
+            {"cart", "\U000F0111"},       {"trash", "\U000F0A7A"},    {"vacuum", "\U000F070D"},
+            {"leak", "\U000F1502"},       {"rain", "\U000F0596"},     {"thermometer", "\U000F050F"},
+            {"light", "\U000F0336"},      {"info", "\U000F02FD"},     {"alert", "\U000F002A"},
+            {"check", "\U000F05E1"},
+          };
+          const char *glyph = ICONS[0].glyph;
+          for (const auto &i : ICONS)
+            if (icon == i.name) { glyph = i.glyph; break; }
+          lv_label_set_text(id(notify_icon), glyph);
+
+          lv_label_set_text(id(notify_title), title.c_str());
+          lv_label_set_text(id(notify_message), message.c_str());
+          if (message.empty()) lv_obj_add_flag(id(notify_message), LV_OBJ_FLAG_HIDDEN);
+          else lv_obj_remove_flag(id(notify_message), LV_OBJ_FLAG_HIDDEN);
+
+          // Stack icon, title and message as one group centred on the screen,
+          // measured after the text is in: a title that wraps to two lines
+          // pushes the message down instead of running into it.
+          // Unhidden first so the measuring sees real sizes; nothing is drawn
+          // until this lambda returns, so there is no flash of the old layout.
+          lv_obj_remove_flag(id(notify_screen), LV_OBJ_FLAG_HIDDEN);
+          lv_obj_update_layout(id(notify_screen));
+          const int32_t ih = lv_obj_get_height(id(notify_icon));
+          const int32_t th = lv_obj_get_height(id(notify_title));
+          const int32_t mh = message.empty() ? 0 : lv_obj_get_height(id(notify_message)) + 8;
+          int32_t y = (240 - 4 - (ih + 6 + th + mh)) / 2;
+          if (y < 4) y = 4;
+          lv_obj_set_y(id(notify_icon), y);
+          lv_obj_set_y(id(notify_title), y + ih + 6);
+          lv_obj_set_y(id(notify_message), y + ih + 6 + th + 8);
+
+          // The countdown: one LVGL animation from full to empty over the
+          // whole duration, repainting only the 4 px bar. None for a
+          // notification that waits for a tap.
+          lv_obj_t *bar = id(notify_bar), *track = id(notify_track);
+          lv_anim_delete(bar, nullptr);
+          if (id(notify_secs) > 0) {
+            lv_bar_set_value(bar, 1000, LV_ANIM_OFF);
+            lv_obj_remove_flag(bar, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_remove_flag(track, LV_OBJ_FLAG_HIDDEN);
+            lv_anim_t a;
+            lv_anim_init(&a);
+            lv_anim_set_var(&a, bar);
+            lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_bar_set_value((lv_obj_t *) o, v, LV_ANIM_OFF); });
+            lv_anim_set_values(&a, 1000, 0);
+            lv_anim_set_duration(&a, (uint32_t) id(notify_secs) * 1000);
+            lv_anim_start(&a);
+          } else {
+            lv_obj_add_flag(bar, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(track, LV_OBJ_FLAG_HIDDEN);
+          }
+
           // Night mode: keep the screen up while this is showing.
-          const uint32_t ms = seconds > 0 ? (uint32_t) seconds * 1000 : 60000;
+          const uint32_t ms = id(notify_secs) > 0 ? (uint32_t) id(notify_secs) * 1000 : 60000;
           id(night_wake_until) = millis() + (ms < 60000 ? ms : 60000);
           id(night_apply).execute();
       - if:
           condition:
-            lambda: 'return seconds > 0;'
+            lambda: 'return id(notify_secs) > 0;'
           then:
-            - delay: !lambda 'return (uint32_t) seconds * 1000;'
-            - lvgl.widget.hide: notify_card
+            - delay: !lambda 'return (uint32_t) id(notify_secs) * 1000;'
+            - script.execute: notify_hide
+
+  - id: notify_hide
+    then:
+      - script.stop: notify_show
+      - lambda: |-
+          lv_anim_delete(id(notify_bar), nullptr);
+          lv_obj_add_flag(id(notify_screen), LV_OBJ_FLAG_HIDDEN);
 
 lvgl:
   top_layer:
     widgets:
-      # Declared after the core's timer widgets, so it draws over them.
+      # Declared after the core's timer widgets, so it covers them.
       - obj:
-          id: notify_card
+          id: notify_screen
           hidden: true
-          align: CENTER
-          width: 296
-          height: SIZE_CONTENT
+          x: 0
+          y: 0
+          width: 320
+          height: 240
+          radius: 0
           bg_color: ${notify_bg_color}
           bg_opa: COVER
-          radius: 14
-          border_side: LEFT
-          border_width: 8
-          border_color: ${notify_accent_color}
-          # No shadow: LVGL renders one as a blurred mask every time the card
-          # redraws, far dearer than the card itself. The accent strip and the
-          # white on a mostly dark UI already separate it.
-          shadow_width: 0
-          pad_all: 16
-          pad_left: 22
+          border_width: 0
+          pad_all: 0
           scrollable: false
           on_click:
-            - script.stop: notify_show
-            - lvgl.widget.hide: notify_card
+            - script.execute: notify_hide
           widgets:
             - label:
-                id: notify_text
-                align: CENTER
-                width: 100%
+                id: notify_icon
+                align: TOP_MID
+                y: 40
+                text: "\U000F009C"
+                text_font: font_notify_icon
+                text_color: ${notify_icon_color}
+            - label:
+                id: notify_title
+                align: TOP_MID
+                y: 102
+                width: 290
                 long_mode: WRAP
                 text_align: CENTER
                 text: ""
-                text_font: font_notify
-                text_color: ${notify_text_color}
+                text_font: font_notify_title
+                text_color: ${notify_title_color}
+            - label:
+                id: notify_message
+                align: TOP_MID
+                y: 158
+                width: 290
+                long_mode: WRAP
+                text_align: CENTER
+                text: ""
+                text_font: font_body
+                text_color: ${notify_message_color}
+            - obj:
+                id: notify_track
+                hidden: true
+                align: BOTTOM_MID
+                width: 320
+                height: 4
+                radius: 0
+                bg_color: ${notify_track_color}
+                bg_opa: COVER
+                border_width: 0
+                pad_all: 0
+                clickable: false
+            - bar:
+                id: notify_bar
+                hidden: true
+                align: BOTTOM_LEFT
+                width: 320
+                height: 4
+                min_value: 0
+                max_value: 1000
+                value: 1000
+                radius: 0
+                bg_opa: TRANSP
+                border_width: 0
+                pad_all: 0
+                clickable: false
+                indicator:
+                  bg_color: ${notify_bar_color}
+                  radius: 0
