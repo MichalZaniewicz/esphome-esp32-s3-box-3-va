@@ -47,6 +47,10 @@ tag. Built and confirmed on hardware with ESPHome 2026.7.1 and 2026.9.1.
   latch into an I2S error state it does not leave on its own while WiFi and the
   API stay healthy; a reboot from HA now recovers the box without a USB cable.
 
+- **Documentation**: README sections for Notifications, Shopping list and Night
+  mode, with screenshots of both new screens (`scripts/gen_notify_shopping.py`),
+  and an up-to-date repository layout.
+
 ### Fixed
 
 - **The onboard speaker was quiet at "100%".** `volume_max` had sat at `0.8`

@@ -20,10 +20,11 @@ which silently removes any <img> placed inside it. -->
 
 [![Star this repo](https://img.shields.io/github/stars/MichalZaniewicz/esphome-esp32-s3-box-3-va?style=for-the-badge&logo=github&label=STAR%20THIS%20REPO&labelColor=555555&color=ffc107)](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va) [![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
 
-> **Status: running on an ESP32-S3-BOX-3.** Wake word, the full Assist pipeline,
-> full duplex audio with barge-in, voice timers with their alarm, the
-> touchscreen, the animated character, the home, settings, media, weather and
-> thermostat screens are all confirmed on device with ESPHome 2026.7.1. The
+> **Status: v1.1.0, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
+> pipeline, full duplex audio with barge-in, voice timers with their alarm, the
+> touchscreen, the animated character, the home, settings, media, weather,
+> thermostat and shopping list screens, notifications, night mode and the hello
+> screen are all confirmed on device, built with ESPHome 2026.9.1. The
 > shipped thin config - core plus one character - measures **flash 27.0%, RAM
 > 41.3%**, up from 25.3%/39.9% before the full-duplex migration; the
 > four-characters-plus-every-optional-screen figure predates that migration
@@ -268,9 +269,19 @@ esp32-s3-box-3-va.yaml     # YOUR config: copy + edit this (pulls the rest from 
 secrets.example.yaml       # copy to secrets.yaml
 base/
   core.yaml                # the always-on core, pulled as a remote package
-  screens/
-    home.yaml              # optional home screen: clock, date, climate
-    face.yaml              # optional animated assistant face (the engine)
+  screens/                 # every one optional; see Screens below
+    home.yaml              # home screen: clock, date, climate
+    home-styles.yaml       # 40 live looks for the home screen
+    face.yaml              # animated assistant face (the engine)
+    settings.yaml          # settings, one swipe down from home
+    media.yaml             # carousel: what is playing
+    weather.yaml           # carousel: now and the week
+    climate.yaml           # carousel: the thermostat
+    shopping.yaml          # carousel: the shopping list (generated, scripts/gen_shopping.py)
+    notify.yaml            # full-screen notifications from Home Assistant
+    show-screen.yaml       # "Show ... screen" buttons for voice
+    canvas.yaml            # Home Assistant draws on the screen
+    swipe.yaml, carousel-example.yaml  # templates for your own screens
   faces/
     pip, astro, momo,      # characters; pick one with `assistant:`
     franky, wizard,        #   artwork ones pull the face engine themselves
@@ -288,6 +299,7 @@ base/
     en.yaml, pl.yaml       # UI translations; copy en.yaml to add one
   sounds/
     timer_finished.flac    # the timer alarm, compiled into the firmware
+    wake.wav, boot.mp3     # wake beep and the boot chime
 docs/
   HARDWARE.md              # pinout, I2C map, gotchas
 scripts/
@@ -303,6 +315,8 @@ scripts/
   gen_climate.py           # the same for base/assets/climate.png
   gen_home_styles_station.py # redraws the 8 Station previews in base/assets/home-styles/
   gen_canvas_example.py    # redraws base/assets/canvas-example.png from a canvas.yaml spec
+  gen_notify_shopping.py   # redraws base/assets/notify.png and shopping.png
+  gen_shopping.py          # writes base/screens/shopping.yaml (its 20-row pool)
   esplog.py                # stream device logs over the native API
   flash.py                 # compile + OTA, but refuses to upload if the SSID
                            #   compiled into main.cpp looks like a placeholder
@@ -383,6 +397,21 @@ with. Two arrows, a row of modes built from whatever the device says it has, and
 a flame that lights when it is genuinely heating rather than merely willing to:
 
 <p align="center"><img src="base/assets/climate.png" width="300" alt="Thermostat screen"></p>
+
+The **shopping list screen** is the next stop: what is still to buy on a Home
+Assistant to-do list, one row per item. Past five rows the card scrolls with a
+finger, and a scrollbar and a chevron at the bottom say there is more. Adding
+items stays with Assist; the screen keeps itself up to date. How to set it up:
+[Shopping list](#shopping-list) below.
+
+<p align="center"><img src="base/assets/shopping.png" width="300" alt="Shopping list screen"></p>
+
+**Notifications** are not a screen you swipe to: Home Assistant puts them over
+whatever is showing, full screen, with an icon, a title, a line of detail and a
+bar counting down until it goes. How to send one:
+[Notifications](#notifications) below.
+
+<p align="center"><img src="base/assets/notify.png" width="300" alt="A full-screen notification"></p>
 
 Install both `home.yaml` and `face.yaml` and the idle screen has two faces: the
 clock, and the character idling. **Tap the screen to swap between them** -
@@ -729,6 +758,74 @@ by design - see above), which is why this text spells out the exact pixel
 budget instead of leaving it implied. The script's own field description
 carries the identical bounds, so they still apply even if this
 system-prompt text gets trimmed or forgotten later.
+
+## Notifications
+
+Add `base/screens/notify.yaml` (needs nothing else) and Home Assistant gets an
+action, `esphome.<device>_show_notification`, that takes over the screen until
+the message is read or its time runs out. The screen underneath does not change;
+when the notification goes, the box is exactly where it was.
+
+| Field | What to pass |
+|---|---|
+| `title` | The big line. |
+| `message` | The smaller line under it, or `""` for none. |
+| `icon` | `bell`, `washer`, `dryer`, `dishwasher`, `stove`, `food`, `timer`, `door`, `doorbell`, `package`, `phone`, `car`, `cart`, `trash`, `vacuum`, `leak`, `rain`, `thermometer`, `light`, `info`, `alert`, `check`. Anything else is a bell. |
+| `seconds` | `0` uses the **Notification time** slider on the device page (15 s out of the box), `-1` waits for a tap, any other number is that many seconds. |
+
+Home Assistant makes every field required, so pass `""` for the ones you skip.
+A tap anywhere dismisses it, and `esphome.<device>_hide_notification` clears it
+from an automation that knows the thing is over.
+
+```yaml
+# In any automation that already announces something on your speakers:
+- action: esphome.kitchen_show_notification
+  data:
+    title: "Washing done"
+    message: "{{ agent.response.speech.plain.speech }}"   # or any text
+    icon: washer
+    seconds: -1          # stays until someone has seen it
+  continue_on_error: true  # the announcement still plays if the box is offline
+```
+
+It is silent on purpose: sound stays with Home Assistant's own announce, so the
+speakers say it and the box shows it. It never switches the screen on, so if
+something turns the backlight off in an empty room, use `seconds: -1` and the
+message will be waiting. With night mode on it brings the dimmed screen up while
+it shows.
+
+## Shopping list
+
+Add `base/screens/shopping.yaml` after `home.yaml` and name the list:
+
+```yaml
+substitutions:
+  shopping_entity: todo.shopping_list
+```
+
+Nothing else to set up beyond **"Allow the device to perform Home Assistant
+actions"** on the device page, which the media and thermostat screens need too:
+the box asks Home Assistant for the items itself. It refreshes whenever the list
+changes and every time the screen comes into view. "Alexa, add milk to the
+shopping list" already works through Assist; to bring the screen up by voice,
+expose the **Show shopping list** button (see
+[Switch screens by voice](#switch-screens-by-voice)).
+
+## Night mode
+
+Built into the core and **off** until you switch it on. On the device page in
+Home Assistant:
+
+| Entity | What it does |
+|---|---|
+| **Night mode** | On/off. |
+| **Night mode start**, **Night mode end** | The window, 22:00 to 06:30 out of the box. A start later than the end crosses midnight. |
+| **Night brightness** | How dim, as a percentage of the Screen light (30% out of the box). |
+
+Inside the window the screen fades down, and comes back to full brightness for a
+conversation, a ringing timer, a notification or a touch, then fades again. The
+daytime brightness is handed back in the morning. A screen someone switched off
+stays off: night mode never turns it on.
 
 ## Claude Code skill
 
