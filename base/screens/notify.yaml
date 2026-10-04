@@ -54,8 +54,8 @@
 #
 #   - action: esphome.kitchen_show_notification
 #     data:
-#       title: "Pranie skończone"
-#       message: "Wyjmij je z pralki"
+#       title: "Laundry is done"
+#       message: "Time to hang it up"
 #       icon: washer
 #       seconds: 0          # the Notification time slider
 ###############################################################################

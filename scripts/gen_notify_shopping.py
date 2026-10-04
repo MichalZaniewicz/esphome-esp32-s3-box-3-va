@@ -54,8 +54,8 @@ def notify(cache, core):
     d = ImageDraw.Draw(img)
     f_icon, f_title, f_msg = icon_font(cache, 56), gfont(cache, 26, 700), gfont(cache, 16)
 
-    title = wrap(d, "Pranie skończone", f_title, 290)
-    msg = wrap(d, "Pralka skończyła swoje, pranie czeka na rozwieszenie.", f_msg, 290)
+    title = wrap(d, "Laundry is done", f_title, 290)
+    msg = wrap(d, "The washer has finished. Time to hang it up before it creases.", f_msg, 290)
     ih, th, lh = 56, 32 * len(title), 20
     mh = lh * len(msg) + 8
     y = max(4, (H - 4 - (ih + 6 + th + mh)) // 2)   # ten sam wzor co notify_show
@@ -81,8 +81,8 @@ def shopping(cache, core):
     d = ImageDraw.Draw(img)
     f_body, f_row, f_icon = gfont(cache, 16), gfont(cache, 20), icon_font(cache, 20)
     accent, line = rgb(s["shopping_accent_color"]), rgb(s["shopping_line_color"])
-    items = ["Mleko", "Chleb żytni", "Jajka (10 szt.)", "Masło", "Pomidory malinowe",
-             "Kawa ziarnista", "Ziemniaki"]
+    items = ["Milk", "Rye bread", "Eggs (a dozen)", "Butter", "Vine tomatoes",
+             "Coffee beans", "Potatoes"]
 
     # Belka
     d.rectangle((0, 0, W, 33), fill=rgb(s["shopping_bar_color"]))

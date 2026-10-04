@@ -781,7 +781,7 @@ from an automation that knows the thing is over.
 # In any automation that already announces something on your speakers:
 - action: esphome.kitchen_show_notification
   data:
-    title: "Washing done"
+    title: "Laundry is done"
     message: "{{ agent.response.speech.plain.speech }}"   # or any text
     icon: washer
     seconds: -1          # stays until someone has seen it
