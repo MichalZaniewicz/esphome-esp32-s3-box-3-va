@@ -20,7 +20,7 @@ which silently removes any <img> placed inside it. -->
 
 [![Star this repo](https://img.shields.io/github/stars/MichalZaniewicz/esphome-esp32-s3-box-3-va?style=for-the-badge&logo=github&label=STAR%20THIS%20REPO&labelColor=555555&color=ffc107)](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va) [![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
 
-> **Status: v1.1.0, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
+> **Status: v1.1.1, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
 > pipeline, full duplex audio with barge-in, voice timers with their alarm, the
 > touchscreen, the animated character, the home, settings, media, weather,
 > thermostat and shopping list screens, notifications, night mode and the hello

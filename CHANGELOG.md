@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.1] - 2026-10-07
+
+**Switch your config to `ref: main`.** The example config now uses
+`ref: main`, so every rebuild picks up the latest changes. If your
+`esp32-s3-box-3-va.yaml` still has `ref: v1.1.0` (or older) in the `packages:`
+block, change it to `ref: main` once, then `esphome clean` and rebuild.
+
+### Changed
+- **Example config tracks `main`** instead of a pinned tag.
+
 ## [1.1.0] - 2026-10-04
 
 Feature release: night mode, full-screen notifications, a shopping list screen

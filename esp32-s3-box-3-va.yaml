@@ -99,7 +99,7 @@ substitutions:
 packages:
   core:
     url: https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va
-    ref: v1.1.0    # a tagged release, see CHANGELOG.md; `main` always equals the latest one
+    ref: main
     files:
       - base/core.yaml
       - base/screens/home.yaml        # optional: clock, date, climate
