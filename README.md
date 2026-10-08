@@ -20,9 +20,6 @@ which silently removes any <img> placed inside it. -->
 
 [![Star this repo](https://img.shields.io/github/stars/MichalZaniewicz/esphome-esp32-s3-box-3-va?style=for-the-badge&logo=github&label=STAR%20THIS%20REPO&labelColor=555555&color=ffc107)](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va) [![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
 
-
-https://github.com/user-attachments/assets/cfbc72c6-e62a-435a-8931-277a9ca3090a
-
 > **Status: v1.1.1, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
 > pipeline, full duplex audio with barge-in, voice timers with their alarm, the
 > touchscreen, the animated character, the home, settings, media, weather,
@@ -35,8 +32,20 @@ https://github.com/user-attachments/assets/cfbc72c6-e62a-435a-8931-277a9ca3090a
 > character. [CHANGELOG.md](CHANGELOG.md) has the detail, including what
 > turned out to be wrong along the way.
 
+## Don't want to read? Watch the 2-minute video
+
+Setup, the voice pipeline, full duplex and timers, the 28 characters, the
+swipeable screens, the home styles, voice control of the screen,
+notifications and night mode, with voice-over and subtitles.
+
+🔊 The player starts muted, so click the speaker icon for the voice-over.
+
+https://github.com/user-attachments/assets/cfbc72c6-e62a-435a-8931-277a9ca3090a
+
 ## What it does
+
 ![Trailer: the voice assistant with its animated character, the swipeable screens, the home styles and the Home Assistant controls](docs/trailer.webp)
+
 - **Voice assistant**: on-device wake word (`alexa`, `okay nabu`, `hey jarvis`,
   pick one in Home Assistant) via
   `micro_wake_word`, the full Home Assistant Assist pipeline (STT / LLM / TTS),
