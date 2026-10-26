@@ -684,7 +684,13 @@ datetime:
 ###############################################################################
 
 external_components:
-  - source: github://n-IA-hane/esphome-audio-stack@v2026.7.0
+  # Our fork of n-IA-hane/esphome-audio-stack: tag v2026.7.0 plus one commit, the
+  # compile-time shim upstream added in v2026.10.3-dev for ESPHome 2026.10 (which
+  # turned RingBuffer::handle_ into a method). Builds on 2026.9.1 and 2026.10.x;
+  # the audio code is otherwise the v2026.7.0 every measurement here was made on.
+  # Go back to upstream once a stable tag carries the fix AND it has had its own
+  # RAM / wake-word / barge-in pass on this board.
+  - source: github://MichalZaniewicz/esphome-audio-stack@v2026.7.0-esphome2026.10
     components: [esp_audio_stack, esp_aec]
     # esp_afe (the fuller ESP-SR front end - noise suppression, AGC, VAD) is
     # deliberately not pulled in. Every false-wake and hit-rate number this
