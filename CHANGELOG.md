@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.2] - 2026-10-26
+
+Fix release: the Box builds on ESPHome 2026.10 again
+([#4](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/issues/4),
+thanks to svenf01 for the report and for testing the fix). Tagged `v1.1.2`;
+the example config tracks `main`, so a normal rebuild picks it up.
+
+### Fixed
+- **Build on ESPHome 2026.10.** 2026.10 turned `RingBuffer::handle_` into a
+  method, and the audio stack this project uses
+  (`n-IA-hane/esphome-audio-stack` v2026.7.0, and its latest stable release)
+  still assigned it as a field, so compilation failed. The core now pulls the
+  audio stack from
+  [`MichalZaniewicz/esphome-audio-stack`](https://github.com/MichalZaniewicz/esphome-audio-stack)
+  tag `v2026.7.0-esphome2026.10`: v2026.7.0 plus the upstream author's own
+  compatibility fix, nothing else. The audio code is unchanged, so every
+  RAM, wake word and barge-in measurement still holds. Builds on ESPHome
+  2026.9.x and 2026.10.x; confirmed on device with both.
+
 ## [1.1.1] - 2026-10-07
 
 **Switch your config to `ref: main`.** The example config now uses

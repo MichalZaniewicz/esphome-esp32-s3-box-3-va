@@ -20,11 +20,12 @@ which silently removes any <img> placed inside it. -->
 
 [![Star this repo](https://img.shields.io/github/stars/MichalZaniewicz/esphome-esp32-s3-box-3-va?style=for-the-badge&logo=github&label=STAR%20THIS%20REPO&labelColor=555555&color=ffc107)](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va) [![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
 
-> **Status: v1.1.1, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
+> **Status: v1.1.2, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
 > pipeline, full duplex audio with barge-in, voice timers with their alarm, the
 > touchscreen, the animated character, the home, settings, media, weather,
 > thermostat and shopping list screens, notifications, night mode and the hello
-> screen are all confirmed on device, built with ESPHome 2026.9.1. The
+> screen are all confirmed on device, built with ESPHome 2026.9.1 (2026.10.0
+> builds and runs too, since v1.1.2). The
 > shipped thin config - core plus one character - measures **flash 27.0%, RAM
 > 41.3%**, up from 25.3%/39.9% before the full-duplex migration; the
 > four-characters-plus-every-optional-screen figure predates that migration
@@ -254,6 +255,7 @@ or smaller face rescales without touching the engine. Details:
 ## Quick start
 
 > Requires **ESPHome 2026.7.0+** - that is where `image:` became a platform component.
+> Built and run on 2026.9.1 and 2026.10.0; 2026.10 needs v1.1.2 or newer.
 
 1. Copy `secrets.example.yaml` to `secrets.yaml` and fill in your Wi-Fi.
 2. Copy **`esp32-s3-box-3-va.yaml`** next to it and edit the `substitutions:` at
