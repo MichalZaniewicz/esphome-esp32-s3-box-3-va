@@ -30,6 +30,20 @@ device, built with ESPHome 2026.10.2.
   false "stop" can never start a conversation. Needs the wake word engine On
   device. A **Stop word** switch on the device page turns it off.
 
+### Fixed
+- **Example config: uncommenting an optional screen broke the YAML.** The
+  commented package lines in `esp32-s3-box-3-va.yaml` sat two columns left of
+  the active ones, so deleting the `# ` left a mis-indented list item. They
+  now line up; each of the ten parses once uncommented. Config file only, no
+  firmware change (on `main` after the tag). If yours fails to validate after
+  uncommenting a screen, indent that line to match `- base/core.yaml`.
+
+### Measured
+- Thin example config (core plus one character): flash 28.3%, RAM 41.6% on
+  ESPHome 2026.10.2, up from 27.0% / 41.3% in 1.1.2. The calendar screen adds
+  about 1.0% flash and 0.4% RAM. Also builds on ESPHome 2026.9.1, calendar
+  included.
+
 ## [1.1.2] - 2026-10-26
 
 Fix release: the Box builds on ESPHome 2026.10 again
