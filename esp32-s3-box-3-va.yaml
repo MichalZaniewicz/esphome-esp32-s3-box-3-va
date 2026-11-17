@@ -88,6 +88,11 @@ substitutions:
   # Needs "Allow the device to perform Home Assistant actions", like media.
   # shopping_entity: todo.shopping_list
 
+  # Calendar: the next few days from one or more calendars, comma separated.
+  # Needs "Allow the device to perform Home Assistant actions", like media.
+  # Pick calendars with a few events a day; a school timetable is too much.
+  # calendar_entities: calendar.family, calendar.personal
+
   # --- Night mode (in the core, off until switched on in Home Assistant) ------
   # Dims the screen on a schedule and brings it up for a conversation, a ringing
   # timer or a touch. These are only the starting values; all three are live
@@ -108,6 +113,7 @@ packages:
     # - base/screens/weather.yaml     # optional: now and the week, next along
     # - base/screens/climate.yaml     # optional: the thermostat, next along
     # - base/screens/shopping.yaml    # optional: the shopping list, next along
+    # - base/screens/calendar.yaml    # optional: the next few days, next along
     # - base/screens/home-styles.yaml # optional: 40 looks for the home screen,
     #                                 #   switched live from Home Assistant
     # - base/screens/show-screen.yaml # optional: four "Show ... screen" buttons

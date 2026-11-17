@@ -182,6 +182,12 @@ substitutions:
   okay_nabu_sliding_window: '3'
   hey_jarvis_probability_cutoff: '0.7'
   hey_jarvis_sliding_window: '3'
+  # The "Stop" word (see STOP WORD under micro_wake_word). The model manifest's
+  # own values, which is also what Home Assistant Voice PE ships. It only runs
+  # while something is ringing, replying or playing, so a false "stop" can at
+  # worst cut a reply short - it can never start a conversation.
+  stop_probability_cutoff: '0.5'
+  stop_sliding_window: '5'
 
   # ---------------------------------------------------------------------------
   # THE SPEAKER THIS ROOM HAS, if it has one besides the box. It is named once
@@ -875,88 +881,122 @@ micro_wake_word:
       id: mww_hey_jarvis
       probability_cutoff: ${hey_jarvis_probability_cutoff}
       sliding_window_size: ${hey_jarvis_sliding_window}
+    # STOP WORD, added 2026-11-17. "Stop" on its own, no "Alexa" first: silences
+    # a ringing timer, cuts a reply short (on the box and on the external
+    # speaker), stops whatever the box itself is playing. The model Home
+    # Assistant Voice PE uses, and the same arrangement:
+    #
+    # - `internal: true` keeps it out of Home Assistant's wake word picker, and
+    #   out of what HA switches on and off: voice_assistant's set-configuration
+    #   handler only walks get_wake_words(), which skips internal models. So the
+    #   one-assistant-one-wake-word choice is untouched.
+    # - It is OFF except while there is something to stop. `stop_word_sync`
+    #   (script, below) switches it on and off. A disabled model is skipped
+    #   per frame and its tensor arena freed, so at rest this costs nothing -
+    #   not inference, not memory. Its arena (21 KB per the manifest) comes from
+    #   RAMAllocator, which takes PSRAM first, so even while it runs it is not
+    #   competing for the internal RAM this board runs short of.
+    # - It is listed LAST on purpose: the component enables only the first model
+    #   by default, and internal models never save an enabled state to flash.
+    #
+    # Only with "Wake word engine location" = On device. In Home Assistant the
+    # box does not run micro_wake_word at all, so there is nothing to hear it.
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+      id: mww_stop
+      internal: true
+      probability_cutoff: ${stop_probability_cutoff}
+      sliding_window_size: ${stop_sliding_window}
   on_wake_word_detected:
-    # Full duplex, so the wake word no longer has to let go of the bus before
-    # the beep plays - this just plays it and waits it out for pacing (the
-    # `wait_until` keeps a longer replacement sound working correctly).
-    #
-    # BARGE-IN, added 2026-07-31. `voice_assistant.start:` below is
-    # `request_start()`, which is a stock-ESPHome no-op unless the component
-    # is already IDLE (confirmed against the compiled source) - so a wake
-    # word heard mid-reply used to do nothing at all, even though mww kept
-    # hearing it fine through the AEC (Michal confirmed: "alexa nie przerywa
-    # tekstu"). Stopping first forces the running response to end (media
-    # player STOP + a stop signal to HA) so the start below actually lands on
-    # an IDLE state instead of being silently dropped.
-    #
-    # RISK, carried over from 2026-07-22: interrupting local playback
-    # mid-flight (`speaker.mute_on`, back then) once hung the NEXT pipeline in
-    # "listening" for reasons never root-caused. This is a different
-    # mechanism (`voice_assistant.stop:`, not muting the codec) but the same
-    # category of "interrupt audio while it is live" - watch for the same
-    # symptom before trusting this broadly.
-    #
-    # TIMER ALARM, added 2026-07-31 after it broke on hardware. `timer_ringing`
-    # never touches `voice_assistant` state at all, so mww keeps running
-    # through it untouched - Michal confirmed "Alexa" gets heard fine at 0.93
-    # while it rings. But `timer_ringing`'s on_turn_on sets REPEAT_ONE plus a
-    # 1 s playlist delay directly on `speaker_media_player`, and stopping only
-    # the CURRENT announcement (below) leaves that repeat mode armed - the
-    # wake beep that plays next inherits it and loops forever instead of
-    # playing once. `switch.turn_off: timer_ringing` is the existing, already
-    # -correct cleanup (REPEAT_OFF + stop): reuse it rather than duplicate it
-    # here half right.
+    # "Stop" stops and goes no further: no beep, no new conversation. Everything
+    # after this block is the normal wake word path, which "Stop" must not
+    # reach - ESPHome has no early return, so the normal path is the `else:`.
     - if:
         condition:
-          switch.is_on: timer_ringing
+          lambda: return wake_word == "Stop";
         then:
-          - switch.turn_off: timer_ringing
-    - if:
-        condition:
-          voice_assistant.is_running:
-        then:
-          # EXTERNAL SPEAKER, added 2026-07-31. `voice_assistant.stop:` below
-          # only reaches the box's OWN media player - in "External player"/
-          # "Both" mode the audible reply is a separate `media_player.play_media`
-          # call to Home Assistant (see on_tts_end), untouched by the box's own
-          # state machine. Without this, barge-in would silently stop nothing
-          # the room could actually hear. Fired before the local stop, same
-          # reasoning as on_tts_end's "cancel goes first": it is a network
-          # round trip, so give it the head start.
+          - script.execute: stop_word_heard
+        else:
+          # Full duplex, so the wake word no longer has to let go of the bus before
+          # the beep plays - this just plays it and waits it out for pacing (the
+          # `wait_until` keeps a longer replacement sound working correctly).
+          #
+          # BARGE-IN, added 2026-07-31. `voice_assistant.start:` below is
+          # `request_start()`, which is a stock-ESPHome no-op unless the component
+          # is already IDLE (confirmed against the compiled source) - so a wake
+          # word heard mid-reply used to do nothing at all, even though mww kept
+          # hearing it fine through the AEC (Michal confirmed: "alexa nie przerywa
+          # tekstu"). Stopping first forces the running response to end (media
+          # player STOP + a stop signal to HA) so the start below actually lands on
+          # an IDLE state instead of being silently dropped.
+          #
+          # RISK, carried over from 2026-07-22: interrupting local playback
+          # mid-flight (`speaker.mute_on`, back then) once hung the NEXT pipeline in
+          # "listening" for reasons never root-caused. This is a different
+          # mechanism (`voice_assistant.stop:`, not muting the codec) but the same
+          # category of "interrupt audio while it is live" - watch for the same
+          # symptom before trusting this broadly.
+          #
+          # TIMER ALARM, added 2026-07-31 after it broke on hardware. `timer_ringing`
+          # never touches `voice_assistant` state at all, so mww keeps running
+          # through it untouched - Michal confirmed "Alexa" gets heard fine at 0.93
+          # while it rings. But `timer_ringing`'s on_turn_on sets REPEAT_ONE plus a
+          # 1 s playlist delay directly on `speaker_media_player`, and stopping only
+          # the CURRENT announcement (below) leaves that repeat mode armed - the
+          # wake beep that plays next inherits it and loops forever instead of
+          # playing once. `switch.turn_off: timer_ringing` is the existing, already
+          # -correct cleanup (REPEAT_OFF + stop): reuse it rather than duplicate it
+          # here half right.
           - if:
               condition:
-                lambda: return id(tts_output).current_option() != "This device";
+                switch.is_on: timer_ringing
               then:
-                - homeassistant.service:
-                    service: media_player.media_stop
-                    data:
-                      entity_id: ${external_media_player_id}
-          - voice_assistant.stop:
-          - wait_until:
+                - switch.turn_off: timer_ringing
+          - if:
               condition:
-                not:
-                  voice_assistant.is_running:
-              timeout: 2s
-    - if:
-        condition:
-          switch.is_on: wake_sound_enabled
-        then:
-          - lambda: id(wake_sound_active) = true;
-          - media_player.speaker.play_on_device_media_file:
-              media_file: wake_sound
-              announcement: true
-          - wait_until:
+                voice_assistant.is_running:
+              then:
+                # EXTERNAL SPEAKER, added 2026-07-31. `voice_assistant.stop:` below
+                # only reaches the box's OWN media player - in "External player"/
+                # "Both" mode the audible reply is a separate `media_player.play_media`
+                # call to Home Assistant (see on_tts_end), untouched by the box's own
+                # state machine. Without this, barge-in would silently stop nothing
+                # the room could actually hear. Fired before the local stop, same
+                # reasoning as on_tts_end's "cancel goes first": it is a network
+                # round trip, so give it the head start.
+                - if:
+                    condition:
+                      lambda: return id(tts_output).current_option() != "This device";
+                    then:
+                      - homeassistant.service:
+                          service: media_player.media_stop
+                          data:
+                            entity_id: ${external_media_player_id}
+                - voice_assistant.stop:
+                - wait_until:
+                    condition:
+                      not:
+                        voice_assistant.is_running:
+                    timeout: 2s
+          - if:
               condition:
-                media_player.is_announcing:
-              timeout: 300ms
-          - wait_until:
-              condition:
-                not:
-                  media_player.is_announcing:
-              timeout: 3s
-          - lambda: id(wake_sound_active) = false;
-    - voice_assistant.start:
-        wake_word: !lambda return wake_word;
+                switch.is_on: wake_sound_enabled
+              then:
+                - lambda: id(wake_sound_active) = true;
+                - media_player.speaker.play_on_device_media_file:
+                    media_file: wake_sound
+                    announcement: true
+                - wait_until:
+                    condition:
+                      media_player.is_announcing:
+                    timeout: 300ms
+                - wait_until:
+                    condition:
+                      not:
+                        media_player.is_announcing:
+                    timeout: 3s
+                - lambda: id(wake_sound_active) = false;
+          - voice_assistant.start:
+              wake_word: !lambda return wake_word;
 
 voice_assistant:
   id: va
@@ -2362,6 +2402,99 @@ script:
           then:
             - micro_wake_word.stop:
 
+  # STOP WORD: what "Stop" does. Everything it can stop, in the order that
+  # matters: the alarm first (it is the loudest and the most likely reason to
+  # say it), then a reply, then plain playback. Each step is guarded, so one
+  # "Stop" while two things are going stops both.
+  - id: stop_word_heard
+    mode: single
+    then:
+      - logger.log:
+          level: INFO
+          format: "Stop word heard"
+      - if:
+          condition:
+            switch.is_on: timer_ringing
+          then:
+            - switch.turn_off: timer_ringing
+      - if:
+          condition:
+            lambda: return id(tts_reply_active);
+          then:
+            # Same reasoning as barge-in: the external speaker is a separate
+            # play_media call the box's own state machine never sees, and the
+            # network round trip goes first so it gets the head start.
+            - if:
+                condition:
+                  lambda: return id(tts_output).current_option() != "This device";
+                then:
+                  - homeassistant.service:
+                      service: media_player.media_stop
+                      data:
+                        entity_id: ${external_media_player_id}
+            # on_end may already be past the pipeline and only HOLDING the
+            # replying phase for the external speaker, against these deadlines.
+            # Expiring them now ends that hold (and the 45 s cancel loop) on its
+            # next check, instead of the face talking on over a silent room.
+            - lambda: |-
+                id(hold_deadline) = millis();
+                id(cancel_deadline) = millis();
+      - if:
+          condition:
+            voice_assistant.is_running:
+          then:
+            - voice_assistant.stop:
+            - wait_until:
+                condition:
+                  not:
+                    voice_assistant.is_running:
+                timeout: 2s
+      - if:
+          condition:
+            media_player.is_announcing:
+          then:
+            - media_player.stop:
+                announcement: true
+      - if:
+          condition:
+            media_player.is_playing:
+          then:
+            - media_player.stop:
+      # BRING THE WAKE WORD BACK. micro_wake_word stops itself after ANY
+      # detection (`stop_after_detection` defaults to true), "Stop" included.
+      # After an "Alexa" a new pipeline follows and restarts it, but nothing
+      # follows a "Stop" - silencing an alarm ends no pipeline, so on_end never
+      # runs, and the box would stay deaf until the 40 s watchdog. And it has to
+      # WAIT for the stop to land first: start() while the component is still
+      # stopping is rejected as "already running" and simply dropped.
+      - wait_until:
+          condition:
+            not:
+              micro_wake_word.is_running:
+          timeout: 1s
+      - script.execute: start_wake_word
+      - script.execute: stop_word_sync
+
+  # STOP WORD: whether the model should be listening, applied only on a change.
+  # Run from a short interval (see INTERVAL) rather than hung off every trigger
+  # that starts or ends something: there are half a dozen of those, and missing
+  # one would leave the model on - running per frame for nothing - or off when
+  # it was wanted. The state test is a handful of comparisons.
+  - id: stop_word_sync
+    then:
+      - lambda: |-
+          const auto st = id(speaker_media_player)->state;
+          const bool playing = (st == media_player::MEDIA_PLAYER_STATE_PLAYING ||
+                                st == media_player::MEDIA_PLAYER_STATE_ANNOUNCING) &&
+                               !id(wake_sound_active) && !id(hello_active);
+          const bool want = id(stop_word_enabled).state &&
+                            id(wake_word_engine_location).current_option() == "On device" &&
+                            (id(timer_ringing).state || id(tts_reply_active) || playing);
+          if (want == id(mww_stop)->is_enabled()) return;
+          if (want) id(mww_stop)->enable();
+          else id(mww_stop)->disable();
+          ESP_LOGD("stop_word", "%s", want ? "Listening for \"Stop\"" : "Not listening for \"Stop\"");
+
   - id: set_idle_or_mute_phase
     then:
       # Resting phase is always idle now. Mute no longer has a screen of its own
@@ -2412,6 +2545,13 @@ script:
 # continuously, and getting it wrong would restart the stream every 40 seconds
 # forever. Left deliberately uncovered rather than covered by guesswork.
 interval:
+  # STOP WORD on and off. A quarter of a second is well inside the time it takes
+  # to say "stop" after an alarm starts, and the script only touches the model
+  # when the answer changes.
+  - interval: 250ms
+    then:
+      - script.execute: stop_word_sync
+
   # THE THIRD WAY BACK. An External reply cuts the amplifier; `on_end` restores it
   # and the timer alarm restores it, both unconditionally. This covers the case
   # where `on_end` never arrives at all - a reboot mid-reply, or a handler that
@@ -2782,6 +2922,16 @@ switch:
     id: wake_sound_enabled
     name: Wake sound
     icon: "mdi:bell-ring"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+
+  # "Stop" on its own silences an alarm or a reply (see STOP WORD). On by
+  # default; the off switch is here for a room where something keeps saying it.
+  - platform: template
+    id: stop_word_enabled
+    name: Stop word
+    icon: "mdi:hand-back-left"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
     entity_category: config

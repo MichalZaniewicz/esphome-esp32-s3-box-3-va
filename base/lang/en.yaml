@@ -66,3 +66,11 @@ substitutions:
   shopping_title: "Shopping list"
   shopping_empty: "Nothing to buy"
   shopping_more: "more"
+  # --- Calendar screen (base/screens/calendar.yaml) -------------------------
+  # Headings read "Today  Tuesday 17 November", then the weekday; the names
+  # come from weekday_names / month_names above.
+  calendar_title: "Calendar"
+  calendar_empty: "Nothing planned"
+  calendar_today: "Today"
+  calendar_tomorrow: "Tomorrow"
+  calendar_more: "more"

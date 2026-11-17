@@ -77,3 +77,11 @@ substitutions:
   shopping_title: "Lista zakupów"
   shopping_empty: "Nic do kupienia"
   shopping_more: "więcej"
+  # --- Ekran kalendarza (base/screens/calendar.yaml) ------------------------
+  # Nagłówki dni: "Dziś  wtorek 17 listopada", potem "Czwartek  19 listopada";
+  # nazwy dni i miesięcy (w dopełniaczu) biorą się z weekday_names / month_names.
+  calendar_title: "Kalendarz"
+  calendar_empty: "Nic w planach"
+  calendar_today: "Dziś"
+  calendar_tomorrow: "Jutro"
+  calendar_more: "więcej"

@@ -20,12 +20,12 @@ which silently removes any <img> placed inside it. -->
 
 [![Star this repo](https://img.shields.io/github/stars/MichalZaniewicz/esphome-esp32-s3-box-3-va?style=for-the-badge&logo=github&label=STAR%20THIS%20REPO&labelColor=555555&color=ffc107)](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va) [![Buy me a coffee](https://img.shields.io/badge/BUY%20ME%20A%20COFFEE-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/zanula)
 
-> **Status: v1.1.2, running on an ESP32-S3-BOX-3.** Wake word, the full Assist
-> pipeline, full duplex audio with barge-in, voice timers with their alarm, the
-> touchscreen, the animated character, the home, settings, media, weather,
-> thermostat and shopping list screens, notifications, night mode and the hello
-> screen are all confirmed on device, built with ESPHome 2026.9.1 (2026.10.0
-> builds and runs too, since v1.1.2). The
+> **Status: v1.2.0, running on an ESP32-S3-BOX-3.** Wake word, the "Stop"
+> word, the full Assist pipeline, full duplex audio with barge-in, voice timers
+> with their alarm, the touchscreen, the animated character, the home,
+> settings, media, weather, thermostat, shopping list and calendar screens,
+> notifications, night mode and the hello screen are all confirmed on device,
+> built with ESPHome 2026.10.2 (2026.9.1 builds too). The
 > shipped thin config - core plus one character - measures **flash 27.0%, RAM
 > 41.3%**, up from 25.3%/39.9% before the full-duplex migration; the
 > four-characters-plus-every-optional-screen figure predates that migration
@@ -55,7 +55,9 @@ https://github.com/user-attachments/assets/cfbc72c6-e62a-435a-8931-277a9ca3090a
   of the bus for the speaker to use it. Practical effect: say the wake word
   again while a reply is still playing and it cuts the reply short and starts
   listening, on the box's own speaker or an external one; a ringing timer can
-  be silenced the same way, not just by touch.
+  be silenced the same way, not just by touch. Or just say **"Stop"**, no wake
+  word first: it silences the alarm or cuts the reply short and goes back to
+  waiting.
 - **LVGL UI**: a page per assistant phase, claimed by whichever screen package
   you install. With none, the core shows plain text status screens; that is the
   floor, not the intended look.
@@ -77,6 +79,10 @@ https://github.com/user-attachments/assets/cfbc72c6-e62a-435a-8931-277a9ca3090a
 - **Timers**: set by voice, with a countdown and a progress strip on LVGL's top
   layer that stays visible across page changes (green while running, blue while
   paused).
+- **Swipeable screens for the house**: media, weather, thermostat, the shopping
+  list and **the calendar** - the next few days from your Home Assistant
+  calendars, merged into one list - each an optional package, one swipe apart.
+  [Screens](#screens) below.
 - **TTS routing you choose at runtime**: the reply can come out of the box, out
   of a Home Assistant media player elsewhere in the house, or both. Details:
   [TTS routing](https://github.com/MichalZaniewicz/esphome-esp32-s3-box-3-va/wiki/TTS-routing).
@@ -292,6 +298,7 @@ base/
     weather.yaml           # carousel: now and the week
     climate.yaml           # carousel: the thermostat
     shopping.yaml          # carousel: the shopping list (generated, scripts/gen_shopping.py)
+    calendar.yaml          # carousel: the next few days of calendars (generated, scripts/gen_calendar.py)
     notify.yaml            # full-screen notifications from Home Assistant
     show-screen.yaml       # "Show ... screen" buttons for voice
     canvas.yaml            # Home Assistant draws on the screen
@@ -331,6 +338,8 @@ scripts/
   gen_canvas_example.py    # redraws base/assets/canvas-example.png from a canvas.yaml spec
   gen_notify_shopping.py   # redraws base/assets/notify.png and shopping.png
   gen_shopping.py          # writes base/screens/shopping.yaml (its 20-row pool)
+  gen_calendar.py          # writes base/screens/calendar.yaml (its 18-slot pool)
+  gen_calendar_png.py      # redraws base/assets/calendar.png
   esplog.py                # stream device logs over the native API
   flash.py                 # compile + OTA, but refuses to upload if the SSID
                            #   compiled into main.cpp looks like a placeholder
@@ -364,6 +373,14 @@ on the wiki.
 Three wake words are compiled in - **alexa**, **okay nabu** and **hey jarvis** -
 and Home Assistant picks between them, one at a time.
 
+A fourth model, **Stop**, is not a wake word and is not in that picker. It runs
+only while there is something to stop - a ringing timer, a reply on the box or
+the external speaker, anything the box itself is playing - and saying "Stop"
+then stops it, with no wake word first and no new conversation after. The model
+and the arrangement are the ones Home Assistant Voice PE uses. It needs the
+wake word engine **On device**, and the **Stop word** switch on the device page
+turns it off if something in the room keeps saying it.
+
 ## Screens
 
 The core ships one page per assistant phase. Extra screens are optional packages
@@ -382,6 +399,7 @@ the line to leave it out. ESPHome merges each package's `lvgl:` block into one U
 | `show-screen.yaml` | Four Home Assistant buttons - **"Show home/weather/thermostat/media screen"** - that jump the display to whichever one is pressed, meant for Assist ("Alexa, pokaż pogodę"). Needs `home.yaml`, `weather.yaml`, `climate.yaml` and `media.yaml` all installed, since it has to name each one's page directly. See [Voice control](#voice-control) below. |
 | `canvas.yaml` | Lets Assist **draw whatever it wants on the screen** - "Alexa, draw a sun" - rectangles, circles, text and Material Design icons, on a blank page it switches to on its own. Only reachable from Home Assistant: never a swipe, never a button on the Box. Needs nothing else. See [Voice control](#voice-control) below. |
 | `shopping.yaml` | A Home Assistant **to-do list as a carousel screen**: a header bar with a cart and a count, and a rounded card of what is still to buy, one row per item with a small accent dot and a hairline, scrolling with a finger past five rows (a thin accent scrollbar and a "more below" chevron say so). Up to 20 rows, then "+N more". Adding and ticking off stay with Assist ("add milk to the shopping list" already works); the box asks for the items itself with `todo.get_items`, so nothing needs setting up in HA beyond the list. A "Show shopping list" button lets Assist bring it up by voice. Set `shopping_entity`. |
+| `calendar.yaml` | **The next few days from your Home Assistant calendars** as a carousel screen, in the shopping list's look: a heading per day ("Today", "Tomorrow", then the weekday, with the date), each event with its start time, all-day events with a dot, the time in the accent colour while an event is on. Several calendars merge into one list in time order, and an event that appears in two of them shows once. Today plus three more days by default (`calendar_days`), finished events drop off, up to 18 rows then "+N more". The box asks for the events itself with `calendar.get_events` when the screen comes into view and every five minutes while it stays there, so nothing needs setting up in HA. A "Show calendar" button lets Assist bring it up by voice. Set `calendar_entities`. |
 | `notify.yaml` | **Notifications from Home Assistant, full screen**: a big icon in the accent colour, a large title, the details under it and a countdown bar along the bottom, on LVGL's top layer so the screen underneath never changes. One action, `esphome.<device>_show_notification`, with `title`, `message`, `icon` (22 household names: washer, door, timer, package...) and `seconds` (0 = the `Notification time` slider in HA, -1 = until tapped); a tap anywhere dismisses it, and `hide_notification` clears it from an automation. Silent on purpose: sound stays with Home Assistant's own announce. Wakes a night-dimmed screen while it shows. Needs nothing else. |
 
 The **settings screen** is **one swipe down** from home - the device's own switches
@@ -419,6 +437,13 @@ items stays with Assist; the screen keeps itself up to date. How to set it up:
 [Shopping list](#shopping-list) below.
 
 <p align="center"><img src="base/assets/shopping.png" width="300" alt="Shopping list screen"></p>
+
+The **calendar screen** looks the same way at the days ahead: today and the next
+three, each under its own heading, from as many Home Assistant calendars as you
+name. What is on right now has its time lit up; what is over is gone. How to set
+it up: [Calendar](#calendar) below.
+
+<p align="center"><img src="base/assets/calendar.png" width="300" alt="Calendar screen"></p>
 
 **Notifications** are not a screen you swipe to: Home Assistant puts them over
 whatever is showing, full screen, with an icon, a title, a line of detail and a
@@ -591,9 +616,10 @@ Expose **Show home screen**, **Show weather screen**, **Show thermostat
 screen** and **Show media screen** to your Assist pipeline's conversation
 agent and "Alexa, pokaż pogodę" jumps the display straight there.
 
-`shopping.yaml` brings its own **Show shopping list** button, so it needs
-neither this file nor the other three screens: expose it the same way and
-"Alexa, show the shopping list" works too.
+`shopping.yaml` brings its own **Show shopping list** button, and
+`calendar.yaml` its own **Show calendar**, so neither needs this file nor the
+other screens: expose them the same way and "Alexa, show the shopping list" or
+"Alexa, show the calendar" works too.
 
 **Four buttons, not one select.** An earlier version was a single "Show
 screen" select with four options - simpler to expose, but Home Assistant's
@@ -716,7 +742,8 @@ You control a kitchen display. You can switch what it shows and draw on it.
 
 SWITCHING SCREENS: press one of the buttons - "Show home screen",
 "Show weather screen", "Show thermostat screen", "Show media screen",
-"Show shopping list". Each one only ever does the one thing its name says.
+"Show shopping list", "Show calendar". Each one only ever does the one thing
+its name says.
 To add something to the shopping list, use the shopping list itself, not a
 button; the display updates on its own.
 
@@ -823,6 +850,36 @@ the box asks Home Assistant for the items itself. It refreshes whenever the list
 changes and every time the screen comes into view. "Alexa, add milk to the
 shopping list" already works through Assist; to bring the screen up by voice,
 expose the **Show shopping list** button (see
+[Switch screens by voice](#switch-screens-by-voice)).
+
+## Calendar
+
+Add `base/screens/calendar.yaml` after `home.yaml` and name one calendar or
+several, comma separated:
+
+```yaml
+substitutions:
+  calendar_entities: calendar.family, calendar.personal
+  # calendar_days: '4'             # today and the next three
+  # calendar_time_format: "%H:%M"  # a strftime format; the column fits "23:59"
+```
+
+Nothing else to set up beyond **"Allow the device to perform Home Assistant
+actions"** on the device page, the same switch the shopping list needs: the box
+asks Home Assistant for the events itself, whenever the screen comes into view
+and every five minutes while it stays there.
+
+Several calendars are merged into one list in time order. When one calendar is
+copied into another (a shared family calendar inside a personal one), an event
+with the same title at the same time is shown once. Times are shown in the
+box's own time zone, whatever offset a calendar reports them in.
+
+**Pick calendars with a handful of events a day.** Home Assistant sends every
+event's full description along with it, and there is no way to ask for less. A
+school timetable or an announcements feed is a lot of text for the box to read
+and nothing it would show.
+
+To bring the screen up by voice, expose the **Show calendar** button (see
 [Switch screens by voice](#switch-screens-by-voice)).
 
 ## Night mode

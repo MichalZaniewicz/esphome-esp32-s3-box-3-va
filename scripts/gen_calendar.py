@@ -1,0 +1,641 @@
+"""Writes repo/base/screens/calendar.yaml. The row pool is repetitive, so it is generated."""
+import os
+
+N = 18          # row slots: day headers and events together
+HEAD_H = 30     # a day header row
+ROW_H = 36      # an event row
+TIME_W = 54     # the time column
+TEXT_X = 70     # where an event's title starts, right of the time column
+
+slots = []
+# Written out in full rather than as YAML anchor copies: ESPHome warns on every
+# `<<` merge that overrides a key, and each slot overrides id and y.
+for i in range(N):
+    slots.append(f"""              - label:
+                  id: cal_time_{i}
+                  hidden: true
+                  x: 12
+                  y: 0
+                  width: {TIME_W}
+                  height: {ROW_H}
+                  pad_top: 9
+                  long_mode: DOT
+                  recolor: true
+                  text: ""
+                  text_font: font_body
+                  text_color: ${{calendar_muted_color}}
+                  gesture_bubble: true
+              - label:
+                  id: cal_text_{i}
+                  hidden: true
+                  x: {TEXT_X}
+                  y: 0
+                  width: {320 - TEXT_X - 12}
+                  height: {ROW_H}
+                  pad_top: 7
+                  long_mode: DOT
+                  recolor: true
+                  text: ""
+                  text_font: font_calendar
+                  text_color: ${{calendar_item_color}}
+                  border_side: BOTTOM
+                  border_width: 1
+                  border_color: ${{calendar_line_color}}
+                  gesture_bubble: true""")
+slots_yaml = "\n".join(slots)
+time_ids = ", ".join(f"id(cal_time_{i})" for i in range(N))
+text_ids = ", ".join(f"id(cal_text_{i})" for i in range(N))
+
+# The fetch handler. Kept out of the f-string below so its C++ braces stay
+# readable; @@NAME@@ markers are filled in by replace().
+FETCH_LAMBDA = r'''
+                lv_obj_t *times[@@N@@] = {@@TIME_IDS@@};
+                lv_obj_t *texts[@@N@@] = {@@TEXT_IDS@@};
+                // One key per slot: kind, y, time and text. A slot whose key is
+                // unchanged is not touched at all.
+                auto &drawn = id(calendar_drawn);
+                if (drawn.size() != @@N@@ + 1) drawn.assign(@@N@@ + 1, std::string("\x01"));
+
+                const ESPTime now = id(ha_time).now();
+                if (!now.is_valid()) return;
+                const int days = ${calendar_days};
+
+                // Days since 1970-01-01 for a civil date (Howard Hinnant's
+                // days_from_civil) and back. Pure arithmetic, no time zone.
+                auto civil = [](int y, int m, int d) -> int32_t {
+                  y -= m <= 2;
+                  const int era = (y >= 0 ? y : y - 399) / 400;
+                  const unsigned yoe = (unsigned) (y - era * 400);
+                  const unsigned doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+                  const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+                  return era * 146097 + (int32_t) doe - 719468;
+                };
+                auto from_civil = [](int32_t z, int &y, int &m, int &d) {
+                  z += 719468;
+                  const int era = (z >= 0 ? z : z - 146096) / 146097;
+                  const unsigned doe = (unsigned) (z - era * 146097);
+                  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+                  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+                  const unsigned mp = (5 * doy + 2) / 153;
+                  d = (int) (doy - (153 * mp + 2) / 5 + 1);
+                  m = (int) (mp < 10 ? mp + 3 : mp - 9);
+                  y = (int) yoe + era * 400 + (m <= 2);
+                };
+                const int32_t today = civil(now.year, now.month, now.day_of_month);
+
+                // Home Assistant sends a date ("2026-11-19") for an all-day
+                // event and an ISO datetime otherwise, usually with an offset
+                // ("2026-11-17T15:00:00+01:00"), sometimes in UTC ("...Z" or
+                // "+00:00", as Sonarr does), occasionally without one. Every
+                // datetime is turned into a UTC epoch, and only then into local
+                // time - comparing the strings would put a UTC event an hour off.
+                auto parse = [&](const char *s, bool &is_date, time_t &epoch, int32_t &cday) -> bool {
+                  int Y, M, D, h = 0, mi = 0, se = 0;
+                  if (sscanf(s, "%4d-%2d-%2d", &Y, &M, &D) != 3) return false;
+                  cday = civil(Y, M, D);
+                  if (strlen(s) <= 10) { is_date = true; return true; }
+                  is_date = false;
+                  if (sscanf(s + 11, "%2d:%2d:%2d", &h, &mi, &se) < 2) return false;
+                  const char *p = s + 16;
+                  if (*p == ':') p += 3;
+                  if (*p == '.') { p++; while (*p >= '0' && *p <= '9') p++; }
+                  if (*p == 'Z' || *p == '+' || *p == '-') {
+                    int off = 0;
+                    if (*p != 'Z') {
+                      int oh = 0, om = 0;
+                      sscanf(p + 1, "%2d:%2d", &oh, &om);
+                      off = (oh * 60 + om) * 60;
+                      if (*p == '-') off = -off;
+                    }
+                    epoch = (time_t) cday * 86400 + h * 3600 + mi * 60 + se - off;
+                  } else {
+                    ESPTime t{};
+                    t.year = Y; t.month = M; t.day_of_month = D;
+                    t.hour = h; t.minute = mi; t.second = se;
+                    t.recalc_timestamp_local();
+                    epoch = t.timestamp;
+                  }
+                  return true;
+                };
+
+                struct Ev { int day; bool all; bool live; time_t start; int32_t cstart; std::string when, title; };
+                std::vector<Ev> evs;
+                int n_cals = 0, n_raw = 0;
+                // Home Assistant wraps every action response as {"response": ...},
+                // and the device hands that wrapper over as-is. Inside it, one key
+                // per calendar asked for.
+                for (JsonPairConst cal : response["response"].as<JsonObjectConst>()) {
+                  n_cals++;
+                  n_raw += cal.value()["events"].as<JsonArrayConst>().size();
+                  for (JsonObjectConst e : cal.value()["events"].as<JsonArrayConst>()) {
+                    bool sd = false, ed = false;
+                    time_t se = 0, ee = 0;
+                    int32_t sc = 0, ec = 0;
+                    if (!parse(e["start"] | "", sd, se, sc) || !parse(e["end"] | "", ed, ee, ec)) continue;
+                    Ev v;
+                    v.all = sd;
+                    v.live = false;
+                    v.start = 0;
+                    v.cstart = sc;
+                    if (sd) {
+                      // All-day: the end date is exclusive. Shown once, on the
+                      // first day of the window it touches.
+                      if (ec <= today || sc >= today + days) continue;
+                      v.day = sc > today ? (int) (sc - today) : 0;
+                    } else {
+                      if (ee <= now.timestamp) continue;     // already over
+                      ESPTime ls = ESPTime::from_epoch_local(se);
+                      const int32_t d = civil(ls.year, ls.month, ls.day_of_month) - today;
+                      if (d >= days) continue;
+                      v.day = d < 0 ? 0 : (int) d;
+                      v.live = se <= now.timestamp;
+                      v.start = se;
+                      char buf[24];
+                      if (d < 0) {
+                        // Began before today and still running: when it ends
+                        // says more than a start time from yesterday.
+                        ESPTime le = ESPTime::from_epoch_local(ee);
+                        le.strftime(buf, sizeof(buf), "${calendar_time_format}");
+                        v.when = std::string("-") + buf;
+                      } else {
+                        ls.strftime(buf, sizeof(buf), "${calendar_time_format}");
+                        v.when = buf;
+                      }
+                    }
+                    v.title = e["summary"] | "";
+                    // Newlines (school calendars have them) and '#', which would
+                    // start or end a recolor run mid-title.
+                    for (char &ch : v.title) if (ch == '\n' || ch == '\r' || ch == '\t' || ch == '#') ch = ' ';
+                    evs.push_back(std::move(v));
+                  }
+                }
+
+                // Day, then all-day before timed, then by time. Calendars are
+                // merged here, so this is where two of them interleave.
+                std::sort(evs.begin(), evs.end(), [](const Ev &a, const Ev &b) {
+                  if (a.day != b.day) return a.day < b.day;
+                  if (a.all != b.all) return a.all;
+                  if (a.start != b.start) return a.start < b.start;
+                  return a.title < b.title;
+                });
+                // The same event in two calendars (a shared one copied into a
+                // family one) is one event: same day, same start, same title.
+                std::vector<Ev> uniq;
+                for (auto &v : evs) {
+                  if (!uniq.empty()) {
+                    const Ev &u = uniq.back();
+                    if (u.day == v.day && u.all == v.all && u.start == v.start && u.title == v.title) continue;
+                  }
+                  uniq.push_back(std::move(v));
+                }
+                // One line per fetch, so "the screen is empty" can be told apart
+                // from "Home Assistant sent nothing" without a debugger.
+                ESP_LOGD("calendar", "%d calendar(s), %d event(s) received, %d shown after dedupe",
+                         n_cals, n_raw, (int) uniq.size());
+
+                static const char *const WEEKDAYS[] = {${weekday_names}};
+                static const char *const MONTHS[] = {${month_names}};
+                const std::string accent = std::string("#") + std::string("${calendar_accent_color}").substr(2) + " ";
+                const std::string allday = std::string("#") + std::string("${calendar_allday_color}").substr(2) +
+                                           " \U000F09DE#  ";
+                // Capital first letter, so a weekday heads its day the way
+                // "Today" does. Polish weekdays are lowercase and one of them
+                // starts with a two-byte letter (sroda), so ASCII toupper alone
+                // is not enough; Latin Extended-A pairs upper/lower as even/odd.
+                auto capital = [](std::string s) {
+                  if (s.empty()) return s;
+                  const unsigned char c0 = s[0];
+                  if (c0 >= 'a' && c0 <= 'z') s[0] = (char) (c0 - 32);
+                  else if ((c0 == 0xC4 || c0 == 0xC5) && s.size() > 1 && ((unsigned char) s[1] & 1)) s[1] = (char) (s[1] - 1);
+                  else if (c0 == 0xC3 && s.size() > 1 && (unsigned char) s[1] >= 0xA0 && (unsigned char) s[1] <= 0xBE) s[1] = (char) (s[1] - 32);
+                  return s;
+                };
+
+                // kind: 0 day header, 1 timed event, 2 all-day, 3 "+N more"
+                struct Row { int kind; std::string time, text; };
+                std::vector<Row> rows;
+                int last_day = -1;
+                for (const auto &v : uniq) {
+                  if (v.day != last_day) {
+                    last_day = v.day;
+                    int y, m, d;
+                    from_civil(today + v.day, y, m, d);
+                    const int dow = (now.day_of_week - 1 + v.day) % 7;   // 0 = Sunday
+                    std::string label, rest;
+                    if (v.day == 0) label = "${calendar_today}";
+                    else if (v.day == 1) label = "${calendar_tomorrow}";
+                    else label = capital(WEEKDAYS[dow]);
+                    if (v.day <= 1) rest = std::string(WEEKDAYS[dow]) + " ";
+                    rest += std::to_string(d) + " " + MONTHS[m - 1];
+                    rows.push_back({0, accent + label + "#  " + rest, ""});
+                  }
+                  if (v.all) rows.push_back({2, "", allday + v.title});
+                  else rows.push_back({1, v.live ? accent + v.when + "#" : v.when, v.title});
+                }
+                const int total = uniq.size();
+                if ((int) rows.size() > @@N@@) {
+                  // Keep what fits, and never end on a header with nothing under it.
+                  rows.resize(@@N@@ - 1);
+                  if (rows.back().kind == 0) rows.pop_back();
+                  int shown = 0;
+                  for (const auto &r : rows) if (r.kind != 0) shown++;
+                  rows.push_back({3, "", std::string("#") + std::string("${calendar_muted_color}").substr(2) + " +" +
+                                         std::to_string(total - shown) + " ${calendar_more}#"});
+                }
+
+                int y = 0;
+                for (int i = 0; i < @@N@@; i++) {
+                  const Row *r = i < (int) rows.size() ? &rows[i] : nullptr;
+                  const int h = r && r->kind == 0 ? @@HEAD_H@@ : @@ROW_H@@;
+                  std::string key;
+                  if (r) key = std::to_string(r->kind) + "|" + std::to_string(y) + "|" + r->time + "|" + r->text;
+                  if (key != drawn[i]) {
+                    drawn[i] = key;
+                    lv_obj_t *tm = times[i], *tx = texts[i];
+                    if (!r) {
+                      lv_obj_add_flag(tm, LV_OBJ_FLAG_HIDDEN);
+                      lv_obj_add_flag(tx, LV_OBJ_FLAG_HIDDEN);
+                    } else if (r->kind == 0) {
+                      // A day header borrows the time label, widened to the row.
+                      lv_obj_set_pos(tm, 12, y);
+                      lv_obj_set_size(tm, 296, h);
+                      lv_obj_set_style_pad_top(tm, 10, 0);
+                      lv_label_set_text(tm, r->time.c_str());
+                      lv_obj_remove_flag(tm, LV_OBJ_FLAG_HIDDEN);
+                      lv_obj_add_flag(tx, LV_OBJ_FLAG_HIDDEN);
+                    } else {
+                      if (r->kind == 1) {
+                        lv_obj_set_pos(tm, 12, y);
+                        lv_obj_set_size(tm, @@TIME_W@@, h);
+                        lv_obj_set_style_pad_top(tm, 9, 0);
+                        lv_label_set_text(tm, r->time.c_str());
+                        lv_obj_remove_flag(tm, LV_OBJ_FLAG_HIDDEN);
+                        lv_obj_set_pos(tx, @@TEXT_X@@, y);
+                        lv_obj_set_width(tx, 320 - @@TEXT_X@@ - 12);
+                      } else {
+                        // All-day and "+N more" run the full width, no time.
+                        lv_obj_add_flag(tm, LV_OBJ_FLAG_HIDDEN);
+                        lv_obj_set_pos(tx, 12, y);
+                        lv_obj_set_width(tx, 296);
+                      }
+                      lv_label_set_text(tx, r->text.c_str());
+                      lv_obj_remove_flag(tx, LV_OBJ_FLAG_HIDDEN);
+                    }
+                  }
+                  if (r) y += h;
+                }
+
+                const std::string count = total ? std::to_string(total) : "";
+                if (count != drawn[@@N@@]) {
+                  drawn[@@N@@] = count;
+                  lv_label_set_text(id(calendar_count_label), count.c_str());
+                  if (total) lv_obj_remove_flag(id(calendar_count_label), LV_OBJ_FLAG_HIDDEN);
+                  else lv_obj_add_flag(id(calendar_count_label), LV_OBJ_FLAG_HIDDEN);
+                }
+                if (total) lv_obj_add_flag(id(calendar_empty_box), LV_OBJ_FLAG_HIDDEN);
+                else lv_obj_remove_flag(id(calendar_empty_box), LV_OBJ_FLAG_HIDDEN);'''
+
+for k, v in {"N": N, "TIME_IDS": time_ids, "TEXT_IDS": text_ids, "HEAD_H": HEAD_H,
+             "ROW_H": ROW_H, "TIME_W": TIME_W, "TEXT_X": TEXT_X}.items():
+    FETCH_LAMBDA = FETCH_LAMBDA.replace(f"@@{k}@@", str(v))
+# Written at 16 columns above; it sits under `on_success: - lambda: |-` inside
+# an `if: then:`, which needs 22.
+FETCH_LAMBDA = "\n".join(("      " + l) if l.strip() else l for l in FETCH_LAMBDA.lstrip("\n").split("\n"))
+
+doc = f'''###############################################################################
+# Calendar: the next few days from one or more Home Assistant calendars, as a
+# carousel screen.
+#
+# Same look as the shopping list: a thin header bar (calendar icon, title, a
+# count in a pill), and under it the days, each under its own heading -
+# "Today  Tuesday 17 November", then "Tomorrow", then the weekday. A timed
+# event is a row with its start time on the left; an all-day one gets a dot in
+# place of the time. An event that is happening right now has its time in the
+# accent colour. Events that are over drop off. Past five or so rows the list
+# scrolls with a finger, and a chevron at the bottom says there is more.
+#
+#   packages:
+#     core:
+#       files:
+#         - base/core.yaml
+#         - base/screens/home.yaml
+#         - base/screens/calendar.yaml   # <- a stop on the ring
+#   substitutions:
+#     calendar_entities: calendar.family, calendar.personal
+#
+# `calendar_entities` takes one calendar or several, comma separated. Several
+# are merged into one list in time order, and the same event in two of them
+# (one calendar copied into another) is shown once. Choose calendars with a
+# handful of events a day: Home Assistant sends each event's full description
+# along with it, so a school timetable or an announcements feed is a lot of
+# text for the box to read and nothing it would show.
+#
+# NOTHING TO SET UP IN HOME ASSISTANT beyond the calendars. A calendar entity's
+# state only says whether an event is on right now; the events themselves live
+# behind the `calendar.get_events` action, so the box asks for them -
+# `homeassistant.action` with `capture_response`, which needs "Allow the device
+# to perform Home Assistant actions" on the device's page in HA, the same
+# switch the media, thermostat and shopping list screens need. It asks whenever
+# the screen comes into view and every five minutes while it stays there, which
+# is also what moves "Tomorrow" to "Today" after midnight.
+#
+# Also adds a "Show calendar" button, so Assist can bring the screen up by
+# voice - a button, not a select, for the reason given in show-screen.yaml.
+#
+# THE WINDOW is today plus `calendar_days - 1` more days, counted in local
+# midnights (default 4: today and the next three). Times are local, whatever
+# offset a calendar reports them in. `calendar_time_format` is a strftime
+# format, 24-hour by default; the time column is {TIME_W} px wide, which fits
+# "23:59" but not "11:59 PM".
+#
+# ROWS ARE A FIXED POOL of {N} slots made at compile time, each one a time
+# label and a title label. Day headers and events share the pool: a header
+# borrows the time label, widened to the row. Unused slots are hidden, and a
+# hidden child does not count towards the list's scroll height, so it scrolls
+# exactly as far as the list goes. Nothing is created or freed at run time -
+# internal RAM is what runs short on this board - and a slot is only rewritten
+# when what it shows actually changes. Past {N} rows the last one reads
+# "+N more".
+#
+# SWIPES. Horizontal swipes still step the carousel: the list scrolls
+# vertically only, so a sideways drag starts no scroll and LVGL hands it on as
+# a gesture, bubbled up to the page.
+#
+# This file is generated by scripts/gen_calendar.py (the row pool is {N}
+# copies of one block, written out in full); edit the script and re-run it
+# rather than this file.
+###############################################################################
+substitutions:
+  calendar_entities: calendar.calendar
+  calendar_days: '4'                 # today and the next three
+  calendar_time_format: "%H:%M"
+  calendar_title: "Calendar"
+  calendar_empty: "Nothing planned"
+  calendar_today: "Today"
+  calendar_tomorrow: "Tomorrow"
+  calendar_more: "more"              # the "+3 more" row past the pool
+  # The same names the home screen uses, so one language file covers both.
+  weekday_names: '"Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"'
+  month_names: '"January","February","March","April","May","June","July","August","September","October","November","December"'
+  calendar_bg_color: '0x000000'
+  calendar_bar_color: '0x161618'
+  calendar_line_color: '0x2A2A2E'
+  calendar_title_color: '0xFFFFFF'
+  calendar_muted_color: '0x8A8A8E'
+  calendar_item_color: '0xFFFFFF'
+  calendar_allday_color: '0xFFB547'
+  calendar_accent_color: ${{accent_color}}   # icon, headings, pill, "now"
+  calendar_font_size: '18'
+
+font:
+  # Event titles, with the icons the screen uses folded in: the all-day dot,
+  # the calendar in the header, the chevron.
+  - id: font_calendar
+    file:
+      type: gfonts
+      family: ${{font_family}}
+      weight: 400
+    size: ${{calendar_font_size}}
+    glyphsets:
+      - ${{font_glyphsets}}
+    extras:
+      - file:
+          type: gfonts
+          family: ${{font_family}}
+          weight: 400
+        glyphs: ${{extra_glyphs}}
+      - file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+        glyphs:
+          - "\\U000F09DE"   # circle-medium, an all-day event
+          - "\\U000F0E18"   # calendar-month-outline, in the header
+          - "\\U000F0140"   # chevron-down, "more below"
+  # The empty state's one big icon.
+  - id: font_calendar_empty
+    file: "https://github.com/Templarian/MaterialDesign-Webfont/raw/v7.4.47/fonts/materialdesignicons-webfont.ttf"
+    size: 48
+    bpp: 4
+    glyphs:
+      - "\\U000F0B66"   # calendar-blank-outline
+
+globals:
+  # What each slot and the count currently show, so an unchanged list is not
+  # redrawn. One key per slot, compared before writing.
+  - id: calendar_drawn
+    type: std::vector<std::string>
+    restore_value: false
+
+button:
+  - platform: template
+    id: show_calendar_btn
+    name: "Show calendar"
+    icon: "mdi:calendar-month"
+    on_press:
+      - lambda: |-
+          id(idle_pos) = 0;
+          id(idle_page_idx) = (int) id(page_calendar)->index;
+      - script.execute: show_phase_page
+
+interval:
+  # Keep a screen someone is looking at current: an event ending, a new one
+  # added, midnight. Not while it is out of view - coming into view fetches.
+  - interval: 5min
+    then:
+      - if:
+          condition:
+            lvgl.page.is_showing: page_calendar
+          then:
+            - script.execute: calendar_fetch
+
+script:
+  - id: calendar_fetch
+    mode: restart
+    then:
+      # Without a clock there is no "today" to count from. Home Assistant sets
+      # it within seconds of connecting, and the screen asks again on view.
+      - if:
+          condition:
+            lambda: return id(ha_time).now().is_valid();
+          then:
+            - homeassistant.action:
+                action: calendar.get_events
+                data:
+                  entity_id: ${{calendar_entities}}
+                  # From now to the local midnight that closes the window, as
+                  # H:MM:SS - Home Assistant accepts hours past 24 there. Not an
+                  # end date: a date without a zone is read on the far side as
+                  # whatever it likes, and this way there is nothing to read.
+                  duration: !lambda |-
+                    // Counted from TODAY'S midnight, not from now: now plus N
+                    // days lands on the wrong date late in the evening. The
+                    // +2 h makes a DST day (23 or 25 hours) still land on the
+                    // right date before it is snapped back to midnight.
+                    const ESPTime now = id(ha_time).now();
+                    ESPTime m = now;
+                    m.hour = 0; m.minute = 0; m.second = 0;
+                    m.recalc_timestamp_local();
+                    m = ESPTime::from_epoch_local(m.timestamp + (time_t) ${{calendar_days}} * 86400 + 7200);
+                    m.hour = 0; m.minute = 0; m.second = 0;
+                    m.recalc_timestamp_local();
+                    long s = (long) (m.timestamp - now.timestamp);
+                    if (s < 60) s = 60;
+                    char buf[24];
+                    snprintf(buf, sizeof(buf), "%ld:%02ld:%02ld", s / 3600, (s / 60) % 60, s % 60);
+                    return std::string(buf);
+                capture_response: true
+                on_success:
+                  - lambda: |-
+{FETCH_LAMBDA}
+                  - script.execute: calendar_more_hint
+                on_error:
+                  - logger.log:
+                      level: WARN
+                      format: "Calendar: calendar.get_events failed: %s"
+                      args: ['error.c_str()']
+
+  # The chevron shows while there is list left below the bottom edge. Run after
+  # a refresh and when a scroll settles - not on every scroll frame.
+  - id: calendar_more_hint
+    then:
+      - lambda: |-
+          lv_obj_t *list = id(calendar_list);
+          lv_obj_update_layout(list);
+          const bool more = lv_obj_get_scroll_bottom(list) > 4;
+          if (more == !lv_obj_has_flag(id(calendar_chevron), LV_OBJ_FLAG_HIDDEN)) return;
+          if (more) lv_obj_remove_flag(id(calendar_chevron), LV_OBJ_FLAG_HIDDEN);
+          else lv_obj_add_flag(id(calendar_chevron), LV_OBJ_FLAG_HIDDEN);
+
+lvgl:
+  pages:
+    - id: page_calendar
+      skip: false                    # a stop on the carousel
+      bg_color: ${{calendar_bg_color}}
+      scrollbar_mode: "OFF"
+      on_load:
+        - script.execute: calendar_fetch
+      on_swipe_left:
+        - script.execute: idle_swipe_left
+      on_swipe_right:
+        - script.execute: idle_swipe_right
+      widgets:
+        # Header bar: calendar, title, count pill.
+        - obj:
+            align: TOP_MID
+            width: 320
+            height: 34
+            radius: 0
+            bg_color: ${{calendar_bar_color}}
+            bg_opa: COVER
+            border_side: BOTTOM
+            border_width: 1
+            border_color: ${{calendar_line_color}}
+            pad_all: 0
+            scrollable: false
+            gesture_bubble: true
+            widgets:
+              - label:
+                  align: LEFT_MID
+                  x: 12
+                  text: "\\U000F0E18"
+                  text_font: font_calendar
+                  text_color: ${{calendar_accent_color}}
+              - label:
+                  align: LEFT_MID
+                  x: 40
+                  text: "${{calendar_title}}"
+                  text_font: font_body
+                  text_color: ${{calendar_title_color}}
+              - label:
+                  id: calendar_count_label
+                  hidden: true
+                  align: RIGHT_MID
+                  x: -10
+                  text: ""
+                  text_font: font_body
+                  text_color: ${{calendar_bg_color}}
+                  bg_color: ${{calendar_accent_color}}
+                  bg_opa: COVER
+                  radius: 10
+                  pad_left: 8
+                  pad_right: 8
+                  pad_top: 1
+                  pad_bottom: 1
+
+        # The list the slots scroll in, the full width under the bar.
+        - obj:
+            id: calendar_list
+            align: TOP_MID
+            y: 34
+            width: 320
+            height: 206
+            radius: 0
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scroll_dir: VER
+            scrollbar_mode: AUTO
+            gesture_bubble: true
+            scrollbar:
+              width: 3
+              radius: 2
+              pad_right: 3
+              pad_top: 8
+              pad_bottom: 8
+              bg_color: ${{calendar_accent_color}}
+              bg_opa: 70%
+            on_scroll_end:
+              - script.execute: calendar_more_hint
+            widgets:
+{slots_yaml}
+
+        # Empty state, centred under the bar.
+        - obj:
+            id: calendar_empty_box
+            align: TOP_MID
+            y: 34
+            width: 320
+            height: 206
+            bg_opa: TRANSP
+            border_width: 0
+            pad_all: 0
+            scrollable: false
+            clickable: false
+            gesture_bubble: true
+            widgets:
+              - label:
+                  align: CENTER
+                  y: -14
+                  text: "\\U000F0B66"
+                  text_font: font_calendar_empty
+                  text_color: ${{calendar_line_color}}
+              - label:
+                  align: CENTER
+                  y: 30
+                  text: "${{calendar_empty}}"
+                  text_font: font_body
+                  text_color: ${{calendar_muted_color}}
+
+        # "More below": a small round chip over the bottom edge.
+        - label:
+            id: calendar_chevron
+            hidden: true
+            align: BOTTOM_MID
+            y: -8
+            width: 28
+            height: 28
+            radius: 14
+            pad_top: 3
+            text_align: CENTER
+            text: "\\U000F0140"
+            text_font: font_calendar
+            text_color: ${{calendar_accent_color}}
+            bg_color: ${{calendar_bar_color}}
+            bg_opa: COVER
+            border_width: 1
+            border_color: ${{calendar_line_color}}
+            clickable: false
+'''
+# Guarded so gen_calendar_png.py can import the row metrics without rewriting
+# the package as a side effect.
+if __name__ == "__main__":
+    open(os.path.join(os.path.dirname(__file__), '..', 'base', 'screens', 'calendar.yaml'), 'w', encoding='utf-8').write(doc)
+    print('ok')
