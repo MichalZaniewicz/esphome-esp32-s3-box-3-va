@@ -25,9 +25,11 @@ which silently removes any <img> placed inside it. -->
 > with their alarm, the touchscreen, the animated character, the home,
 > settings, media, weather, thermostat, shopping list and calendar screens,
 > notifications, night mode and the hello screen are all confirmed on device,
-> built with ESPHome 2026.10.2 (2026.9.1 builds too). The
-> shipped thin config - core plus one character - measures **flash 27.0%, RAM
-> 41.3%**, up from 25.3%/39.9% before the full-duplex migration; the
+> built with ESPHome 2026.10.2 (v1.1.2 also built on 2026.9.1; v1.2.0 has
+> only been built on 2026.10.2). The
+> shipped thin config - core plus one character - measured **flash 27.0%, RAM
+> 41.3%** before v1.2.0 (the Stop word adds a little to the core and has not
+> been remeasured), up from 25.3%/39.9% before the full-duplex migration; the
 > four-characters-plus-every-optional-screen figure predates that migration
 > and has not been remeasured yet. Artwork is what costs: 150 KB per
 > character. [CHANGELOG.md](CHANGELOG.md) has the detail, including what
@@ -261,7 +263,8 @@ or smaller face rescales without touching the engine. Details:
 ## Quick start
 
 > Requires **ESPHome 2026.7.0+** - that is where `image:` became a platform component.
-> Built and run on 2026.9.1 and 2026.10.0; 2026.10 needs v1.1.2 or newer.
+> Built and run on 2026.9.1, 2026.10.0 and 2026.10.2; 2026.10 needs v1.1.2 or
+> newer. v1.2.0 itself has only been built on 2026.10.2.
 
 1. Copy `secrets.example.yaml` to `secrets.yaml` and fill in your Wi-Fi.
 2. Copy **`esp32-s3-box-3-va.yaml`** next to it and edit the `substitutions:` at
@@ -351,7 +354,7 @@ skill/
 
 Day-to-day settings are Home Assistant entities, not config edits: microphone
 mute, mic gain, wake sound, screen brightness, TTS output, wake word engine
-location, the wake word itself and the timer switch. **`Mic gain`** is the
+location, the wake word itself, the Stop word and the timer switch. **`Mic gain`** is the
 ES7210's hardware gain in dB: it sits before the split that feeds the wake word
 and the speech-to-text both, so it is the real microphone-sensitivity knob, and
 it is restored across reboots.
