@@ -440,6 +440,17 @@ esphome:
       then:
         - lambda: |-
             id(audio_stack)->set_mic_gain(powf(10.0f, id(mic_gain_number).state / 20.0f));
+        # Same trap for the two wake word knobs, found 2026-11-19: `Wake word
+        # cutoff` was set to 0.8 in HA on 11-14 and HA kept showing 0.8, but
+        # the device's own config dump read 0.70 - every reboot since had put
+        # the models back on the compiled default. Re-apply both here. The
+        # cutoff loop skips internal models (get_wake_words()), so "Stop"
+        # keeps its own threshold.
+        - lambda: |-
+            uint8_t q = (uint8_t) roundf(id(mww_cutoff).state * 255.0f);
+            for (auto *m : id(mww).get_wake_words())
+              m->set_probability_cutoff(q);
+            id(mww_mic_src)->set_gain_factor((uint8_t) id(mww_gain).state);
         # Seed the carousel position with the home screen's page index. This is
         # not restored across reboots (see the global), so the device always
         # comes back on home; within a session the swipe scripts move it.
